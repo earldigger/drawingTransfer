@@ -8,37 +8,39 @@ everything intact.
 
 **This is deliberately not the target platform.** The spec calls for a
 native iPhone/iPad/Mac app in Swift, SwiftUI, Core Image, AVFoundation, and
-Vision. This repo is a PySide6 + OpenCV/NumPy stand-in, built to let the
-actual workflow (perspective correction, nondestructive layer transforms,
-blend modes, grid, compare modes) be tried and iterated on quickly in a
-language/toolchain this session can run and test directly -- which Swift on
-this Linux environment cannot. See "Porting to Swift" below.
+Vision. This repo is a PySide6 + OpenCV/NumPy stand-in, built so the
+workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 
-## What's implemented (maps to the spec's MVP list)
+## What's implemented
 
 - Project creation with canvas width/height/units (in/cm)
-- Import image (file picker; camera capture is out of scope on desktop)
-- Four-point perspective correction with draggable handles
-- Move (drag on canvas or spinboxes), proportional or independent scale,
-  rotate, horizontal/vertical skew -- all nondestructive (stored as
-  parameters, recomputed on every render)
-- Layers: add, delete, rename, reorder, show/hide, select active
-- Layer opacity (0-100%) and blend mode (Normal, Multiply)
-- Adjustable grid overlay: rows, columns, opacity, line thickness, with
+- Image import (file picker); phone photos are rotated upright from their
+  EXIF orientation
+- Four-point perspective correction with draggable handles, either keeping
+  the photo's proportions (drawings) or stretching to fill the canvas
+  (photos of the canvas itself)
+- Imported images are fitted inside the canvas (never cropped) and open
+  with the transform box active
+- Fresco-style transform tool: 8 handles plus a rotation handle; drag
+  inside the box to move; modes **Proportional**, **Free** (independent
+  width/height), **Skew**, **Distort**; Flip Horizontal/Vertical; Fit to
+  Canvas. Content pushed past the canvas edge is hidden, not lost, and
+  shows faintly while the box is active
+- Layers: add, delete, rename (double-click), reorder, show/hide, select
+- Per-layer opacity, Normal/Multiply blend, contrast, invert
+- Grid overlay: rows, columns, opacity, thickness, RGB color picker,
   3x3 / 4x5 / 8x10 presets
-- Compare: Overlay (the normal composite), Blink (alternate two layers on
-  a timer), Split view (two layers side by side with a divider)
-- Save/open as a `.ctproj` package (folder with `project.json` +
-  `images/`, raw source photos only -- never baked/destructive) and
-  autosave on every change once a project has been saved once
+- Compare: Overlay, Blink Layer A only (rest of the stack stays on),
+  Blink A/B (alternate), Split view
+- Save/open as a `.ctproj` package; autosave (debounced) once saved
 
 ## What's intentionally skipped
 
 - Camera capture (AVFoundation) -- desktop file import only
-- Automatic rectangle detection (Vision framework) -- corners default to
-  the image's own bounds; the user positions them manually
-- Everything in the spec's "Future Features" list (auto-alignment,
-  Difference blend, Apple Pencil, measurement tools, cloud collaboration)
+- HEIC import -- export phone photos as JPEG first
+- Automatic rectangle detection (Vision framework)
+- Zoom/pan of the canvas view
+- Everything in the spec's "Future Features" list
 
 ## Running it
 
@@ -47,57 +49,65 @@ pip install -r requirements.txt
 python -m canvastransfer.main
 ```
 
+### macOS: "Could not find the Qt platform plugin 'cocoa'"
+
+If the app aborts with this message even though the plugin file exists,
+check whether the files inside `.venv` carry macOS's hidden flag
+(`ls -lO .venv/lib/python3.12/site-packages/PySide6/Qt/plugins/platforms/`
+shows `hidden`). Qt skips hidden files when it scans for plugins. Clear the
+flag with:
+
+```
+chflags -R nohidden .venv
+```
+
 ## Running the tests
 
 ```
 pytest
 ```
 
-31 tests cover the data model, the perspective/transform/blend/grid math in
-`compositing.py`, and project save/load round-tripping. The GUI itself was
-smoke-tested end-to-end under Xvfb (new project -> import -> perspective
-correct -> grid -> second layer -> Multiply blend -> drag-to-move -> reorder
--> Split/Blink compare -> save -> reload into a second window) with
-screenshots verified at each step.
+The suite covers the transform geometry, image operations, compare-mode
+rules, project save/load, and -- rendered offscreen through the real Qt
+scene -- blend-mode pixel values, layer placement, split clipping, grid
+color, and mouse-driven dragging.
 
 ## Architecture
 
 ```
 canvastransfer/
-  models.py        Project, Layer, Transform, PerspectiveCorners, GridSettings
-  compositing.py    pure image ops: perspective warp, affine transform,
-                     Normal/Multiply blend, grid rendering, split view
-                     (this module is the Core Image stand-in)
-  render.py          ties a project + its layer images into one composite
-  project_io.py      save/load the .ctproj package, autosave
-  ui/                PySide6 widgets (main window, canvas view, layers/
-                      transform/grid/compare panels, perspective dialog)
+  models.py        Project, Layer (placement quad, perspective corners,
+                    blend, contrast, invert), GridSettings
+  geometry.py       pure transform-tool math: fit, move, rotate,
+                    proportional/free scale, skew, distort, flip
+  image_ops.py      perspective correction, downscaling, contrast/invert
+  compare.py        how each layer displays in each compare mode
+  project_io.py     .ctproj package save/load, autosave
+  ui/
+    canvas_view.py   Qt scene showing all layers + the transform tool
+    scene_items.py   layer item (projective transform, Multiply) and grid
+    layer_display.py cached per-layer display pixmaps
+    main_window.py   toolbar, menus, wiring; plus the side panels
 ```
 
-`compositing.py` has no Qt dependency and is the piece most worth reading
-closely before porting: its functions are pure `(numpy array, params) ->
-numpy array`, which maps fairly directly onto Core Image filters/CIFilter
-chains. `models.py`'s fields map directly onto the spec's "Basic Project
-Data" section and are a reasonable starting point for Swift `Codable`
-structs. The UI layer does not port -- it gets rewritten in SwiftUI --
-but the interaction logic each panel encodes (what triggers a re-render,
-proportional vs. independent scale locking, blink's timer-driven layer
-swap) is worth keeping as a reference.
+A layer's placement is four canvas points (its "quad"), stored as
+fractions of the canvas size. Every transform mode just moves those
+points, and the layer image is mapped onto them with a projective
+transform, so all edits stay nondestructive and repeatable. Source photos
+are stored untouched; perspective correction and adjustments are
+recomputed for display and cached.
 
 ## Porting to Swift
 
-This prototype exists to de-risk the *workflow*, not to be translated
-line-by-line. When moving to the real Swift/SwiftUI/Core Image app:
-
-- `models.py` -> `Codable` structs; the project package format
-  (`project.json` + `images/`) can likely be kept almost as-is, or wrapped
-  in a proper `FileWrapper`-based document package.
-- `compositing.py` -> `CIFilter`s: `CIPerspectiveCorrection` for the
-  4-point warp, `CIAffineTransform` for move/scale/rotate/skew,
-  `CIMultiplyBlendMode` / `CISourceOverCompositing` for blend, and a
-  custom `CIFilter` or Core Graphics draw for the grid lines.
-- `render.py`'s compositing order (bottom-to-top, grid last) carries over
-  directly as a `CIFilter` chain.
-- Camera capture (AVFoundation) and rectangle detection (Vision) are new
-  work with no prototype equivalent here, since neither is available
-  outside Apple platforms.
+- `models.py` -> `Codable` structs; the `.ctproj` layout (`project.json` +
+  `images/`) can carry over, likely wrapped in a `FileWrapper` package.
+- `geometry.py` -> a plain Swift module; it has no dependencies and is the
+  most directly portable piece.
+- `image_ops.py` -> `CIPerspectiveCorrection`, `CIColorControls`
+  (contrast), `CIColorInvert`.
+- Layer display -> each layer drawn through a `CIPerspectiveTransform`
+  (quad -> canvas) and composited with `CIMultiplyBlendMode` /
+  `CISourceOverCompositing`; or `CALayer`s with a 3D transform and a
+  multiply `compositingFilter` for live interaction.
+- Camera capture and rectangle detection are new work with no prototype
+  equivalent here.

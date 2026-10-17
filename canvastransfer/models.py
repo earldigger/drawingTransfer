@@ -1,21 +1,19 @@
 """Data model for a Canvas Transfer project.
 
-Mirrors the "Basic Project Data" section of the project spec:
-Project (name, canvas width/height, units), Layer (name, image, visibility,
-opacity, blend mode, position, scale, rotation, skew, perspective corners),
-and Grid (rows, columns, opacity, line thickness).
-
-All transforms are stored as parameters, never baked into pixels, so the
-model stays nondestructive -- the same requirement as the spec's Image
-Transform and Core Image sections.
+Mirrors the "Basic Project Data" section of the project spec. A layer's
+placement on the canvas is stored as four corner points (its "quad") rather
+than baked into pixels, so every move/scale/rotate/skew/distort/flip stays
+editable and nondestructive.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
 import itertools
 import uuid
+
+Point = tuple[float, float]
 
 
 class Units(str, Enum):
@@ -30,7 +28,8 @@ class BlendMode(str, Enum):
 
 class CompareMode(str, Enum):
     OVERLAY = "overlay"
-    BLINK = "blink"
+    BLINK = "blink"  # alternate between layer A alone and layer B alone
+    BLINK_A = "blink_a"  # normal stack, only layer A toggles on/off
     SPLIT = "split"
 
 
@@ -42,40 +41,17 @@ def new_id(prefix: str) -> str:
 
 
 @dataclass
-class Transform:
-    """Nondestructive 2D transform applied to a layer's (already
-    perspective-corrected) image before it is composited onto the canvas.
-    """
-
-    offset_x: float = 0.0
-    offset_y: float = 0.0
-    scale_x: float = 1.0
-    scale_y: float = 1.0
-    rotation_deg: float = 0.0
-    skew_x_deg: float = 0.0
-    skew_y_deg: float = 0.0
-
-    def to_dict(self) -> dict:
-        return asdict(self)
-
-    @staticmethod
-    def from_dict(data: dict) -> "Transform":
-        return Transform(**data)
-
-
-@dataclass
 class PerspectiveCorners:
-    """Four corner points (image pixel space, origin top-left) used to
-    correct the perspective of a photographed drawing or canvas.
-    Order: top-left, top-right, bottom-right, bottom-left.
+    """Four corner points (raw image pixel space, origin top-left) marking
+    the photographed drawing or canvas. Order: TL, TR, BR, BL.
     """
 
-    top_left: tuple[float, float]
-    top_right: tuple[float, float]
-    bottom_right: tuple[float, float]
-    bottom_left: tuple[float, float]
+    top_left: Point
+    top_right: Point
+    bottom_right: Point
+    bottom_left: Point
 
-    def as_list(self) -> list[tuple[float, float]]:
+    def as_list(self) -> list[Point]:
         return [self.top_left, self.top_right, self.bottom_right, self.bottom_left]
 
     def to_dict(self) -> dict:
@@ -113,8 +89,14 @@ class Layer:
     visible: bool = True
     opacity: float = 1.0  # 0..1
     blend_mode: BlendMode = BlendMode.NORMAL
-    transform: Transform = field(default_factory=Transform)
+    # Where the layer's image corners land on the canvas, as fractions of
+    # canvas width/height (TL, TR, BR, BL). None = fit to canvas on next use.
+    quad: list[Point] | None = None
     perspective_corners: PerspectiveCorners | None = None
+    # True for canvas photos: the corrected image fills the canvas exactly.
+    perspective_fill_canvas: bool = False
+    contrast: float = 0.0  # -1..1, 0 = unchanged
+    invert: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -124,14 +106,18 @@ class Layer:
             "visible": self.visible,
             "opacity": self.opacity,
             "blend_mode": self.blend_mode.value,
-            "transform": self.transform.to_dict(),
+            "quad": [list(p) for p in self.quad] if self.quad else None,
             "perspective_corners": (
                 self.perspective_corners.to_dict() if self.perspective_corners else None
             ),
+            "perspective_fill_canvas": self.perspective_fill_canvas,
+            "contrast": self.contrast,
+            "invert": self.invert,
         }
 
     @staticmethod
     def from_dict(data: dict) -> "Layer":
+        quad = data.get("quad")
         return Layer(
             id=data["id"],
             name=data["name"],
@@ -139,12 +125,15 @@ class Layer:
             visible=data.get("visible", True),
             opacity=data.get("opacity", 1.0),
             blend_mode=BlendMode(data.get("blend_mode", "normal")),
-            transform=Transform.from_dict(data.get("transform", {})) if data.get("transform") else Transform(),
+            quad=[tuple(p) for p in quad] if quad else None,
             perspective_corners=(
                 PerspectiveCorners.from_dict(data["perspective_corners"])
                 if data.get("perspective_corners")
                 else None
             ),
+            perspective_fill_canvas=data.get("perspective_fill_canvas", False),
+            contrast=data.get("contrast", 0.0),
+            invert=data.get("invert", False),
         )
 
 
@@ -185,7 +174,7 @@ class Project:
     canvas_width: float
     canvas_height: float
     units: Units = Units.INCHES
-    layers: list[Layer] = field(default_factory=list)
+    layers: list[Layer] = field(default_factory=list)  # index 0 = bottom of stack
     grid: GridSettings = field(default_factory=GridSettings)
     active_layer_id: str | None = None
     compare_mode: CompareMode = CompareMode.OVERLAY
@@ -202,7 +191,7 @@ class Project:
         if self.active_layer_id == layer_id:
             self.active_layer_id = self.layers[-1].id if self.layers else None
 
-    def get_layer(self, layer_id: str) -> Layer | None:
+    def get_layer(self, layer_id: str | None) -> Layer | None:
         for l in self.layers:
             if l.id == layer_id:
                 return l

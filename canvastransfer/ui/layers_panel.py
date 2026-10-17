@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QGroupBox,
     QInputDialog,
+    QCheckBox,
 )
 
 from ..models import Project, BlendMode
@@ -31,6 +32,8 @@ class LayersPanel(QWidget):
     moveLayerDownRequested = Signal(str)
     renameLayerRequested = Signal(str, str)
     perspectiveCorrectRequested = Signal(str)
+    layerContrastChanged = Signal(str, float)
+    layerInvertToggled = Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -89,6 +92,25 @@ class LayersPanel(QWidget):
         blend_row.addWidget(self.blend_combo)
         appearance_layout.addLayout(blend_row)
 
+        contrast_row = QHBoxLayout()
+        contrast_row.addWidget(QLabel("Contrast"))
+        self.contrast_slider = QSlider(Qt.Horizontal)
+        self.contrast_slider.setRange(-100, 100)
+        self.contrast_slider.setValue(0)
+        self.contrast_value_label = QLabel("0")
+        self.contrast_value_label.setMinimumWidth(32)
+        self.contrast_slider.valueChanged.connect(self._on_contrast_changed)
+        self.contrast_reset = QPushButton("Reset")
+        self.contrast_reset.clicked.connect(lambda: self.contrast_slider.setValue(0))
+        contrast_row.addWidget(self.contrast_slider)
+        contrast_row.addWidget(self.contrast_value_label)
+        contrast_row.addWidget(self.contrast_reset)
+        appearance_layout.addLayout(contrast_row)
+
+        self.invert_check = QCheckBox("Invert values")
+        self.invert_check.toggled.connect(self._on_invert_toggled)
+        appearance_layout.addWidget(self.invert_check)
+
         self._set_appearance_enabled(False)
 
     # -- outward-facing API ------------------------------------------------
@@ -99,7 +121,7 @@ class LayersPanel(QWidget):
         for layer in reversed(project.layers):  # top of stack shown first
             item = QListWidgetItem(layer.name)
             item.setData(LAYER_ID_ROLE, layer.id)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable | Qt.ItemIsEditable)
+            item.setFlags((item.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable)
             item.setCheckState(Qt.Checked if layer.visible else Qt.Unchecked)
             self.list_widget.addItem(item)
             if layer.id == project.active_layer_id:
@@ -115,6 +137,8 @@ class LayersPanel(QWidget):
             self._set_appearance_enabled(True)
             self.opacity_slider.setValue(round(layer.opacity * 100))
             self.blend_combo.setCurrentIndex(self.blend_combo.findData(layer.blend_mode.value))
+            self.contrast_slider.setValue(round(layer.contrast * 100))
+            self.invert_check.setChecked(layer.invert)
         else:
             self._set_appearance_enabled(False)
         self._updating = False
@@ -122,6 +146,9 @@ class LayersPanel(QWidget):
     def _set_appearance_enabled(self, enabled: bool) -> None:
         self.opacity_slider.setEnabled(enabled)
         self.blend_combo.setEnabled(enabled)
+        self.contrast_slider.setEnabled(enabled)
+        self.contrast_reset.setEnabled(enabled)
+        self.invert_check.setEnabled(enabled)
         self.delete_button.setEnabled(enabled)
         self.up_button.setEnabled(enabled)
         self.down_button.setEnabled(enabled)
@@ -164,6 +191,21 @@ class LayersPanel(QWidget):
         layer_id = self._current_layer_id()
         if layer_id:
             self.layerBlendModeChanged.emit(layer_id, self.blend_combo.currentData())
+
+    def _on_contrast_changed(self, value: int):
+        self.contrast_value_label.setText(f"{value:+d}" if value else "0")
+        if self._updating:
+            return
+        layer_id = self._current_layer_id()
+        if layer_id:
+            self.layerContrastChanged.emit(layer_id, value / 100.0)
+
+    def _on_invert_toggled(self, checked: bool):
+        if self._updating:
+            return
+        layer_id = self._current_layer_id()
+        if layer_id:
+            self.layerInvertToggled.emit(layer_id, checked)
 
     def _emit_delete(self):
         layer_id = self._current_layer_id()

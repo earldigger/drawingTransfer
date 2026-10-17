@@ -3,55 +3,80 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 from PySide6.QtWidgets import (
-    QMainWindow,
     QDockWidget,
-    QScrollArea,
-    QWidget,
-    QVBoxLayout,
     QFileDialog,
+    QMainWindow,
     QMessageBox,
+    QScrollArea,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ..models import Project, Layer, Transform, CompareMode, BlendMode, new_id
-from ..project_io import ProjectDocument, save_project, load_project, autosave
-from ..render import compute_canvas_pixel_size, render_composite, render_layer
-from ..compositing import composite_layers, blank_canvas, split_view
-
-from .canvas_view import CanvasView
-from .layers_panel import LayersPanel
-from .transform_panel import TransformPanel
-from .grid_panel import GridPanel
+from ..compare import display_states, uses_split_line
+from ..geometry import (
+    TransformMode,
+    canvas_pixel_size,
+    canvas_quad,
+    denormalize_quad,
+    fit_quad,
+    flip_horizontal,
+    flip_vertical,
+    normalize_quad,
+)
+from ..models import BlendMode, CompareMode, Layer, Project, new_id
+from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
+from .canvas_view import CanvasView, LayerEntry
 from .compare_panel import ComparePanel
-from .perspective_dialog import PerspectiveDialog
+from .grid_panel import GridPanel
+from .layer_display import LayerDisplayCache
+from .layers_panel import LayersPanel
 from .new_project_dialog import NewProjectDialog
-from .image_qt import rgba_float_to_qpixmap
+from .perspective_dialog import PerspectiveDialog
 
-IMAGE_FILE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)"
+IMAGE_FILE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp)"
+AUTOSAVE_DELAY_MS = 500
+
+MODE_LABELS = [
+    (TransformMode.UNIFORM, "Proportional", "Corner and edge handles scale evenly, keeping proportions"),
+    (TransformMode.FREE, "Free", "Handles stretch width and height independently"),
+    (TransformMode.SKEW, "Skew", "Edge handles slide an edge sideways (shear); corners scale freely"),
+    (TransformMode.DISTORT, "Distort", "Each corner moves on its own"),
+]
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Canvas Transfer (prototype)")
-        self.resize(1300, 850)
+        self.resize(1400, 900)
 
         self.doc: ProjectDocument | None = None
-        self._blink_showing_a = True
+        self.cache = LayerDisplayCache()
+        self._canvas_size = (1, 1)
+        self._mode = TransformMode.UNIFORM
+
+        self._blink_on = True
         self.blink_timer = QTimer(self)
         self.blink_timer.timeout.connect(self._on_blink_tick)
 
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setSingleShot(True)
+        self._autosave_timer.setInterval(AUTOSAVE_DELAY_MS)
+        self._autosave_timer.timeout.connect(self._autosave_now)
+
         self.canvas_view = CanvasView()
         self.setCentralWidget(self.canvas_view)
-        self.canvas_view.layerDragDelta.connect(self._on_canvas_drag)
-        self.canvas_view.dragFinished.connect(self._autosave)
+        self.canvas_view.quadCommitted.connect(self._on_quad_committed)
 
         self.layers_panel = LayersPanel()
-        self.transform_panel = TransformPanel()
         self.grid_panel = GridPanel()
         self.compare_panel = ComparePanel()
         self._build_side_dock()
         self._build_menu()
+        self._build_toolbar()
         self._wire_panels()
 
         self.statusBar().showMessage("Create or open a project to begin.")
@@ -62,13 +87,14 @@ class MainWindow(QMainWindow):
     def _build_side_dock(self) -> None:
         container = QWidget()
         layout = QVBoxLayout(container)
-        for panel in (self.layers_panel, self.transform_panel, self.grid_panel, self.compare_panel):
+        for panel in (self.layers_panel, self.grid_panel, self.compare_panel):
             layout.addWidget(panel)
         layout.addStretch(1)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(container)
+        scroll.setMinimumWidth(380)
 
         dock = QDockWidget("Workspace", self)
         dock.setWidget(scroll)
@@ -77,19 +103,54 @@ class MainWindow(QMainWindow):
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
-        file_menu.addAction("New Project…", self._new_project)
-        file_menu.addAction("Open Project…", self._open_project)
-        file_menu.addAction("Save", self._save_project)
-        file_menu.addAction("Save As…", self._save_project_as)
+        file_menu.addAction("New Project…", QKeySequence.New, self._new_project)
+        file_menu.addAction("Open Project…", QKeySequence.Open, self._open_project)
+        file_menu.addAction("Save", QKeySequence.Save, self._save_project)
+        file_menu.addAction("Save As…", QKeySequence.SaveAs, self._save_project_as)
         file_menu.addSeparator()
         file_menu.addAction("Add Image Layer…", self._import_image)
+
+    def _build_toolbar(self) -> None:
+        bar = QToolBar("Transform", self)
+        bar.setMovable(False)
+        bar.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        self.addToolBar(Qt.TopToolBarArea, bar)
+
+        self.transform_action = QAction("Transform", self)
+        self.transform_action.setCheckable(True)
+        self.transform_action.setShortcut("T")
+        self.transform_action.setToolTip("Show the transform box on the selected layer (T)")
+        self.transform_action.toggled.connect(self._on_tool_toggled)
+        bar.addAction(self.transform_action)
+        bar.addSeparator()
+
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self.mode_actions: dict[TransformMode, QAction] = {}
+        for mode, label, tip in MODE_LABELS:
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setToolTip(tip)
+            action.triggered.connect(lambda _checked, m=mode: self._on_mode_chosen(m))
+            group.addAction(action)
+            bar.addAction(action)
+            self.mode_actions[mode] = action
+        self.mode_actions[self._mode].setChecked(True)
+        bar.addSeparator()
+
+        self.flip_h_action = bar.addAction("Flip Horizontal", lambda: self._flip(horizontal=True))
+        self.flip_v_action = bar.addAction("Flip Vertical", lambda: self._flip(horizontal=False))
+        self.fit_action = bar.addAction("Fit to Canvas", self._fit_active)
+        self.fit_action.setToolTip("Reset the selected layer to fit inside the canvas")
 
     def _wire_panels(self) -> None:
         lp = self.layers_panel
         lp.layerSelected.connect(self._on_layer_selected)
-        lp.layerVisibilityToggled.connect(self._on_layer_visibility_toggled)
-        lp.layerOpacityChanged.connect(self._on_layer_opacity_changed)
-        lp.layerBlendModeChanged.connect(self._on_layer_blend_mode_changed)
+        lp.layerVisibilityToggled.connect(lambda lid, v: self._set_layer_attr(lid, "visible", v))
+        lp.layerOpacityChanged.connect(lambda lid, v: self._set_layer_attr(lid, "opacity", v))
+        lp.layerBlendModeChanged.connect(lambda lid, v: self._set_layer_attr(lid, "blend_mode", BlendMode(v)))
+        lp.layerContrastChanged.connect(lambda lid, v: self._set_layer_attr(lid, "contrast", v))
+        lp.layerInvertToggled.connect(lambda lid, v: self._set_layer_attr(lid, "invert", v))
         lp.addLayerRequested.connect(self._import_image)
         lp.deleteLayerRequested.connect(self._on_delete_layer)
         lp.moveLayerUpRequested.connect(lambda lid: self._on_move_layer(lid, +1))
@@ -97,43 +158,50 @@ class MainWindow(QMainWindow):
         lp.renameLayerRequested.connect(self._on_rename_layer)
         lp.perspectiveCorrectRequested.connect(self._on_perspective_correct)
 
-        self.transform_panel.transformChanged.connect(self._on_transform_changed)
         self.grid_panel.gridChanged.connect(self._on_grid_changed)
         self.compare_panel.settingsChanged.connect(self._on_compare_changed)
 
     def _update_enabled_state(self) -> None:
         has_project = self.doc is not None
+        has_layer = has_project and self._active_layer() is not None
         self.layers_panel.setEnabled(has_project)
         self.grid_panel.setEnabled(has_project)
         self.compare_panel.setEnabled(has_project)
+        for action in [self.transform_action, self.flip_h_action, self.flip_v_action, self.fit_action, *self.mode_actions.values()]:
+            action.setEnabled(has_layer)
 
     # -- project lifecycle ---------------------------------------------
+
+    def _set_document(self, doc: ProjectDocument) -> None:
+        self._flush_autosave()
+        self.doc = doc
+        self.cache.clear()
+        self._blink_on = True
+        self.blink_timer.stop()
+        self._canvas_size = canvas_pixel_size(doc.project.canvas_width, doc.project.canvas_height)
+        self.canvas_view.set_canvas_size(*self._canvas_size)
+        self._refresh_all()
+        self._restart_blink_if_needed()
 
     def _new_project(self) -> None:
         dialog = NewProjectDialog(self)
         if dialog.exec() != NewProjectDialog.Accepted:
             return
         name, width, height, units = dialog.values()
-        project = Project(name=name, canvas_width=width, canvas_height=height, units=units)
-        self.doc = ProjectDocument(project=project)
-        self._blink_showing_a = True
-        self.blink_timer.stop()
-        self._refresh_all()
-        self.statusBar().showMessage(f"New project '{name}' ({width}x{height} {units.value}) -- not yet saved.")
+        self._set_document(ProjectDocument(Project(name=name, canvas_width=width, canvas_height=height, units=units)))
+        self.statusBar().showMessage(f"New project '{name}' ({width:g} x {height:g} {units.value}) -- not saved yet.")
 
     def _open_project(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Open Project (.ctproj folder)")
         if not path:
             return
         try:
-            self.doc = load_project(path)
-        except Exception as exc:  # surface to the user rather than crash
+            doc = load_project(path)
+        except Exception as exc:
             QMessageBox.critical(self, "Open Project Failed", str(exc))
             return
-        self._blink_showing_a = True
-        self.blink_timer.stop()
-        self._refresh_all()
-        self.statusBar().showMessage(f"Opened '{self.doc.project.name}' from {path}")
+        self._set_document(doc)
+        self.statusBar().showMessage(f"Opened '{doc.project.name}' from {path}")
 
     def _save_project(self) -> None:
         if self.doc is None:
@@ -152,13 +220,26 @@ class MainWindow(QMainWindow):
         if not path:
             return
         save_project(self.doc, path)
-        self.statusBar().showMessage(f"Saved to {path}")
+        self.statusBar().showMessage(f"Saved to {path} -- changes now autosave.")
 
-    def _autosave(self) -> None:
+    def _schedule_autosave(self) -> None:
+        if self.doc is not None and self.doc.package_dir is not None:
+            self._autosave_timer.start()
+
+    def _autosave_now(self) -> None:
         if self.doc is not None:
             autosave(self.doc)
 
-    # -- image import ---------------------------------------------------
+    def _flush_autosave(self) -> None:
+        if self._autosave_timer.isActive():
+            self._autosave_timer.stop()
+            self._autosave_now()
+
+    def closeEvent(self, event):
+        self._flush_autosave()
+        super().closeEvent(event)
+
+    # -- image import -----------------------------------------------------
 
     def _import_image(self) -> None:
         if self.doc is None:
@@ -167,115 +248,139 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Import Image", "", IMAGE_FILE_FILTER)
         if not path:
             return
-        from ..project_io import load_image_rgba
-
         try:
             image = load_image_rgba(path)
         except Exception as exc:
-            QMessageBox.critical(self, "Import Failed", str(exc))
+            QMessageBox.critical(self, "Import Failed", f"{exc}\n\nHEIC photos aren't supported yet -- export as JPEG first.")
             return
 
         layer_id = new_id("layer")
         layer = Layer(id=layer_id, name=Path(path).stem, image_filename=f"{layer_id}.png")
         self.doc.set_layer_image(layer_id, image)
         self.doc.project.add_layer(layer)
-
         self._refresh_all()
-        self._autosave()
+        self.transform_action.setChecked(True)
+        self.statusBar().showMessage(
+            "Image fitted to the canvas. Drag inside the box to move, drag handles to scale, "
+            "drag the blue dot to rotate. Press T to hide the box."
+        )
+        self._schedule_autosave()
 
-    # -- layer panel handlers --------------------------------------------
+    # -- layer handlers ------------------------------------------------------
+
+    def _active_layer(self) -> Layer | None:
+        return self.doc.project.get_layer(self.doc.project.active_layer_id) if self.doc else None
 
     def _on_layer_selected(self, layer_id: str) -> None:
         if self.doc is None:
             return
         self.doc.project.active_layer_id = layer_id
-        layer = self.doc.project.get_layer(layer_id)
-        if layer is not None:
-            self.transform_panel.set_transform(layer.transform)
-        self.layers_panel.sync_appearance(layer)
+        self.layers_panel.sync_appearance(self._active_layer())
+        self.canvas_view.set_active_layer(layer_id)
+        self._update_enabled_state()
 
-    def _on_layer_visibility_toggled(self, layer_id: str, visible: bool) -> None:
-        layer = self._get_layer(layer_id)
-        if layer:
-            layer.visible = visible
-            self._autosave()
-            self._rerender()
-
-    def _on_layer_opacity_changed(self, layer_id: str, opacity: float) -> None:
-        layer = self._get_layer(layer_id)
-        if layer:
-            layer.opacity = opacity
-            self._autosave()
-            self._rerender()
-
-    def _on_layer_blend_mode_changed(self, layer_id: str, mode_value: str) -> None:
-        layer = self._get_layer(layer_id)
-        if layer:
-            layer.blend_mode = BlendMode(mode_value)
-            self._autosave()
-            self._rerender()
+    def _set_layer_attr(self, layer_id: str, attr: str, value) -> None:
+        layer = self.doc.project.get_layer(layer_id) if self.doc else None
+        if layer is None:
+            return
+        setattr(layer, attr, value)
+        self._refresh_canvas()
+        self._schedule_autosave()
 
     def _on_delete_layer(self, layer_id: str) -> None:
         if self.doc is None:
             return
         self.doc.project.remove_layer(layer_id)
         self.doc.images.pop(layer_id, None)
+        self.cache.forget(layer_id)
         self._refresh_all()
-        self._autosave()
+        self._schedule_autosave()
 
     def _on_move_layer(self, layer_id: str, direction: int) -> None:
         if self.doc is None:
             return
-        layers = self.doc.project.layers
-        idx = next((i for i, l in enumerate(layers) if l.id == layer_id), None)
+        idx = next((i for i, l in enumerate(self.doc.project.layers) if l.id == layer_id), None)
         if idx is None:
             return
         self.doc.project.move_layer(layer_id, idx + direction)
         self._refresh_all()
-        self._autosave()
+        self._schedule_autosave()
 
     def _on_rename_layer(self, layer_id: str, new_name: str) -> None:
-        layer = self._get_layer(layer_id)
+        layer = self.doc.project.get_layer(layer_id) if self.doc else None
         if layer:
             layer.name = new_name
             self._refresh_all()
-            self._autosave()
+            self._schedule_autosave()
 
     def _on_perspective_correct(self, layer_id: str) -> None:
-        if self.doc is None:
+        layer = self.doc.project.get_layer(layer_id) if self.doc else None
+        raw = self.doc.get_layer_image(layer_id) if self.doc else None
+        if layer is None or raw is None:
             return
-        layer = self._get_layer(layer_id)
-        raw_image = self.doc.get_layer_image(layer_id)
-        if layer is None or raw_image is None:
-            return
-        dialog = PerspectiveDialog(raw_image, layer.perspective_corners, self)
+        dialog = PerspectiveDialog(raw, layer.perspective_corners, layer.perspective_fill_canvas, self)
         if dialog.exec() == PerspectiveDialog.Accepted:
             layer.perspective_corners = dialog.result_corners()
-            self._autosave()
-            self._rerender()
+            layer.perspective_fill_canvas = dialog.result_fill_canvas()
+            layer.quad = None  # re-place the corrected image
+            self._refresh_canvas()
+            self._schedule_autosave()
 
-    # -- transform / grid / compare handlers -----------------------------
+    # -- transform tool ---------------------------------------------------------
 
-    def _on_transform_changed(self, transform: Transform) -> None:
-        if self.doc is None or self.doc.project.active_layer_id is None:
+    def _on_tool_toggled(self, enabled: bool) -> None:
+        self.canvas_view.set_tool(enabled, self._mode)
+
+    def _on_mode_chosen(self, mode: TransformMode) -> None:
+        self._mode = mode
+        if not self.transform_action.isChecked():
+            self.transform_action.setChecked(True)
+        self.canvas_view.set_tool(True, mode)
+
+    def _on_quad_committed(self, layer_id: str, quad) -> None:
+        layer = self.doc.project.get_layer(layer_id) if self.doc else None
+        if layer is not None:
+            layer.quad = normalize_quad(quad, *self._canvas_size)
+            self._schedule_autosave()
+
+    def _flip(self, horizontal: bool) -> None:
+        layer = self._active_layer()
+        if layer is None or layer.quad is None:
             return
-        layer = self._get_layer(self.doc.project.active_layer_id)
-        if layer:
-            layer.transform = transform
-            self._autosave()
-            self._rerender()
+        quad = denormalize_quad(layer.quad, *self._canvas_size)
+        quad = flip_horizontal(quad) if horizontal else flip_vertical(quad)
+        layer.quad = normalize_quad(quad, *self._canvas_size)
+        self._refresh_canvas()
+        self._schedule_autosave()
 
-    def _on_canvas_drag(self, dx: float, dy: float) -> None:
-        if self.doc is None or self.doc.project.active_layer_id is None:
+    def _fit_active(self) -> None:
+        layer = self._active_layer()
+        if layer is None:
             return
-        self.transform_panel.nudge_offset(dx, dy)
+        layer.quad = None
+        self._refresh_canvas()
+        self.canvas_view.refit()
+        self._schedule_autosave()
+
+    def _placement(self, layer: Layer, pixmap) -> list:
+        cw, ch = self._canvas_size
+        if layer.quad is None:
+            if layer.perspective_corners is not None and layer.perspective_fill_canvas:
+                quad = canvas_quad(cw, ch)
+            else:
+                quad = fit_quad(pixmap.width(), pixmap.height(), cw, ch)
+            layer.quad = normalize_quad(quad, cw, ch)
+            self._schedule_autosave()
+        return denormalize_quad(layer.quad, cw, ch)
+
+    # -- grid / compare -----------------------------------------------------------
 
     def _on_grid_changed(self, grid) -> None:
         if self.doc is None:
             return
         self.doc.project.grid = grid
-        self._autosave()
-        self._rerender()
+        self.canvas_view.set_grid(grid)
+        self._schedule_autosave()
 
     def _on_compare_changed(self) -> None:
         if self.doc is None:
@@ -285,26 +390,26 @@ class MainWindow(QMainWindow):
         project.compare_layer_a = self.compare_panel.current_layer_a_id()
         project.compare_layer_b = self.compare_panel.current_layer_b_id()
         project.split_position = self.compare_panel.current_split_position()
+        self._restart_blink_if_needed()
+        self._refresh_canvas()
+        self._schedule_autosave()
 
-        if project.compare_mode == CompareMode.BLINK:
+    def _restart_blink_if_needed(self) -> None:
+        blinking = self.doc is not None and self.doc.project.compare_mode in (CompareMode.BLINK, CompareMode.BLINK_A)
+        if blinking:
             self.blink_timer.setInterval(self.compare_panel.current_blink_interval_ms())
             if not self.blink_timer.isActive():
-                self._blink_showing_a = True
+                self._blink_on = True
                 self.blink_timer.start()
         else:
             self.blink_timer.stop()
-
-        self._autosave()
-        self._rerender()
+            self._blink_on = True
 
     def _on_blink_tick(self) -> None:
-        self._blink_showing_a = not self._blink_showing_a
-        self._rerender()
+        self._blink_on = not self._blink_on
+        self._refresh_canvas()
 
-    # -- helpers ----------------------------------------------------------
-
-    def _get_layer(self, layer_id: str) -> Layer | None:
-        return self.doc.project.get_layer(layer_id) if self.doc else None
+    # -- refresh --------------------------------------------------------------------
 
     def _refresh_all(self) -> None:
         self._update_enabled_state()
@@ -312,34 +417,26 @@ class MainWindow(QMainWindow):
             return
         project = self.doc.project
         self.layers_panel.refresh(project)
-        active = project.get_layer(project.active_layer_id) if project.active_layer_id else None
-        self.transform_panel.set_transform(active.transform if active else Transform())
-        self.transform_panel.setEnabled(active is not None)
         self.grid_panel.set_grid(project.grid)
         self.compare_panel.refresh_layers(project)
-        self._rerender()
+        if self.compare_panel.current_layer_a_id() != project.compare_layer_a or \
+                self.compare_panel.current_layer_b_id() != project.compare_layer_b:
+            project.compare_layer_a = self.compare_panel.current_layer_a_id()
+            project.compare_layer_b = self.compare_panel.current_layer_b_id()
+        self._refresh_canvas()
 
-    def _rerender(self) -> None:
+    def _refresh_canvas(self) -> None:
         if self.doc is None:
             return
         project = self.doc.project
-        canvas_size = compute_canvas_pixel_size(project)
-        mode = project.compare_mode
-
-        if mode == CompareMode.BLINK and project.compare_layer_a and project.compare_layer_b:
-            layer_id = project.compare_layer_a if self._blink_showing_a else project.compare_layer_b
-            composite = self._render_single_layer(layer_id, canvas_size)
-        elif mode == CompareMode.SPLIT and project.compare_layer_a and project.compare_layer_b:
-            img_a = self._render_single_layer(project.compare_layer_a, canvas_size)
-            img_b = self._render_single_layer(project.compare_layer_b, canvas_size)
-            composite = split_view(img_a, img_b, project.split_position)
-        else:
-            composite = render_composite(self.doc, canvas_size)
-
-        self.canvas_view.set_image(rgba_float_to_qpixmap(composite))
-
-    def _render_single_layer(self, layer_id: str | None, canvas_size):
-        plane = render_layer(self.doc, layer_id, canvas_size) if layer_id else None
-        if plane is None:
-            return blank_canvas(canvas_size)
-        return composite_layers([(plane, 1.0, BlendMode.NORMAL)], canvas_size)
+        states = display_states(project, self._blink_on)
+        entries = []
+        for layer in project.layers:
+            pixmap = self.cache.pixmap(self.doc, layer, self._canvas_size)
+            if pixmap is None:
+                continue
+            entries.append(LayerEntry(layer.id, pixmap, self._placement(layer, pixmap), states[layer.id]))
+        split = project.split_position if uses_split_line(project) else None
+        self.canvas_view.show_layers(entries, split)
+        self.canvas_view.set_grid(project.grid)
+        self.canvas_view.set_active_layer(project.active_layer_id)

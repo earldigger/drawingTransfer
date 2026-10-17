@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
     QFormLayout,
@@ -10,6 +11,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QGroupBox,
     QVBoxLayout,
+    QPushButton,
+    QColorDialog,
 )
 
 from ..models import GridSettings
@@ -63,6 +66,12 @@ class GridPanel(QWidget):
         self.thickness.setSingleStep(0.5)
         form.addRow("Line thickness (px)", self.thickness)
 
+        self._color = GridSettings().color
+        self.color_button = QPushButton("Choose…")
+        self.color_button.clicked.connect(self._choose_color)
+        form.addRow("Color", self.color_button)
+        self._show_color()
+
         self.enabled.toggled.connect(self._emit_change)
         self.rows.valueChanged.connect(self._on_manual_division_change)
         self.columns.valueChanged.connect(self._on_manual_division_change)
@@ -77,6 +86,8 @@ class GridPanel(QWidget):
         self.columns.setValue(grid.columns)
         self.opacity.setValue(grid.opacity * 100)
         self.thickness.setValue(grid.thickness_px)
+        self._color = tuple(grid.color)
+        self._show_color()
         self._sync_preset_label(grid.rows, grid.columns)
         self._updating = False
 
@@ -87,7 +98,21 @@ class GridPanel(QWidget):
             columns=self.columns.value(),
             opacity=self.opacity.value() / 100.0,
             thickness_px=self.thickness.value(),
+            color=self._color,
         )
+
+    def _show_color(self) -> None:
+        r, g, b = self._color
+        text = "black" if (0.299 * r + 0.587 * g + 0.114 * b) > 150 else "white"
+        self.color_button.setText(f"RGB {r}, {g}, {b}")
+        self.color_button.setStyleSheet(f"background-color: rgb({r},{g},{b}); color: {text};")
+
+    def _choose_color(self) -> None:
+        chosen = QColorDialog.getColor(QColor(*self._color), self, "Grid Color")
+        if chosen.isValid():
+            self._color = (chosen.red(), chosen.green(), chosen.blue())
+            self._show_color()
+            self._emit_change()
 
     def _sync_preset_label(self, rows: int, columns: int) -> None:
         for label, dims in PRESETS.items():
