@@ -35,7 +35,8 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Layers: add, delete, rename (double-click), reorder, show/hide, select
 - Per-layer opacity and blend mode: Normal, Multiply, Screen, Linear Light
 - Per-layer Levels (dark point, midtones, light point) and Invert values
-- Per-layer Color & Vibrance: temperature, vibrance, saturation
+- Per-layer Color & Vibrance: temperature (blue-yellow), tint
+  (green-magenta), vibrance, saturation, each with a typeable value
 - Grid overlay: rows, columns, opacity, thickness, RGB color picker,
   3x3 / 4x5 / 8x10 presets
 - Compare: Overlay, Blink Layer A only (rest of the stack stays on),

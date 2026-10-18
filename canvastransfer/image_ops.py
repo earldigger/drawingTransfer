@@ -17,7 +17,7 @@ import cv2
 from .models import Adjustments, PerspectiveCorners
 
 MAX_DISPLAY_EDGE = 2400
-TEMPERATURE_STRENGTH = 0.3  # temperature=+1 boosts red 30% and cuts blue 30%
+COLOR_SHIFT_STRENGTH = 0.3  # how far temperature/tint at +-100 move the channels
 
 
 def capped_size(w: float, h: float, max_edge: int = MAX_DISPLAY_EDGE) -> tuple[int, int]:
@@ -69,19 +69,32 @@ def levels_curve(black: int, gamma: float, white: int, invert: bool = False) -> 
     return t ** (1.0 / max(gamma, 1e-3))
 
 
+def color_gains(temperature: float, tint: float) -> tuple[float, float, float]:
+    """R, G, B multipliers. Temperature runs blue <-> yellow (yellow = red +
+    green), tint runs green <-> magenta (magenta = red + blue), matching
+    the two axes of Photoshop's sliders."""
+    t = COLOR_SHIFT_STRENGTH * float(np.clip(temperature, -1.0, 1.0))
+    m = COLOR_SHIFT_STRENGTH * float(np.clip(tint, -1.0, 1.0))
+    return (
+        (1.0 + t / 2) * (1.0 + m / 2),
+        (1.0 + t / 2) * (1.0 - m),
+        (1.0 - t) * (1.0 + m / 2),
+    )
+
+
 def tone_lut(adj: Adjustments) -> np.ndarray:
-    """RGBA lookup table (256, 1, 4) for invert + levels + temperature.
+    """RGBA lookup table (256, 1, 4) for invert + levels + temperature/tint.
     Alpha maps to itself; doing all four channels in one LUT call avoids
     slow per-channel slicing of large images."""
     curve = levels_curve(adj.black, adj.gamma, adj.white, adj.invert) * 255.0
-    k = TEMPERATURE_STRENGTH * float(np.clip(adj.temperature, -1.0, 1.0))
-    gains = (1.0 + k, 1.0, 1.0 - k)  # R, G, B
+    gains = color_gains(adj.temperature, adj.tint)
     channels = [np.clip(np.round(curve * g), 0, 255) for g in gains] + [np.arange(256)]
     return np.stack(channels, axis=-1).astype(np.uint8).reshape(256, 1, 4)
 
 
 def _tone_is_identity(adj: Adjustments) -> bool:
-    return not adj.invert and adj.black == 0 and adj.white == 255 and adj.gamma == 1.0 and adj.temperature == 0.0
+    return (not adj.invert and adj.black == 0 and adj.white == 255 and adj.gamma == 1.0
+            and adj.temperature == 0.0 and adj.tint == 0.0)
 
 
 def _saturate(rgb: np.ndarray, vibrance: float, saturation: float) -> np.ndarray:

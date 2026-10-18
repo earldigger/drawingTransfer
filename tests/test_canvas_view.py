@@ -274,3 +274,18 @@ def test_on_screen_render_matches_with_linear_light(view, qapp):
     center = view.mapFromScene(50, 50)
     c = shot.pixelColor(center.x(), center.y())
     assert (c.red(), c.green(), c.blue()) == (255, 255, 255)
+
+
+def test_color_number_box_and_slider_stay_in_sync(qapp):
+    window, (layer,) = make_window_with_layers(qapp, (20, 20))
+    tint = window.layers_panel.tint
+    tint.spin.setValue(-35)  # typing a number moves the slider and applies it
+    assert tint.slider.value() == -35
+    assert window.doc.project.get_layer(layer.id).adjustments.tint == -0.35
+    tint.slider.setValue(20)
+    assert tint.spin.value() == 20
+    window.layers_panel.color_reset.click()
+    assert tint.spin.value() == 0 and window.doc.project.get_layer(layer.id).adjustments.tint == 0
+    window.undo_action.trigger()
+    assert tint.spin.value() == 20 and tint.slider.value() == 20  # panel follows undo
+    window.deleteLater()

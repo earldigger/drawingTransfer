@@ -84,11 +84,24 @@ def test_invert_happens_before_levels():
     assert adjusted((230, 230, 230), invert=True, black=40) == (0, 0, 0)
 
 
-def test_temperature_warms_and_cools():
+def test_temperature_runs_blue_to_yellow():
     r, g, b = adjusted((150, 150, 150), temperature=1.0)
-    assert r > 150 and g == 150 and b < 150
+    assert r > 150 and g > 150 and b < 150 and r == g  # yellow
     r, g, b = adjusted((150, 150, 150), temperature=-1.0)
-    assert r < 150 and b > 150
+    assert r < 150 and g < 150 and b > 150  # blue
+
+
+def test_tint_runs_green_to_magenta():
+    r, g, b = adjusted((150, 150, 150), tint=1.0)
+    assert g < 150 and r > 150 and b > 150 and r == b  # magenta
+    r, g, b = adjusted((150, 150, 150), tint=-1.0)
+    assert g > 150 and r < 150 and b < 150  # green
+
+
+def test_temperature_and_tint_combine():
+    alone = adjusted((150, 150, 150), temperature=0.5)
+    both = adjusted((150, 150, 150), temperature=0.5, tint=0.5)
+    assert both[1] < alone[1]  # tint pulls green down on top of the warm shift
 
 
 def test_saturation_minus_one_is_gray():
@@ -116,5 +129,5 @@ def test_gray_stays_gray_under_vibrance_and_saturation():
 
 def test_adjustments_keep_alpha():
     img = solid((100, 120, 140, 77), 3, 3)
-    out = apply_adjustments(img, Adjustments(black=10, temperature=0.5, vibrance=0.5, saturation=-0.3))
+    out = apply_adjustments(img, Adjustments(black=10, temperature=0.5, tint=-0.4, vibrance=0.5, saturation=-0.3))
     assert np.all(out[..., 3] == 77)

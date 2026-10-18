@@ -86,14 +86,16 @@ class PerspectiveCorners:
 @dataclass(frozen=True)
 class Adjustments:
     """Per-layer value and color adjustments, applied in this order to
-    what the layer shows: invert, levels, temperature, vibrance, saturation.
+    what the layer shows: invert, levels, temperature + tint, vibrance,
+    saturation.
     """
 
     invert: bool = False
     black: int = 0  # levels dark point, 0..255
     gamma: float = 1.0  # levels midtones; >1 lightens, <1 darkens
     white: int = 255  # levels light point, 0..255
-    temperature: float = 0.0  # -1 cooler .. +1 warmer
+    temperature: float = 0.0  # -1 blue .. +1 yellow
+    tint: float = 0.0  # -1 green .. +1 magenta
     vibrance: float = 0.0  # -1..1
     saturation: float = 0.0  # -1 (gray) .. +1
 
