@@ -17,7 +17,6 @@ import cv2
 from .models import Adjustments, PerspectiveCorners
 
 MAX_DISPLAY_EDGE = 2400
-COLOR_SHIFT_STRENGTH = 0.3  # how far temperature/tint at +-100 move the channels
 
 
 def capped_size(w: float, h: float, max_edge: int = MAX_DISPLAY_EDGE) -> tuple[int, int]:
@@ -69,58 +68,62 @@ def levels_curve(black: int, gamma: float, white: int, invert: bool = False) -> 
     return t ** (1.0 / max(gamma, 1e-3))
 
 
-def color_gains(temperature: float, tint: float) -> tuple[float, float, float]:
-    """R, G, B multipliers. Temperature runs blue <-> yellow (yellow = red +
-    green), tint runs green <-> magenta (magenta = red + blue), matching
-    the two axes of Photoshop's sliders."""
-    t = COLOR_SHIFT_STRENGTH * float(np.clip(temperature, -1.0, 1.0))
-    m = COLOR_SHIFT_STRENGTH * float(np.clip(tint, -1.0, 1.0))
-    return (
-        (1.0 + t / 2) * (1.0 + m / 2),
-        (1.0 + t / 2) * (1.0 - m),
-        (1.0 - t) * (1.0 + m / 2),
-    )
+def _rgba_lut(rgb_lut: np.ndarray) -> np.ndarray:
+    """(256, 1, 4) LUT applying `rgb_lut` (256,) to R, G, B and leaving alpha.
+    One 4-channel LUT call avoids slow per-channel slicing of large images."""
+    rgb_lut = np.clip(np.round(rgb_lut), 0, 255)
+    return np.stack([rgb_lut, rgb_lut, rgb_lut, np.arange(256)], axis=-1).astype(np.uint8).reshape(256, 1, 4)
 
 
-def tone_lut(adj: Adjustments) -> np.ndarray:
-    """RGBA lookup table (256, 1, 4) for invert + levels + temperature/tint.
-    Alpha maps to itself; doing all four channels in one LUT call avoids
-    slow per-channel slicing of large images."""
-    curve = levels_curve(adj.black, adj.gamma, adj.white, adj.invert) * 255.0
-    gains = color_gains(adj.temperature, adj.tint)
-    channels = [np.clip(np.round(curve * g), 0, 255) for g in gains] + [np.arange(256)]
-    return np.stack(channels, axis=-1).astype(np.uint8).reshape(256, 1, 4)
+def levels_lut(adj: Adjustments) -> np.ndarray:
+    return _rgba_lut(levels_curve(adj.black, adj.gamma, adj.white, adj.invert) * 255.0)
 
 
-def _tone_is_identity(adj: Adjustments) -> bool:
-    return (not adj.invert and adj.black == 0 and adj.white == 255 and adj.gamma == 1.0
-            and adj.temperature == 0.0 and adj.tint == 0.0)
+def lightness_curve(lightness: int) -> np.ndarray:
+    """Photoshop Hue/Saturation lightness: blend toward white (+) or black (-)."""
+    x = np.arange(256, dtype=np.float32)
+    v = float(np.clip(lightness, -100, 100)) / 100.0
+    return x + (255.0 - x) * v if v >= 0 else x * (1.0 + v)
 
 
-def _saturate(rgb: np.ndarray, vibrance: float, saturation: float) -> np.ndarray:
-    """Push each pixel away from (or toward) its own gray. Vibrance scales
-    the push by how muted the pixel already is, so strong colors hold."""
-    sat = cv2.extractChannel(cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV), 1)
-    muted = 1.0 - np.arange(256, dtype=np.float32) / 255.0
-    factor_lut = ((1.0 + saturation) * (1.0 + vibrance * muted)).astype(np.float32)
-    factor = cv2.LUT(sat, factor_lut)
-    gray = cv2.cvtColor(cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY), cv2.COLOR_GRAY2RGB)
-    # gray + (color - gray) * factor, as one fast weighted blend
-    return cv2.blendLinear(rgb, gray, factor, 1.0 - factor)
+def _levels_is_identity(adj: Adjustments) -> bool:
+    return not adj.invert and adj.black == 0 and adj.white == 255 and adj.gamma == 1.0
+
+
+def _hue_sat_is_identity(adj: Adjustments) -> bool:
+    return not adj.colorize and adj.hue == 0 and adj.saturation == 0
+
+
+def _hue_saturation(rgb: np.ndarray, adj: Adjustments) -> np.ndarray:
+    """Hue shift + saturation in HLS space, or Colorize. OpenCV's 8-bit HLS
+    stores hue as 0..179 (2 degrees per step), lightness and saturation as
+    0..255."""
+    if adj.colorize:
+        # Keep each pixel's brightness, replace its color with one tint.
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        hue = np.full_like(gray, round((adj.colorize_hue % 360) / 2) % 180)
+        sat = np.full_like(gray, round(255 * np.clip(adj.colorize_saturation, 0, 100) / 100))
+        return cv2.cvtColor(cv2.merge([hue, gray, sat]), cv2.COLOR_HLS2RGB)
+
+    i = np.arange(256)
+    shift = round(np.clip(adj.hue, -180, 180) / 2)
+    # Hue 180 can occur for colors just short of 360 degrees; it means red, so wrap it too.
+    hue_lut = np.where(i <= 180, (i + shift) % 180, i)
+    sat_lut = np.clip(np.round(i * (1.0 + np.clip(adj.saturation, -100, 100) / 100.0)), 0, 255)
+    lut = np.stack([hue_lut, i, sat_lut], axis=-1).astype(np.uint8).reshape(256, 1, 3)
+    return cv2.cvtColor(cv2.LUT(cv2.cvtColor(rgb, cv2.COLOR_RGB2HLS), lut), cv2.COLOR_HLS2RGB)
 
 
 def apply_adjustments(image: np.ndarray, adj: Adjustments) -> np.ndarray:
     """Returns `image` itself when nothing is adjusted; alpha is untouched."""
     if adj == Adjustments():
         return image
-    out = image if _tone_is_identity(adj) else cv2.LUT(image, tone_lut(adj))
-    if adj.vibrance != 0.0 or adj.saturation != 0.0:
-        rgb = _saturate(
-            cv2.cvtColor(out, cv2.COLOR_RGBA2RGB),
-            float(np.clip(adj.vibrance, -1, 1)),
-            float(np.clip(adj.saturation, -1, 1)),
-        )
+    out = image if _levels_is_identity(adj) else cv2.LUT(image, levels_lut(adj))
+    if not _hue_sat_is_identity(adj):
+        rgb = _hue_saturation(cv2.cvtColor(out, cv2.COLOR_RGBA2RGB), adj)
         out_rgba = cv2.cvtColor(rgb, cv2.COLOR_RGB2RGBA)
         cv2.mixChannels([image], [out_rgba], [3, 3])  # restore original alpha
         out = out_rgba
+    if adj.lightness != 0:
+        out = cv2.LUT(out, _rgba_lut(lightness_curve(adj.lightness)))
     return out

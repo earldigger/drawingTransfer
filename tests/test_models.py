@@ -21,7 +21,8 @@ def test_project_round_trip_through_dict():
     layer.quad = [(0.1, 0.2), (0.9, 0.2), (0.9, 0.8), (0.1, 0.8)]
     layer.perspective_corners = PerspectiveCorners.default_for_image(800, 600)
     layer.perspective_fill_canvas = True
-    layer.adjustments = Adjustments(invert=True, black=20, gamma=1.5, white=230, temperature=0.3, vibrance=-0.2, saturation=0.4)
+    layer.adjustments = Adjustments(invert=True, black=20, gamma=1.5, white=230, hue=-40, saturation=30, lightness=-10,
+                                    colorize=True, colorize_hue=200, colorize_saturation=45)
     layer.blend_mode = BlendMode.LINEAR_LIGHT
     project.add_layer(layer)
     project.grid = GridSettings(enabled=True, rows=4, columns=5, color=(10, 20, 30))

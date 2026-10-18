@@ -213,8 +213,8 @@ def test_adjustment_controls_change_displayed_pixmap(qapp):
     panel.black.slider.setValue(60)  # (155 - 60) / (255 - 60) -> darker
     assert center_gray() == 124
     panel.levels_reset.click()
-    panel.temperature.slider.setValue(100)
-    assert window.canvas_view.entry(layer.id).pixmap.toImage().pixelColor(10, 10).red() > 155
+    panel.lightness.slider.setValue(50)
+    assert center_gray() > 155
     window.deleteLater()
 
 
@@ -276,16 +276,47 @@ def test_on_screen_render_matches_with_linear_light(view, qapp):
     assert (c.red(), c.green(), c.blue()) == (255, 255, 255)
 
 
-def test_color_number_box_and_slider_stay_in_sync(qapp):
+def test_hue_number_box_and_slider_stay_in_sync(qapp):
     window, (layer,) = make_window_with_layers(qapp, (20, 20))
-    tint = window.layers_panel.tint
-    tint.spin.setValue(-35)  # typing a number moves the slider and applies it
-    assert tint.slider.value() == -35
-    assert window.doc.project.get_layer(layer.id).adjustments.tint == -0.35
-    tint.slider.setValue(20)
-    assert tint.spin.value() == 20
-    window.layers_panel.color_reset.click()
-    assert tint.spin.value() == 0 and window.doc.project.get_layer(layer.id).adjustments.tint == 0
+    hue = window.layers_panel.hue
+    hue.spin.setValue(-35)  # typing a number moves the slider and applies it
+    assert hue.slider.value() == -35
+    assert window.doc.project.get_layer(layer.id).adjustments.hue == -35
+    hue.slider.setValue(20)
+    assert hue.spin.value() == 20
+    window.layers_panel.hue_sat_reset.click()
+    assert hue.spin.value() == 0 and window.doc.project.get_layer(layer.id).adjustments.hue == 0
     window.undo_action.trigger()
-    assert tint.spin.value() == 20 and tint.slider.value() == 20  # panel follows undo
+    assert hue.spin.value() == 20 and hue.slider.value() == 20  # panel follows undo
+    window.deleteLater()
+
+
+def test_levels_number_boxes(qapp):
+    window, (layer,) = make_window_with_layers(qapp, (20, 20))
+    panel = window.layers_panel
+    panel.black.spin.setValue(30)
+    panel.gamma.spin.setValue(1.5)
+    panel.white.spin.setValue(220)
+    adj = window.doc.project.get_layer(layer.id).adjustments
+    assert (adj.black, adj.white) == (30, 220)
+    assert abs(adj.gamma - 1.5) < 0.02
+    assert panel.black.slider.value() == 30 and panel.white.slider.value() == 220
+    panel.gamma.slider.setValue(0)
+    assert panel.gamma.spin.value() == 1.0
+    window.deleteLater()
+
+
+def test_colorize_switches_hue_and_saturation_ranges(qapp):
+    window, (layer,) = make_window_with_layers(qapp, (20, 20))
+    panel = window.layers_panel
+    panel.hue.slider.setValue(-90)
+    panel.colorize_check.setChecked(True)
+    assert panel.hue.slider.minimum() == 0 and panel.hue.slider.maximum() == 360
+    assert panel.saturation.slider.maximum() == 100
+    assert panel.saturation.spin.value() == 25  # Photoshop's colorize default
+    panel.hue.spin.setValue(210)
+    adj = window.doc.project.get_layer(layer.id).adjustments
+    assert adj.colorize and adj.colorize_hue == 210 and adj.hue == -90  # regular hue kept for later
+    panel.colorize_check.setChecked(False)
+    assert panel.hue.slider.value() == -90 and panel.hue.slider.minimum() == -180
     window.deleteLater()

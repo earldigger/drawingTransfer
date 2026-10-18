@@ -177,7 +177,7 @@ def test_levels_slider_drag_is_one_undo_step(window):
 def test_reset_color_is_undoable(window):
     w, (_, top) = window
     w.layers_panel.saturation.slider.setValue(-50)
-    w.layers_panel.color_reset.click()
+    w.layers_panel.hue_sat_reset.click()
     assert w.doc.project.get_layer(top.id).adjustments.saturation == 0
     w.undo_action.trigger()
-    assert w.doc.project.get_layer(top.id).adjustments.saturation == -0.5
+    assert w.doc.project.get_layer(top.id).adjustments.saturation == -50

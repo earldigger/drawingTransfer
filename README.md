@@ -35,8 +35,8 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Layers: add, delete, rename (double-click), reorder, show/hide, select
 - Per-layer opacity and blend mode: Normal, Multiply, Screen, Linear Light
 - Per-layer Levels (dark point, midtones, light point) and Invert values
-- Per-layer Color & Vibrance: temperature (blue-yellow), tint
-  (green-magenta), vibrance, saturation, each with a typeable value
+- Per-layer Hue / Saturation (hue, saturation, lightness) with Colorize,
+  Photoshop-style; every adjustment slider has a typeable number box
 - Grid overlay: rows, columns, opacity, thickness, RGB color picker,
   3x3 / 4x5 / 8x10 presets
 - Compare: Overlay, Blink Layer A only (rest of the stack stays on),
@@ -115,8 +115,9 @@ recomputed for display and cached.
 - `geometry.py` -> a plain Swift module; it has no dependencies and is the
   most directly portable piece.
 - `image_ops.py` -> `CIPerspectiveCorrection`, `CIColorInvert`,
-  `CIGammaAdjust` + `CIColorMatrix` (levels), `CITemperatureAndTint`,
-  `CIVibrance`, `CIColorControls` (saturation).
+  `CIGammaAdjust` + `CIColorMatrix` (levels), `CIHueAdjust` +
+  `CIColorControls` (hue/saturation/lightness), `CIColorMonochrome`
+  (colorize).
 - Layer display -> each layer drawn through a `CIPerspectiveTransform`
   (quad -> canvas) and composited with `CIMultiplyBlendMode`,
   `CIScreenBlendMode`, `CILinearLightBlendMode` or

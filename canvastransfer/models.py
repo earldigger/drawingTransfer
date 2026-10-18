@@ -85,19 +85,21 @@ class PerspectiveCorners:
 
 @dataclass(frozen=True)
 class Adjustments:
-    """Per-layer value and color adjustments, applied in this order to
-    what the layer shows: invert, levels, temperature + tint, vibrance,
-    saturation.
+    """Per-layer value and color adjustments in Photoshop's units, applied
+    in this order to what the layer shows: invert, levels, hue/saturation
+    (or colorize), lightness.
     """
 
     invert: bool = False
     black: int = 0  # levels dark point, 0..255
     gamma: float = 1.0  # levels midtones; >1 lightens, <1 darkens
     white: int = 255  # levels light point, 0..255
-    temperature: float = 0.0  # -1 blue .. +1 yellow
-    tint: float = 0.0  # -1 green .. +1 magenta
-    vibrance: float = 0.0  # -1..1
-    saturation: float = 0.0  # -1 (gray) .. +1
+    hue: int = 0  # -180..180 degrees around the color wheel
+    saturation: int = 0  # -100 (gray) .. 100
+    lightness: int = 0  # -100 (black) .. 100 (white)
+    colorize: bool = False  # tint the whole layer one color instead
+    colorize_hue: int = 0  # 0..360, the tint color when colorizing
+    colorize_saturation: int = 25  # 0..100, tint strength when colorizing
 
     def to_dict(self) -> dict:
         return asdict(self)

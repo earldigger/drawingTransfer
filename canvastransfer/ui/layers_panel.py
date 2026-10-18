@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -33,48 +34,20 @@ BLEND_LABELS = [
     (BlendMode.LINEAR_LIGHT, "Linear Light"),
 ]
 
+# Track colors like Photoshop's sliders: each shows what moving that way does.
+HUE_TRACK = ["#ff0000", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#ff00ff", "#ff0000"]
+SATURATION_TRACK = ["#7c7c7c", "#6aa7a0", "#3048ff", "#c020d8", "#ff2020"]
+LIGHTNESS_TRACK = ["#000000", "#808080", "#ffffff"]
+VALUE_TRACK = ["#000000", "#ffffff"]
+MIDTONE_TRACK = ["#303030", "#d0d0d0"]
+
 
 def gamma_to_slider(gamma: float) -> int:
     return round(100 * math.log10(max(gamma, 1e-3)))
 
 
 def slider_to_gamma(value: int) -> float:
-    return round(10 ** (value / 100), 3)
-
-
-class _SliderRow:
-    """Label | slider | value readout, laid into a grid row."""
-
-    def __init__(self, grid: QGridLayout, row: int, label: str, lo: int, hi: int, value: int, fmt, tooltip: str = ""):
-        self.label = QLabel(label)
-        self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(lo, hi)
-        self.slider.setValue(value)
-        self.readout = QLabel()
-        self.readout.setMinimumWidth(40)
-        self.readout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self._fmt = fmt
-        if tooltip:
-            for w in (self.label, self.slider):
-                w.setToolTip(tooltip)
-        self.slider.valueChanged.connect(self._show)
-        self._show(value)
-        grid.addWidget(self.label, row, 0)
-        grid.addWidget(self.slider, row, 1)
-        grid.addWidget(self.readout, row, 2)
-
-    def _show(self, value: int) -> None:
-        self.readout.setText(self._fmt(value))
-
-    def set(self, value: int) -> None:
-        self.slider.setValue(value)
-        self._show(value)
-
-
-# Track colors like Photoshop's Camera Raw sliders: each shows which way it shifts.
-TEMPERATURE_TRACK = ["#2a3cff", "#8a8a8a", "#f4ef1c"]
-TINT_TRACK = ["#22e022", "#8a8a8a", "#f020f0"]
-SATURATION_TRACK = ["#7c7c7c", "#7f9a72", "#d8c870", "#c8503c"]
+    return round(10 ** (value / 100), 2)
 
 
 def _track_style(colors: list[str]) -> str:
@@ -88,43 +61,64 @@ def _track_style(colors: list[str]) -> str:
     )
 
 
-class _GradientSliderRow:
+class _ValueSliderRow:
     """Photoshop-style control: label with an editable number box on top,
-    colored track below. Slider and box stay in sync."""
+    colored track below; slider and box stay in sync. For non-integer
+    displays (midtones gamma) pass `decimals` plus the two conversions."""
 
-    def __init__(self, layout: QVBoxLayout, label: str, colors: list[str], tooltip: str = ""):
+    def __init__(self, layout: QVBoxLayout, label: str, lo: int, hi: int, value: int, colors: list[str],
+                 tooltip: str = "", decimals: int = 0, to_display=None, from_display=None):
+        self._to_display = to_display or (lambda v: v)
+        self._from_display = from_display or (lambda v: v)
+
         top = QHBoxLayout()
         self.label = QLabel(f"{label}:")
-        self.spin = QSpinBox()
-        self.spin.setRange(-100, 100)
+        if decimals:
+            self.spin = QDoubleSpinBox()
+            self.spin.setDecimals(decimals)
+            self.spin.setSingleStep(10 ** -decimals)
+        else:
+            self.spin = QSpinBox()
         self.spin.setButtonSymbols(QSpinBox.NoButtons)
         self.spin.setAlignment(Qt.AlignRight)
         self.spin.setFixedWidth(64)
-        self.spin.setKeyboardTracking(False)  # apply on Return / focus-out, not each keystroke
+        self.spin.setKeyboardTracking(False)  # apply on Return / leaving the box, not every keystroke
         top.addWidget(self.label)
         top.addStretch(1)
         top.addWidget(self.spin)
         layout.addLayout(top)
 
         self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(-100, 100)
         self.slider.setStyleSheet(_track_style(colors))
         layout.addWidget(self.slider)
         if tooltip:
             for w in (self.label, self.slider, self.spin):
                 w.setToolTip(tooltip)
 
+        self.set_range(lo, hi)
         self.slider.valueChanged.connect(self._slider_moved)
-        self.spin.valueChanged.connect(self.slider.setValue)
+        self.spin.valueChanged.connect(lambda v: self.slider.setValue(round(self._from_display(v))))
+        self.set(value)
+
+    def set_range(self, lo: int, hi: int) -> None:
+        self.slider.blockSignals(True)
+        self.slider.setRange(lo, hi)
+        self.slider.blockSignals(False)
+        self.spin.blockSignals(True)
+        self.spin.setRange(self._to_display(lo), self._to_display(hi))
+        self.spin.blockSignals(False)
 
     def _slider_moved(self, value: int) -> None:
         self.spin.blockSignals(True)
-        self.spin.setValue(value)
+        self.spin.setValue(self._to_display(value))
         self.spin.blockSignals(False)
 
     def set(self, value: int) -> None:
         self.slider.setValue(value)
         self._slider_moved(value)
+
+    def widgets(self) -> list[QWidget]:
+        return [self.slider, self.spin]
 
 
 class LayersPanel(QWidget):
@@ -132,7 +126,7 @@ class LayersPanel(QWidget):
     layerVisibilityToggled = Signal(str, bool)
     layerOpacityChanged = Signal(str, float)
     layerBlendModeChanged = Signal(str, str)
-    # layer id, new Adjustments, slider name ("" = discrete change; same
+    # layer id, new Adjustments, control name ("" = discrete change; the same
     # name in quick succession is merged into one undo step)
     layerAdjustmentsChanged = Signal(str, object, str)
     addLayerRequested = Signal()
@@ -152,7 +146,7 @@ class LayersPanel(QWidget):
         layout.addWidget(self._build_layers_box())
         layout.addWidget(self._build_appearance_box())
         layout.addWidget(self._build_levels_box())
-        layout.addWidget(self._build_color_box())
+        layout.addWidget(self._build_hue_box())
         self._set_layer_controls_enabled(False)
 
     # -- construction -----------------------------------------------------
@@ -187,9 +181,16 @@ class LayersPanel(QWidget):
     def _build_appearance_box(self) -> QGroupBox:
         box = QGroupBox("Layer Appearance")
         grid = QGridLayout(box)
-        self.opacity = _SliderRow(grid, 0, "Opacity", 0, 100, 100, lambda v: f"{v}%")
-        self.opacity_slider = self.opacity.slider
+        grid.addWidget(QLabel("Opacity"), 0, 0)
+        self.opacity_slider = QSlider(Qt.Horizontal)
+        self.opacity_slider.setRange(0, 100)
+        self.opacity_slider.setValue(100)
+        self.opacity_label = QLabel("100%")
+        self.opacity_label.setMinimumWidth(40)
+        self.opacity_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.opacity_slider.valueChanged.connect(self._on_opacity_changed)
+        grid.addWidget(self.opacity_slider, 0, 1)
+        grid.addWidget(self.opacity_label, 0, 2)
 
         grid.addWidget(QLabel("Blend Mode"), 1, 0)
         self.blend_combo = QComboBox()
@@ -203,17 +204,16 @@ class LayersPanel(QWidget):
         box = QGroupBox("Levels")
         v = QVBoxLayout(box)
         self.invert_check = QCheckBox("Invert values")
-        self.invert_check.toggled.connect(self._on_invert_toggled)
+        self.invert_check.toggled.connect(lambda c: self._emit_adjust("", replace(self._adjust, invert=c)))
         v.addWidget(self.invert_check)
 
-        grid = QGridLayout()
-        v.addLayout(grid)
-        self.black = _SliderRow(grid, 0, "Dark point", 0, 255 - MIN_LEVELS_GAP, 0, str,
-                                "Values at or below this become black")
-        self.gamma = _SliderRow(grid, 1, "Midtones", -100, 100, 0, lambda s: f"{slider_to_gamma(s):.2f}",
-                                "Right lightens the middle values, left darkens them")
-        self.white = _SliderRow(grid, 2, "Light point", MIN_LEVELS_GAP, 255, 255, str,
-                                "Values at or above this become white")
+        self.black = _ValueSliderRow(v, "Dark point", 0, 255 - MIN_LEVELS_GAP, 0, VALUE_TRACK,
+                                     "Values at or below this become black")
+        self.gamma = _ValueSliderRow(v, "Midtones", -100, 100, 0, MIDTONE_TRACK,
+                                     "Right lightens the middle values, left darkens them (1.00 = unchanged)",
+                                     decimals=2, to_display=slider_to_gamma, from_display=lambda g: gamma_to_slider(g))
+        self.white = _ValueSliderRow(v, "Light point", MIN_LEVELS_GAP, 255, 255, VALUE_TRACK,
+                                     "Values at or above this become white")
         self.black.slider.valueChanged.connect(self._on_black_changed)
         self.gamma.slider.valueChanged.connect(
             lambda s: self._emit_adjust("gamma", replace(self._adjust, gamma=slider_to_gamma(s)))
@@ -227,28 +227,34 @@ class LayersPanel(QWidget):
         v.addWidget(self.levels_reset, alignment=Qt.AlignRight)
         return box
 
-    def _build_color_box(self) -> QGroupBox:
-        box = QGroupBox("Color && Vibrance")
+    def _build_hue_box(self) -> QGroupBox:
+        box = QGroupBox("Hue / Saturation")
         v = QVBoxLayout(box)
-        self.temperature = _GradientSliderRow(v, "Temperature", TEMPERATURE_TRACK, "Left bluer, right yellower")
-        self.tint = _GradientSliderRow(v, "Tint", TINT_TRACK, "Left greener, right more magenta")
-        v.addSpacing(6)
-        self.vibrance = _GradientSliderRow(v, "Vibrance", SATURATION_TRACK,
-                                           "Changes muted colors most and leaves strong colors mostly alone")
-        self.saturation = _GradientSliderRow(v, "Saturation", SATURATION_TRACK, "-100 is fully gray")
-        self._color_rows = {
-            "temperature": self.temperature, "tint": self.tint,
-            "vibrance": self.vibrance, "saturation": self.saturation,
-        }
-        for name, row in self._color_rows.items():
-            row.slider.valueChanged.connect(
-                lambda s, n=name: self._emit_adjust(n, replace(self._adjust, **{n: s / 100.0}))
-            )
-        self.color_reset = QPushButton("Reset Color")
-        self.color_reset.clicked.connect(
-            lambda: self._emit_adjust("", replace(self._adjust, **{n: 0.0 for n in self._color_rows}), sync=True)
-        )
-        v.addWidget(self.color_reset, alignment=Qt.AlignRight)
+        self.hue = _ValueSliderRow(v, "Hue", -180, 180, 0, HUE_TRACK, "Shifts every color around the color wheel")
+        self.saturation = _ValueSliderRow(v, "Saturation", -100, 100, 0, SATURATION_TRACK, "-100 is fully gray")
+        self.lightness = _ValueSliderRow(v, "Lightness", -100, 100, 0, LIGHTNESS_TRACK,
+                                         "+100 is white, -100 is black")
+        self.colorize_check = QCheckBox("Colorize")
+        self.colorize_check.setToolTip("Tint the whole layer one color, keeping only its light and dark")
+        v.addWidget(self.colorize_check)
+
+        self.hue.slider.valueChanged.connect(lambda s: self._emit_adjust(
+            "colorize_hue" if self._adjust.colorize else "hue",
+            replace(self._adjust, **{"colorize_hue" if self._adjust.colorize else "hue": s})))
+        self.saturation.slider.valueChanged.connect(lambda s: self._emit_adjust(
+            "colorize_saturation" if self._adjust.colorize else "saturation",
+            replace(self._adjust, **{"colorize_saturation" if self._adjust.colorize else "saturation": s})))
+        self.lightness.slider.valueChanged.connect(
+            lambda s: self._emit_adjust("lightness", replace(self._adjust, lightness=s)))
+        self.colorize_check.toggled.connect(
+            lambda c: self._emit_adjust("", replace(self._adjust, colorize=c), sync=True))
+
+        self.hue_sat_reset = QPushButton("Reset Hue / Saturation")
+        defaults = Adjustments()
+        self.hue_sat_reset.clicked.connect(lambda: self._emit_adjust("", replace(
+            self._adjust, hue=0, saturation=0, lightness=0, colorize=False,
+            colorize_hue=defaults.colorize_hue, colorize_saturation=defaults.colorize_saturation), sync=True))
+        v.addWidget(self.hue_sat_reset, alignment=Qt.AlignRight)
         return box
 
     # -- outward-facing API ------------------------------------------------
@@ -271,7 +277,7 @@ class LayersPanel(QWidget):
         self._updating = True
         self._set_layer_controls_enabled(layer is not None)
         if layer is not None:
-            self.opacity.set(round(layer.opacity * 100))
+            self.opacity_slider.setValue(round(layer.opacity * 100))
             self.blend_combo.setCurrentIndex(self.blend_combo.findData(layer.blend_mode.value))
             self._show_adjustments(layer.adjustments)
         self._updating = False
@@ -283,18 +289,28 @@ class LayersPanel(QWidget):
         self.black.set(adj.black)
         self.gamma.set(gamma_to_slider(adj.gamma))
         self.white.set(adj.white)
-        for name, row in self._color_rows.items():
-            row.set(round(getattr(adj, name) * 100))
+        # Colorize reuses the Hue and Saturation sliders with Photoshop's colorize ranges.
+        self.colorize_check.setChecked(adj.colorize)
+        if adj.colorize:
+            self.hue.set_range(0, 360)
+            self.saturation.set_range(0, 100)
+            self.hue.set(adj.colorize_hue)
+            self.saturation.set(adj.colorize_saturation)
+        else:
+            self.hue.set_range(-180, 180)
+            self.saturation.set_range(-100, 100)
+            self.hue.set(adj.hue)
+            self.saturation.set(adj.saturation)
+        self.lightness.set(adj.lightness)
         self._updating = was_updating
 
     def _set_layer_controls_enabled(self, enabled: bool) -> None:
         widgets = [
             self.opacity_slider, self.blend_combo, self.delete_button, self.up_button, self.down_button,
-            self.perspective_button, self.invert_check, self.black.slider, self.gamma.slider, self.white.slider,
-            self.levels_reset, self.color_reset,
+            self.perspective_button, self.invert_check, self.levels_reset, self.colorize_check, self.hue_sat_reset,
         ]
-        for row in self._color_rows.values():
-            widgets += [row.slider, row.spin]
+        for row in (self.black, self.gamma, self.white, self.hue, self.saturation, self.lightness):
+            widgets += row.widgets()
         for w in widgets:
             w.setEnabled(enabled)
 
@@ -309,7 +325,7 @@ class LayersPanel(QWidget):
         if layer_id:
             signal.emit(layer_id)
 
-    def _emit_adjust(self, slider_name: str, adj: Adjustments, sync: bool = False) -> None:
+    def _emit_adjust(self, control: str, adj: Adjustments, sync: bool = False) -> None:
         if self._updating:
             return
         layer_id = self._current_layer_id()
@@ -318,7 +334,7 @@ class LayersPanel(QWidget):
         self._adjust = adj
         if sync:
             self._show_adjustments(adj)
-        self.layerAdjustmentsChanged.emit(layer_id, adj, slider_name)
+        self.layerAdjustmentsChanged.emit(layer_id, adj, control)
 
     def _on_black_changed(self, value: int) -> None:
         if self._updating:
@@ -342,9 +358,6 @@ class LayersPanel(QWidget):
             value = limit
         self._emit_adjust("white", replace(self._adjust, white=value))
 
-    def _on_invert_toggled(self, checked: bool) -> None:
-        self._emit_adjust("", replace(self._adjust, invert=checked))
-
     def _on_current_changed(self, current, _previous):
         if self._updating or current is None:
             return
@@ -361,6 +374,7 @@ class LayersPanel(QWidget):
             self.renameLayerRequested.emit(item.data(LAYER_ID_ROLE), new_name.strip())
 
     def _on_opacity_changed(self, value: int):
+        self.opacity_label.setText(f"{value}%")
         if self._updating:
             return
         layer_id = self._current_layer_id()

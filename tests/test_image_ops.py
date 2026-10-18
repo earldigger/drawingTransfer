@@ -43,6 +43,10 @@ def test_downscale_to_max_returns_same_array_when_small():
     assert downscale_to_max(solid((1, 2, 3, 255), 400, 200), 100).shape == (50, 100, 4)
 
 
+def close(a, b, tol=3):
+    return all(abs(int(x) - int(y)) <= tol for x, y in zip(a, b))
+
+
 def adjusted(rgb, **kw):
     return tuple(apply_adjustments(solid((*rgb, 255), 1, 1), Adjustments(**kw))[0, 0, :3])
 
@@ -84,50 +88,61 @@ def test_invert_happens_before_levels():
     assert adjusted((230, 230, 230), invert=True, black=40) == (0, 0, 0)
 
 
-def test_temperature_runs_blue_to_yellow():
-    r, g, b = adjusted((150, 150, 150), temperature=1.0)
-    assert r > 150 and g > 150 and b < 150 and r == g  # yellow
-    r, g, b = adjusted((150, 150, 150), temperature=-1.0)
-    assert r < 150 and g < 150 and b > 150  # blue
+def test_hue_shift_rotates_around_the_wheel():
+    assert close(adjusted((255, 0, 0), hue=120), (0, 255, 0))
+    assert close(adjusted((255, 0, 0), hue=-120), (0, 0, 255))
+    assert close(adjusted((255, 0, 0), hue=180), (0, 255, 255))
 
 
-def test_tint_runs_green_to_magenta():
-    r, g, b = adjusted((150, 150, 150), tint=1.0)
-    assert g < 150 and r > 150 and b > 150 and r == b  # magenta
-    r, g, b = adjusted((150, 150, 150), tint=-1.0)
-    assert g > 150 and r < 150 and b < 150  # green
+def test_hue_shift_wraps_reds_just_below_360_degrees():
+    # (255, 0, 1) is 359.8 degrees, which OpenCV stores as hue 180
+    assert close(adjusted((255, 0, 1), hue=120), (0, 255, 0))
 
 
-def test_temperature_and_tint_combine():
-    alone = adjusted((150, 150, 150), temperature=0.5)
-    both = adjusted((150, 150, 150), temperature=0.5, tint=0.5)
-    assert both[1] < alone[1]  # tint pulls green down on top of the warm shift
+def test_hue_shift_leaves_grays_alone():
+    assert close(adjusted((90, 90, 90), hue=77), (90, 90, 90))
 
 
-def test_saturation_minus_one_is_gray():
-    r, g, b = adjusted((200, 100, 50), saturation=-1.0)
-    assert r == g == b
+def test_saturation_minus_100_is_gray():
+    r, g, b = adjusted((200, 100, 50), saturation=-100)
+    assert abs(r - g) <= 1 and abs(g - b) <= 1
 
 
 def test_saturation_boost_pushes_away_from_gray():
-    r, g, b = adjusted((160, 120, 110), saturation=1.0)
+    r, g, b = adjusted((160, 120, 110), saturation=60)
     assert r > 160 and b < 110
 
 
-def test_vibrance_affects_muted_colors_more_than_strong_ones():
-    def spread(rgb):
-        return max(rgb) - min(rgb)
-    muted, strong = (140, 120, 115), (230, 40, 30)
-    muted_gain = spread(adjusted(muted, vibrance=1.0)) / spread(muted)
-    strong_gain = spread(adjusted(strong, vibrance=1.0)) / spread(strong)
-    assert muted_gain > 1.4 and strong_gain < 1.25
+def test_lightness_blends_toward_white_or_black():
+    assert adjusted((100, 50, 200), lightness=100) == (255, 255, 255)
+    assert adjusted((100, 50, 200), lightness=-100) == (0, 0, 0)
+    assert close(adjusted((100, 100, 100), lightness=50), (178, 178, 178))
+    assert close(adjusted((100, 100, 100), lightness=-50), (50, 50, 50))
 
 
-def test_gray_stays_gray_under_vibrance_and_saturation():
-    assert adjusted((90, 90, 90), vibrance=1.0, saturation=1.0) == (90, 90, 90)
+def test_colorize_tints_everything_one_hue_keeping_lightness():
+    dark = adjusted((40, 40, 40), colorize=True, colorize_hue=240, colorize_saturation=60)
+    light = adjusted((200, 200, 200), colorize=True, colorize_hue=240, colorize_saturation=60)
+    for r, g, b in (dark, light):
+        assert b > r and abs(r - g) <= 2  # blue tint
+    assert sum(map(int, light)) > sum(map(int, dark))  # light stays lighter than dark
+    # a red pixel gets the same blue tint: its own color is discarded
+    red = adjusted((200, 30, 30), colorize=True, colorize_hue=240, colorize_saturation=60)
+    assert red[2] > red[0]
+
+
+def test_colorize_with_zero_saturation_is_grayscale():
+    r, g, b = adjusted((200, 30, 30), colorize=True, colorize_saturation=0)
+    assert abs(r - g) <= 1 and abs(g - b) <= 1
+
+
+def test_colorize_ignores_regular_hue_and_saturation():
+    a = adjusted((120, 80, 60), colorize=True, colorize_hue=30, hue=90, saturation=-50)
+    b = adjusted((120, 80, 60), colorize=True, colorize_hue=30)
+    assert a == b
 
 
 def test_adjustments_keep_alpha():
     img = solid((100, 120, 140, 77), 3, 3)
-    out = apply_adjustments(img, Adjustments(black=10, temperature=0.5, tint=-0.4, vibrance=0.5, saturation=-0.3))
-    assert np.all(out[..., 3] == 77)
+    for adj in (Adjustments(black=10, hue=40, saturation=-30, lightness=20), Adjustments(colorize=True, lightness=-10)):
+        assert np.all(apply_adjustments(img, adj)[..., 3] == 77)
