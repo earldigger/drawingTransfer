@@ -16,7 +16,7 @@ def make_project():
 def test_overlay_uses_layer_settings():
     project, drawing, canvas, extra = make_project()
     states = display_states(project, True)
-    assert states[drawing.id].opacity == 0.6 and states[drawing.id].multiply
+    assert states[drawing.id].opacity == 0.6 and states[drawing.id].blend == BlendMode.MULTIPLY
     assert states[canvas.id].visible and not states[extra.id].visible
 
 
@@ -25,7 +25,7 @@ def test_blink_alternates_solo_layers():
     project.compare_mode = CompareMode.BLINK
     on, off = display_states(project, True), display_states(project, False)
     assert on[drawing.id].visible and not on[canvas.id].visible
-    assert on[drawing.id].opacity == 1.0 and not on[drawing.id].multiply
+    assert on[drawing.id].opacity == 1.0 and on[drawing.id].blend == BlendMode.NORMAL
     assert off[canvas.id].visible and not off[drawing.id].visible
 
 
@@ -33,7 +33,7 @@ def test_blink_a_only_toggles_a_and_keeps_rest_of_stack():
     project, drawing, canvas, extra = make_project()
     project.compare_mode = CompareMode.BLINK_A
     on, off = display_states(project, True), display_states(project, False)
-    assert on[drawing.id].visible and on[drawing.id].multiply and on[drawing.id].opacity == 0.6
+    assert on[drawing.id].visible and on[drawing.id].blend == BlendMode.MULTIPLY and on[drawing.id].opacity == 0.6
     assert not off[drawing.id].visible
     for states in (on, off):
         assert states[canvas.id].visible

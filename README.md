@@ -33,7 +33,9 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Undo/Redo (Cmd+Z / Shift+Cmd+Z) for every project edit; a slider drag
   is one step. Compare-mode settings are not undoable (viewing choice)
 - Layers: add, delete, rename (double-click), reorder, show/hide, select
-- Per-layer opacity, Normal/Multiply blend, contrast, invert
+- Per-layer opacity and blend mode: Normal, Multiply, Screen, Linear Light
+- Per-layer Levels (dark point, midtones, light point) and Invert values
+- Per-layer Color & Vibrance: temperature, vibrance, saturation
 - Grid overlay: rows, columns, opacity, thickness, RGB color picker,
   3x3 / 4x5 / 8x10 presets
 - Compare: Overlay, Blink Layer A only (rest of the stack stays on),
@@ -91,8 +93,9 @@ canvastransfer/
   history.py        undo/redo snapshots and transform sessions
   project_io.py     .ctproj package save/load, autosave
   ui/
-    canvas_view.py   Qt scene showing all layers + the transform tool
-    scene_items.py   layer item (projective transform, Multiply) and grid
+    canvas_view.py   live canvas + the transform tool
+    canvas_render.py layer compositing (Qt blend modes; Linear Light
+                     computed from the pixels underneath) and grid
     layer_display.py cached per-layer display pixmaps
     main_window.py   toolbar, menus, wiring; plus the side panels
 ```
@@ -110,10 +113,12 @@ recomputed for display and cached.
   `images/`) can carry over, likely wrapped in a `FileWrapper` package.
 - `geometry.py` -> a plain Swift module; it has no dependencies and is the
   most directly portable piece.
-- `image_ops.py` -> `CIPerspectiveCorrection`, `CIColorControls`
-  (contrast), `CIColorInvert`.
+- `image_ops.py` -> `CIPerspectiveCorrection`, `CIColorInvert`,
+  `CIGammaAdjust` + `CIColorMatrix` (levels), `CITemperatureAndTint`,
+  `CIVibrance`, `CIColorControls` (saturation).
 - Layer display -> each layer drawn through a `CIPerspectiveTransform`
-  (quad -> canvas) and composited with `CIMultiplyBlendMode` /
+  (quad -> canvas) and composited with `CIMultiplyBlendMode`,
+  `CIScreenBlendMode`, `CILinearLightBlendMode` or
   `CISourceOverCompositing`; or `CALayer`s with a 3D transform and a
   multiply `compositingFilter` for live interaction.
 - Camera capture and rectangle detection are new work with no prototype

@@ -1,4 +1,5 @@
 from canvastransfer.models import (
+    Adjustments,
     Project,
     Layer,
     GridSettings,
@@ -20,9 +21,8 @@ def test_project_round_trip_through_dict():
     layer.quad = [(0.1, 0.2), (0.9, 0.2), (0.9, 0.8), (0.1, 0.8)]
     layer.perspective_corners = PerspectiveCorners.default_for_image(800, 600)
     layer.perspective_fill_canvas = True
-    layer.blend_mode = BlendMode.MULTIPLY
-    layer.contrast = 0.4
-    layer.invert = True
+    layer.adjustments = Adjustments(invert=True, black=20, gamma=1.5, white=230, temperature=0.3, vibrance=-0.2, saturation=0.4)
+    layer.blend_mode = BlendMode.LINEAR_LIGHT
     project.add_layer(layer)
     project.grid = GridSettings(enabled=True, rows=4, columns=5, color=(10, 20, 30))
     project.compare_mode = CompareMode.BLINK_A
@@ -32,9 +32,9 @@ def test_project_round_trip_through_dict():
     r = restored.layers[0]
     assert restored.name == "My Painting" and restored.units == Units.INCHES
     assert r.quad == layer.quad
-    assert r.blend_mode == BlendMode.MULTIPLY
+    assert r.blend_mode == BlendMode.LINEAR_LIGHT
     assert r.perspective_corners.top_right == (800.0, 0.0)
-    assert r.perspective_fill_canvas and r.invert and r.contrast == 0.4
+    assert r.perspective_fill_canvas and r.adjustments == layer.adjustments
     assert restored.grid.color == (10, 20, 30) and restored.grid.columns == 5
     assert restored.compare_mode == CompareMode.BLINK_A
     assert restored.active_layer_id == layer.id
@@ -73,3 +73,9 @@ def test_move_layer_unknown_id_is_noop():
     project.add_layer(make_layer("A"))
     project.move_layer("does-not-exist", 0)
     assert [l.name for l in project.layers] == ["A"]
+
+
+def test_adjustments_ignore_unknown_keys_and_default_missing():
+    adj = Adjustments.from_dict({"black": 10, "contrast": 0.5})
+    assert adj == Adjustments(black=10)
+    assert Adjustments.from_dict(None) == Adjustments()

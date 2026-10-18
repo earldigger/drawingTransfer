@@ -13,19 +13,16 @@ from .models import Project, CompareMode, BlendMode
 class DisplayState:
     visible: bool
     opacity: float
-    multiply: bool
+    blend: BlendMode
     clip: str | None = None  # None, "left" or "right" of the split line
 
 
-HIDDEN = DisplayState(False, 1.0, False)
-SOLO = DisplayState(True, 1.0, False)
+HIDDEN = DisplayState(False, 1.0, BlendMode.NORMAL)
+SOLO = DisplayState(True, 1.0, BlendMode.NORMAL)
 
 
 def display_states(project: Project, blink_phase_on: bool) -> dict[str, DisplayState]:
-    normal = {
-        l.id: DisplayState(l.visible, l.opacity, l.blend_mode == BlendMode.MULTIPLY)
-        for l in project.layers
-    }
+    normal = {l.id: DisplayState(l.visible, l.opacity, l.blend_mode) for l in project.layers}
     a, b = project.compare_layer_a, project.compare_layer_b
     has_a, has_b = a in normal, b in normal
     mode = project.compare_mode
@@ -37,13 +34,13 @@ def display_states(project: Project, blink_phase_on: bool) -> dict[str, DisplayS
     if mode == CompareMode.BLINK_A and has_a:
         states = dict(normal)
         layer_a = normal[a]
-        states[a] = DisplayState(blink_phase_on, layer_a.opacity, layer_a.multiply)
+        states[a] = DisplayState(blink_phase_on, layer_a.opacity, layer_a.blend)
         return states
 
     if mode == CompareMode.SPLIT and has_a and has_b and a != b:
         states = {lid: HIDDEN for lid in normal}
-        states[a] = DisplayState(True, 1.0, False, "left")
-        states[b] = DisplayState(True, 1.0, False, "right")
+        states[a] = DisplayState(True, 1.0, BlendMode.NORMAL, "left")
+        states[b] = DisplayState(True, 1.0, BlendMode.NORMAL, "right")
         return states
 
     return normal

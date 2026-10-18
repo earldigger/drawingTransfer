@@ -103,7 +103,7 @@ def test_undo_delete_brings_layer_and_image_back(window):
     w.undo_action.trigger()
     assert w.doc.project.get_layer(top.id) is not None
     assert top.id in w.doc.images
-    assert top.id in w.canvas_view._items
+    assert w.canvas_view.entry(top.id) is not None
 
     w.redo_action.trigger()
     assert w.doc.project.get_layer(top.id) is None
@@ -120,7 +120,7 @@ def test_other_edit_during_session_commits_it_first(window):
     assert not w.history.in_session and not w.transform_action.isChecked()
     w.undo_action.trigger()  # undoes invert
     layer = w.doc.project.get_layer(top.id)
-    assert not layer.invert and layer.quad != original
+    assert not layer.adjustments.invert and layer.quad != original
     w.undo_action.trigger()  # undoes the transform
     assert w.doc.project.get_layer(top.id).quad == original
 
@@ -162,3 +162,22 @@ def test_undo_buttons_disabled_with_nothing_to_undo(window):
     w, _ = window
     assert not w.undo_action.isEnabled() and not w.redo_action.isEnabled()
     assert not w.done_action.isEnabled() and not w.cancel_action.isEnabled()
+
+
+def test_levels_slider_drag_is_one_undo_step(window):
+    w, (_, top) = window
+    for value in (10, 20, 30, 40):
+        w.layers_panel.black.slider.setValue(value)
+    assert w.doc.project.get_layer(top.id).adjustments.black == 40
+    w.undo_action.trigger()
+    assert w.doc.project.get_layer(top.id).adjustments.black == 0
+    assert w.layers_panel.black.slider.value() == 0  # panel follows the undo
+
+
+def test_reset_color_is_undoable(window):
+    w, (_, top) = window
+    w.layers_panel.saturation.slider.setValue(-50)
+    w.layers_panel.color_reset.click()
+    assert w.doc.project.get_layer(top.id).adjustments.saturation == 0
+    w.undo_action.trigger()
+    assert w.doc.project.get_layer(top.id).adjustments.saturation == -0.5

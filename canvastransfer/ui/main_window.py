@@ -166,8 +166,11 @@ class MainWindow(QMainWindow):
         lp.layerVisibilityToggled.connect(lambda lid, v: self._set_layer_attr(lid, "visible", v))
         lp.layerOpacityChanged.connect(lambda lid, v: self._set_layer_attr(lid, "opacity", v, key=("opacity", lid)))
         lp.layerBlendModeChanged.connect(lambda lid, v: self._set_layer_attr(lid, "blend_mode", BlendMode(v)))
-        lp.layerContrastChanged.connect(lambda lid, v: self._set_layer_attr(lid, "contrast", v, key=("contrast", lid)))
-        lp.layerInvertToggled.connect(lambda lid, v: self._set_layer_attr(lid, "invert", v))
+        lp.layerAdjustmentsChanged.connect(
+            lambda lid, adj, slider: self._set_layer_attr(
+                lid, "adjustments", adj, key=("adjust", slider, lid) if slider else None
+            )
+        )
         lp.addLayerRequested.connect(self._import_image)
         lp.deleteLayerRequested.connect(self._on_delete_layer)
         lp.moveLayerUpRequested.connect(lambda lid: self._on_move_layer(lid, +1))

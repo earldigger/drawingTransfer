@@ -1,24 +1,77 @@
 from __future__ import annotations
 
+import math
+from dataclasses import replace
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
+    QInputDialog,
+    QLabel,
     QListWidget,
     QListWidgetItem,
     QPushButton,
     QSlider,
-    QComboBox,
-    QLabel,
-    QGroupBox,
-    QInputDialog,
-    QCheckBox,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ..models import Project, BlendMode
+from ..models import Adjustments, BlendMode, Layer, Project
 
 LAYER_ID_ROLE = Qt.UserRole + 1
+MIN_LEVELS_GAP = 2
+
+BLEND_LABELS = [
+    (BlendMode.NORMAL, "Normal"),
+    (BlendMode.MULTIPLY, "Multiply"),
+    (BlendMode.SCREEN, "Screen"),
+    (BlendMode.LINEAR_LIGHT, "Linear Light"),
+]
+
+
+def gamma_to_slider(gamma: float) -> int:
+    return round(100 * math.log10(max(gamma, 1e-3)))
+
+
+def slider_to_gamma(value: int) -> float:
+    return round(10 ** (value / 100), 3)
+
+
+class _SliderRow:
+    """Label | slider | value readout, laid into a grid row."""
+
+    def __init__(self, grid: QGridLayout, row: int, label: str, lo: int, hi: int, value: int, fmt, tooltip: str = ""):
+        self.label = QLabel(label)
+        self.slider = QSlider(Qt.Horizontal)
+        self.slider.setRange(lo, hi)
+        self.slider.setValue(value)
+        self.readout = QLabel()
+        self.readout.setMinimumWidth(40)
+        self.readout.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._fmt = fmt
+        if tooltip:
+            for w in (self.label, self.slider):
+                w.setToolTip(tooltip)
+        self.slider.valueChanged.connect(self._show)
+        self._show(value)
+        grid.addWidget(self.label, row, 0)
+        grid.addWidget(self.slider, row, 1)
+        grid.addWidget(self.readout, row, 2)
+
+    def _show(self, value: int) -> None:
+        self.readout.setText(self._fmt(value))
+
+    def set(self, value: int) -> None:
+        self.slider.setValue(value)
+        self._show(value)
+
+
+def _signed(value: int) -> str:
+    return f"{value:+d}" if value else "0"
 
 
 class LayersPanel(QWidget):
@@ -26,29 +79,39 @@ class LayersPanel(QWidget):
     layerVisibilityToggled = Signal(str, bool)
     layerOpacityChanged = Signal(str, float)
     layerBlendModeChanged = Signal(str, str)
+    # layer id, new Adjustments, slider name ("" = discrete change; same
+    # name in quick succession is merged into one undo step)
+    layerAdjustmentsChanged = Signal(str, object, str)
     addLayerRequested = Signal()
     deleteLayerRequested = Signal(str)
     moveLayerUpRequested = Signal(str)
     moveLayerDownRequested = Signal(str)
     renameLayerRequested = Signal(str, str)
     perspectiveCorrectRequested = Signal(str)
-    layerContrastChanged = Signal(str, float)
-    layerInvertToggled = Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._updating = False
+        self._adjust = Adjustments()
 
         layout = QVBoxLayout(self)
-        box = QGroupBox("Layers")
-        layout.addWidget(box)
-        box_layout = QVBoxLayout(box)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._build_layers_box())
+        layout.addWidget(self._build_appearance_box())
+        layout.addWidget(self._build_levels_box())
+        layout.addWidget(self._build_color_box())
+        self._set_layer_controls_enabled(False)
 
+    # -- construction -----------------------------------------------------
+
+    def _build_layers_box(self) -> QGroupBox:
+        box = QGroupBox("Layers")
+        v = QVBoxLayout(box)
         self.list_widget = QListWidget()
         self.list_widget.itemChanged.connect(self._on_item_changed)
         self.list_widget.currentItemChanged.connect(self._on_current_changed)
         self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
-        box_layout.addWidget(self.list_widget)
+        v.addWidget(self.list_widget)
 
         buttons = QHBoxLayout()
         self.add_button = QPushButton("Add Image…")
@@ -57,61 +120,79 @@ class LayersPanel(QWidget):
         self.down_button = QPushButton("↓")
         for b in (self.add_button, self.delete_button, self.up_button, self.down_button):
             buttons.addWidget(b)
-        box_layout.addLayout(buttons)
-
+        v.addLayout(buttons)
         self.add_button.clicked.connect(self.addLayerRequested)
-        self.delete_button.clicked.connect(self._emit_delete)
-        self.up_button.clicked.connect(self._emit_move_up)
-        self.down_button.clicked.connect(self._emit_move_down)
+        self.delete_button.clicked.connect(lambda: self._emit_for_current(self.deleteLayerRequested))
+        self.up_button.clicked.connect(lambda: self._emit_for_current(self.moveLayerUpRequested))
+        self.down_button.clicked.connect(lambda: self._emit_for_current(self.moveLayerDownRequested))
 
         self.perspective_button = QPushButton("Perspective Correct…")
-        self.perspective_button.clicked.connect(self._emit_perspective)
-        box_layout.addWidget(self.perspective_button)
+        self.perspective_button.clicked.connect(lambda: self._emit_for_current(self.perspectiveCorrectRequested))
+        v.addWidget(self.perspective_button)
+        return box
 
-        appearance = QGroupBox("Layer Appearance")
-        layout.addWidget(appearance)
-        appearance_layout = QVBoxLayout(appearance)
-
-        opacity_row = QHBoxLayout()
-        opacity_row.addWidget(QLabel("Opacity"))
-        self.opacity_slider = QSlider(Qt.Horizontal)
-        self.opacity_slider.setRange(0, 100)
-        self.opacity_slider.setValue(100)
-        self.opacity_value_label = QLabel("100%")
+    def _build_appearance_box(self) -> QGroupBox:
+        box = QGroupBox("Layer Appearance")
+        grid = QGridLayout(box)
+        self.opacity = _SliderRow(grid, 0, "Opacity", 0, 100, 100, lambda v: f"{v}%")
+        self.opacity_slider = self.opacity.slider
         self.opacity_slider.valueChanged.connect(self._on_opacity_changed)
-        opacity_row.addWidget(self.opacity_slider)
-        opacity_row.addWidget(self.opacity_value_label)
-        appearance_layout.addLayout(opacity_row)
 
-        blend_row = QHBoxLayout()
-        blend_row.addWidget(QLabel("Blend Mode"))
+        grid.addWidget(QLabel("Blend Mode"), 1, 0)
         self.blend_combo = QComboBox()
-        self.blend_combo.addItem("Normal", BlendMode.NORMAL.value)
-        self.blend_combo.addItem("Multiply", BlendMode.MULTIPLY.value)
+        for mode, label in BLEND_LABELS:
+            self.blend_combo.addItem(label, mode.value)
         self.blend_combo.currentIndexChanged.connect(self._on_blend_changed)
-        blend_row.addWidget(self.blend_combo)
-        appearance_layout.addLayout(blend_row)
+        grid.addWidget(self.blend_combo, 1, 1, 1, 2)
+        return box
 
-        contrast_row = QHBoxLayout()
-        contrast_row.addWidget(QLabel("Contrast"))
-        self.contrast_slider = QSlider(Qt.Horizontal)
-        self.contrast_slider.setRange(-100, 100)
-        self.contrast_slider.setValue(0)
-        self.contrast_value_label = QLabel("0")
-        self.contrast_value_label.setMinimumWidth(32)
-        self.contrast_slider.valueChanged.connect(self._on_contrast_changed)
-        self.contrast_reset = QPushButton("Reset")
-        self.contrast_reset.clicked.connect(lambda: self.contrast_slider.setValue(0))
-        contrast_row.addWidget(self.contrast_slider)
-        contrast_row.addWidget(self.contrast_value_label)
-        contrast_row.addWidget(self.contrast_reset)
-        appearance_layout.addLayout(contrast_row)
-
+    def _build_levels_box(self) -> QGroupBox:
+        box = QGroupBox("Levels")
+        v = QVBoxLayout(box)
         self.invert_check = QCheckBox("Invert values")
         self.invert_check.toggled.connect(self._on_invert_toggled)
-        appearance_layout.addWidget(self.invert_check)
+        v.addWidget(self.invert_check)
 
-        self._set_appearance_enabled(False)
+        grid = QGridLayout()
+        v.addLayout(grid)
+        self.black = _SliderRow(grid, 0, "Dark point", 0, 255 - MIN_LEVELS_GAP, 0, str,
+                                "Values at or below this become black")
+        self.gamma = _SliderRow(grid, 1, "Midtones", -100, 100, 0, lambda s: f"{slider_to_gamma(s):.2f}",
+                                "Right lightens the middle values, left darkens them")
+        self.white = _SliderRow(grid, 2, "Light point", MIN_LEVELS_GAP, 255, 255, str,
+                                "Values at or above this become white")
+        self.black.slider.valueChanged.connect(self._on_black_changed)
+        self.gamma.slider.valueChanged.connect(
+            lambda s: self._emit_adjust("gamma", replace(self._adjust, gamma=slider_to_gamma(s)))
+        )
+        self.white.slider.valueChanged.connect(self._on_white_changed)
+
+        self.levels_reset = QPushButton("Reset Levels")
+        self.levels_reset.clicked.connect(
+            lambda: self._emit_adjust("", replace(self._adjust, black=0, gamma=1.0, white=255), sync=True)
+        )
+        v.addWidget(self.levels_reset, alignment=Qt.AlignRight)
+        return box
+
+    def _build_color_box(self) -> QGroupBox:
+        box = QGroupBox("Color && Vibrance")
+        v = QVBoxLayout(box)
+        grid = QGridLayout()
+        v.addLayout(grid)
+        self.temperature = _SliderRow(grid, 0, "Temperature", -100, 100, 0, _signed, "Left cooler (blue), right warmer (orange)")
+        self.vibrance = _SliderRow(grid, 1, "Vibrance", -100, 100, 0, _signed,
+                                   "Changes muted colors most and leaves strong colors mostly alone")
+        self.saturation = _SliderRow(grid, 2, "Saturation", -100, 100, 0, _signed, "-100 is fully gray")
+        for name, row in (("temperature", self.temperature), ("vibrance", self.vibrance), ("saturation", self.saturation)):
+            row.slider.valueChanged.connect(
+                lambda s, n=name: self._emit_adjust(n, replace(self._adjust, **{n: s / 100.0}))
+            )
+        self.color_reset = QPushButton("Reset Color")
+        self.color_reset.clicked.connect(
+            lambda: self._emit_adjust("", replace(self._adjust, temperature=0.0, vibrance=0.0, saturation=0.0), sync=True)
+        )
+        v.addWidget(self.color_reset, alignment=Qt.AlignRight)
+        return box
 
     # -- outward-facing API ------------------------------------------------
 
@@ -126,39 +207,84 @@ class LayersPanel(QWidget):
             self.list_widget.addItem(item)
             if layer.id == project.active_layer_id:
                 self.list_widget.setCurrentItem(item)
-
-        active = project.get_layer(project.active_layer_id) if project.active_layer_id else None
         self._updating = False
-        self.sync_appearance(active)
+        self.sync_appearance(project.get_layer(project.active_layer_id))
 
-    def sync_appearance(self, layer) -> None:
+    def sync_appearance(self, layer: Layer | None) -> None:
         self._updating = True
+        self._set_layer_controls_enabled(layer is not None)
         if layer is not None:
-            self._set_appearance_enabled(True)
-            self.opacity_slider.setValue(round(layer.opacity * 100))
+            self.opacity.set(round(layer.opacity * 100))
             self.blend_combo.setCurrentIndex(self.blend_combo.findData(layer.blend_mode.value))
-            self.contrast_slider.setValue(round(layer.contrast * 100))
-            self.invert_check.setChecked(layer.invert)
-        else:
-            self._set_appearance_enabled(False)
+            self._show_adjustments(layer.adjustments)
         self._updating = False
 
-    def _set_appearance_enabled(self, enabled: bool) -> None:
-        self.opacity_slider.setEnabled(enabled)
-        self.blend_combo.setEnabled(enabled)
-        self.contrast_slider.setEnabled(enabled)
-        self.contrast_reset.setEnabled(enabled)
-        self.invert_check.setEnabled(enabled)
-        self.delete_button.setEnabled(enabled)
-        self.up_button.setEnabled(enabled)
-        self.down_button.setEnabled(enabled)
-        self.perspective_button.setEnabled(enabled)
+    def _show_adjustments(self, adj: Adjustments) -> None:
+        was_updating, self._updating = self._updating, True
+        self._adjust = adj
+        self.invert_check.setChecked(adj.invert)
+        self.black.set(adj.black)
+        self.gamma.set(gamma_to_slider(adj.gamma))
+        self.white.set(adj.white)
+        self.temperature.set(round(adj.temperature * 100))
+        self.vibrance.set(round(adj.vibrance * 100))
+        self.saturation.set(round(adj.saturation * 100))
+        self._updating = was_updating
+
+    def _set_layer_controls_enabled(self, enabled: bool) -> None:
+        for w in (
+            self.opacity_slider, self.blend_combo, self.delete_button, self.up_button, self.down_button,
+            self.perspective_button, self.invert_check, self.black.slider, self.gamma.slider, self.white.slider,
+            self.levels_reset, self.temperature.slider, self.vibrance.slider, self.saturation.slider, self.color_reset,
+        ):
+            w.setEnabled(enabled)
 
     # -- internal handlers ---------------------------------------------
 
     def _current_layer_id(self) -> str | None:
         item = self.list_widget.currentItem()
         return item.data(LAYER_ID_ROLE) if item else None
+
+    def _emit_for_current(self, signal) -> None:
+        layer_id = self._current_layer_id()
+        if layer_id:
+            signal.emit(layer_id)
+
+    def _emit_adjust(self, slider_name: str, adj: Adjustments, sync: bool = False) -> None:
+        if self._updating:
+            return
+        layer_id = self._current_layer_id()
+        if not layer_id or adj == self._adjust:
+            return
+        self._adjust = adj
+        if sync:
+            self._show_adjustments(adj)
+        self.layerAdjustmentsChanged.emit(layer_id, adj, slider_name)
+
+    def _on_black_changed(self, value: int) -> None:
+        if self._updating:
+            return
+        limit = self._adjust.white - MIN_LEVELS_GAP
+        if value > limit:  # dark point can't pass the light point
+            self._updating = True
+            self.black.set(limit)
+            self._updating = False
+            value = limit
+        self._emit_adjust("black", replace(self._adjust, black=value))
+
+    def _on_white_changed(self, value: int) -> None:
+        if self._updating:
+            return
+        limit = self._adjust.black + MIN_LEVELS_GAP
+        if value < limit:
+            self._updating = True
+            self.white.set(limit)
+            self._updating = False
+            value = limit
+        self._emit_adjust("white", replace(self._adjust, white=value))
+
+    def _on_invert_toggled(self, checked: bool) -> None:
+        self._emit_adjust("", replace(self._adjust, invert=checked))
 
     def _on_current_changed(self, current, _previous):
         if self._updating or current is None:
@@ -168,17 +294,14 @@ class LayersPanel(QWidget):
     def _on_item_changed(self, item: QListWidgetItem):
         if self._updating:
             return
-        layer_id = item.data(LAYER_ID_ROLE)
-        self.layerVisibilityToggled.emit(layer_id, item.checkState() == Qt.Checked)
+        self.layerVisibilityToggled.emit(item.data(LAYER_ID_ROLE), item.checkState() == Qt.Checked)
 
     def _on_item_double_clicked(self, item: QListWidgetItem):
-        layer_id = item.data(LAYER_ID_ROLE)
         new_name, ok = QInputDialog.getText(self, "Rename Layer", "Name:", text=item.text())
         if ok and new_name.strip():
-            self.renameLayerRequested.emit(layer_id, new_name.strip())
+            self.renameLayerRequested.emit(item.data(LAYER_ID_ROLE), new_name.strip())
 
     def _on_opacity_changed(self, value: int):
-        self.opacity_value_label.setText(f"{value}%")
         if self._updating:
             return
         layer_id = self._current_layer_id()
@@ -191,38 +314,3 @@ class LayersPanel(QWidget):
         layer_id = self._current_layer_id()
         if layer_id:
             self.layerBlendModeChanged.emit(layer_id, self.blend_combo.currentData())
-
-    def _on_contrast_changed(self, value: int):
-        self.contrast_value_label.setText(f"{value:+d}" if value else "0")
-        if self._updating:
-            return
-        layer_id = self._current_layer_id()
-        if layer_id:
-            self.layerContrastChanged.emit(layer_id, value / 100.0)
-
-    def _on_invert_toggled(self, checked: bool):
-        if self._updating:
-            return
-        layer_id = self._current_layer_id()
-        if layer_id:
-            self.layerInvertToggled.emit(layer_id, checked)
-
-    def _emit_delete(self):
-        layer_id = self._current_layer_id()
-        if layer_id:
-            self.deleteLayerRequested.emit(layer_id)
-
-    def _emit_move_up(self):
-        layer_id = self._current_layer_id()
-        if layer_id:
-            self.moveLayerUpRequested.emit(layer_id)
-
-    def _emit_move_down(self):
-        layer_id = self._current_layer_id()
-        if layer_id:
-            self.moveLayerDownRequested.emit(layer_id)
-
-    def _emit_perspective(self):
-        layer_id = self._current_layer_id()
-        if layer_id:
-            self.perspectiveCorrectRequested.emit(layer_id)

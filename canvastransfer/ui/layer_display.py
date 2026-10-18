@@ -2,7 +2,7 @@
 
 Two cache levels: the geometry step (perspective correction + downscale,
 slow) is redone only when the corners change; the adjustment step
-(contrast/invert, a fast lookup table) is redone when those sliders move.
+(levels, color, invert) is redone when those controls change.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from PySide6.QtGui import QPixmap
 
 from ..image_ops import (
     MAX_DISPLAY_EDGE,
-    adjust,
+    apply_adjustments,
     capped_size,
     corrected_size,
     downscale_to_max,
@@ -63,10 +63,10 @@ class LayerDisplayCache:
         base = self.base_image(doc, layer, canvas_size)
         if base is None:
             return None
-        key = (self._geometry_key(layer, canvas_size), layer.contrast, layer.invert)
+        key = (self._geometry_key(layer, canvas_size), layer.adjustments)
         cached = self._pixmaps.get(layer.id)
         if cached and cached[0] == key:
             return cached[1]
-        pixmap = rgba_to_qpixmap(adjust(base, layer.contrast, layer.invert))
+        pixmap = rgba_to_qpixmap(apply_adjustments(base, layer.adjustments))
         self._pixmaps[layer.id] = (key, pixmap)
         return pixmap

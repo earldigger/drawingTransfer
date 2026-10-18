@@ -1,11 +1,11 @@
-"""Renders the real Qt canvas scene offscreen and checks pixels, so blend
+"""Renders the real canvas compositor offscreen and checks pixels, so blend
 modes, placement, split view, grid and dragging are tested as drawn."""
 
 import pytest
 
 from canvastransfer.compare import DisplayState
 from canvastransfer.geometry import TransformMode
-from canvastransfer.models import GridSettings, CompareMode
+from canvastransfer.models import BlendMode, CompareMode, GridSettings
 
 SIZE = 100
 FULL = [(0, 0), (SIZE, 0), (SIZE, SIZE), (0, SIZE)]
@@ -20,14 +20,7 @@ def solid_pixmap(rgb, w=10, h=10):
 
 
 def render(view):
-    from PySide6.QtCore import QRectF
-    from PySide6.QtGui import QImage, QPainter
-
-    image = QImage(SIZE, SIZE, QImage.Format_RGB32)
-    painter = QPainter(image)
-    view.scene().render(painter, QRectF(0, 0, SIZE, SIZE), QRectF(0, 0, SIZE, SIZE))
-    painter.end()
-    return image
+    return view.render_canvas_image()
 
 
 def rgb(image, x, y):
@@ -46,10 +39,10 @@ def view(qapp):
     v.deleteLater()
 
 
-def entry(layer_id, color, quad=FULL, opacity=1.0, multiply=False, clip=None):
+def entry(layer_id, color, quad=FULL, opacity=1.0, blend=BlendMode.NORMAL, clip=None):
     from canvastransfer.ui.canvas_view import LayerEntry
 
-    return LayerEntry(layer_id, solid_pixmap(color), quad, DisplayState(True, opacity, multiply, clip))
+    return LayerEntry(layer_id, solid_pixmap(color), quad, DisplayState(True, opacity, blend, clip))
 
 
 def close(a, b, tol=3):
@@ -64,18 +57,60 @@ def test_layer_is_placed_on_its_quad(view):
 
 
 def test_multiply_darkens_layer_below(view):
-    view.show_layers([entry("bottom", (255, 200, 0)), entry("top", (128, 128, 128), multiply=True)], None)
+    view.show_layers([entry("bottom", (255, 200, 0)), entry("top", (128, 128, 128), blend=BlendMode.MULTIPLY)], None)
     assert close(rgb(render(view), 50, 50), (128, 100, 0))
 
 
 def test_multiply_respects_opacity(view):
-    view.show_layers([entry("bottom", (255, 0, 0)), entry("top", (0, 0, 0), opacity=0.5, multiply=True)], None)
+    view.show_layers([entry("bottom", (255, 0, 0)), entry("top", (0, 0, 0), opacity=0.5, blend=BlendMode.MULTIPLY)], None)
     assert close(rgb(render(view), 50, 50), (128, 0, 0))
 
 
 def test_normal_opacity_mixes(view):
     view.show_layers([entry("bottom", (0, 0, 0)), entry("top", (255, 255, 255), opacity=0.5)], None)
     assert close(rgb(render(view), 50, 50), (128, 128, 128))
+
+
+def test_screen_lightens_layer_below(view):
+    view.show_layers([entry("bottom", (100, 200, 0)), entry("top", (128, 128, 128), blend=BlendMode.SCREEN)], None)
+    # screen = 1 - (1-a)(1-b)
+    assert close(rgb(render(view), 50, 50), (178, 227, 128))
+
+
+def test_screen_respects_opacity(view):
+    view.show_layers([entry("bottom", (0, 0, 0)), entry("top", (255, 255, 255), opacity=0.5, blend=BlendMode.SCREEN)], None)
+    assert close(rgb(render(view), 50, 50), (128, 128, 128))
+
+
+def test_linear_light_formula(view):
+    # result = base + 2*blend - 255, clamped
+    view.show_layers([entry("bottom", (100, 100, 220)), entry("top", (178, 64, 200), blend=BlendMode.LINEAR_LIGHT)], None)
+    assert close(rgb(render(view), 50, 50), (201, 0, 255))
+
+
+def test_linear_light_mid_gray_is_neutral(view):
+    view.show_layers([entry("bottom", (30, 140, 230)), entry("top", (128, 128, 128), blend=BlendMode.LINEAR_LIGHT)], None)
+    assert close(rgb(render(view), 50, 50), (31, 141, 231))
+
+
+def test_linear_light_partial_opacity_mixes_with_clamped_result(view):
+    # white paper over a light canvas at 50%: halfway to white, not blown out
+    view.show_layers([entry("bottom", (217, 217, 217)), entry("top", (255, 255, 255), opacity=0.5, blend=BlendMode.LINEAR_LIGHT)], None)
+    assert close(rgb(render(view), 50, 50), (236, 236, 236))
+
+
+def test_linear_light_only_affects_its_quad(view):
+    view.show_layers([entry("bottom", (100, 100, 100)),
+                      entry("top", (255, 255, 255), quad=[(0, 0), (50, 0), (50, 100), (0, 100)], blend=BlendMode.LINEAR_LIGHT)], None)
+    img = render(view)
+    assert rgb(img, 25, 50) == (255, 255, 255)
+    assert rgb(img, 75, 50) == (100, 100, 100)
+
+
+def test_layers_above_linear_light_still_draw(view):
+    view.show_layers([entry("bottom", (100, 100, 100)), entry("ll", (128, 128, 128), blend=BlendMode.LINEAR_LIGHT),
+                      entry("top", (0, 0, 0), opacity=0.5)], None)
+    assert close(rgb(render(view), 50, 50), (50, 50, 50))
 
 
 def test_layers_are_clipped_to_canvas(view):
@@ -165,18 +200,32 @@ def test_imported_image_is_fitted_not_cropped(qapp):
     window.deleteLater()
 
 
-def test_contrast_and_invert_change_displayed_pixmap(qapp):
+def test_adjustment_controls_change_displayed_pixmap(qapp):
     window, (layer,) = make_window_with_layers(qapp, (20, 20))
-    item = window.canvas_view._items[layer.id]
+    panel = window.layers_panel
 
     def center_gray():
-        return item.pixmap().toImage().pixelColor(10, 10).red()
+        return window.canvas_view.entry(layer.id).pixmap.toImage().pixelColor(10, 10).red()
 
     assert center_gray() == 100
-    window._set_layer_attr(layer.id, "invert", True)
+    panel.invert_check.setChecked(True)
     assert center_gray() == 155
-    window._set_layer_attr(layer.id, "contrast", 0.5)
-    assert center_gray() > 155
+    panel.black.slider.setValue(60)  # (155 - 60) / (255 - 60) -> darker
+    assert center_gray() == 124
+    panel.levels_reset.click()
+    panel.temperature.slider.setValue(100)
+    assert window.canvas_view.entry(layer.id).pixmap.toImage().pixelColor(10, 10).red() > 155
+    window.deleteLater()
+
+
+def test_dark_point_cannot_pass_light_point(qapp):
+    window, (layer,) = make_window_with_layers(qapp, (20, 20))
+    panel = window.layers_panel
+    panel.white.slider.setValue(120)
+    panel.black.slider.setValue(200)
+    adj = window.doc.project.get_layer(layer.id).adjustments
+    assert adj.black < adj.white
+    assert panel.black.slider.value() == adj.black
     window.deleteLater()
 
 
@@ -186,13 +235,14 @@ def test_blink_a_only_toggles_just_layer_a(qapp):
     project.compare_mode = CompareMode.BLINK_A
     project.compare_layer_a = drawing.id
     window._refresh_canvas()
-    items = window.canvas_view._items
+    def visible(layer):
+        return window.canvas_view.entry(layer.id).state.visible
 
     window._blink_on = True
     window._on_blink_tick()
-    assert not items[drawing.id].isVisible() and items[canvas_layer.id].isVisible()
+    assert not visible(drawing) and visible(canvas_layer)
     window._on_blink_tick()
-    assert items[drawing.id].isVisible() and items[canvas_layer.id].isVisible()
+    assert visible(drawing) and visible(canvas_layer)
     window.deleteLater()
 
 
@@ -204,3 +254,23 @@ def test_flip_mirrors_active_layer_quad(qapp):
     window._fit_active()
     assert layer.quad == before
     window.deleteLater()
+
+
+def test_blend_combo_offers_new_modes(qapp):
+    window, (layer,) = make_window_with_layers(qapp, (20, 20))
+    combo = window.layers_panel.blend_combo
+    for mode in (BlendMode.SCREEN, BlendMode.LINEAR_LIGHT):
+        combo.setCurrentIndex(combo.findData(mode.value))
+        assert window.doc.project.get_layer(layer.id).blend_mode == mode
+    window.deleteLater()
+
+
+def test_on_screen_render_matches_with_linear_light(view, qapp):
+    """The live viewport path (device-pixel buffer, scaled transform) also composites Linear Light."""
+    view.show()
+    view.show_layers([entry("bottom", (100, 100, 100)), entry("top", (255, 255, 255), blend=BlendMode.LINEAR_LIGHT)], None)
+    qapp.processEvents()
+    shot = view.grab().toImage()
+    center = view.mapFromScene(50, 50)
+    c = shot.pixelColor(center.x(), center.y())
+    assert (c.red(), c.green(), c.blue()) == (255, 255, 255)

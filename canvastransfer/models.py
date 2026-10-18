@@ -8,7 +8,7 @@ editable and nondestructive.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from enum import Enum
 import itertools
 import uuid
@@ -24,6 +24,8 @@ class Units(str, Enum):
 class BlendMode(str, Enum):
     NORMAL = "normal"
     MULTIPLY = "multiply"
+    SCREEN = "screen"
+    LINEAR_LIGHT = "linear_light"
 
 
 class CompareMode(str, Enum):
@@ -81,6 +83,29 @@ class PerspectiveCorners:
         )
 
 
+@dataclass(frozen=True)
+class Adjustments:
+    """Per-layer value and color adjustments, applied in this order to
+    what the layer shows: invert, levels, temperature, vibrance, saturation.
+    """
+
+    invert: bool = False
+    black: int = 0  # levels dark point, 0..255
+    gamma: float = 1.0  # levels midtones; >1 lightens, <1 darkens
+    white: int = 255  # levels light point, 0..255
+    temperature: float = 0.0  # -1 cooler .. +1 warmer
+    vibrance: float = 0.0  # -1..1
+    saturation: float = 0.0  # -1 (gray) .. +1
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(data: dict | None) -> "Adjustments":
+        names = {f.name for f in fields(Adjustments)}
+        return Adjustments(**{k: v for k, v in (data or {}).items() if k in names})
+
+
 @dataclass
 class Layer:
     id: str
@@ -95,8 +120,7 @@ class Layer:
     perspective_corners: PerspectiveCorners | None = None
     # True for canvas photos: the corrected image fills the canvas exactly.
     perspective_fill_canvas: bool = False
-    contrast: float = 0.0  # -1..1, 0 = unchanged
-    invert: bool = False
+    adjustments: Adjustments = field(default_factory=Adjustments)
 
     def to_dict(self) -> dict:
         return {
@@ -111,8 +135,7 @@ class Layer:
                 self.perspective_corners.to_dict() if self.perspective_corners else None
             ),
             "perspective_fill_canvas": self.perspective_fill_canvas,
-            "contrast": self.contrast,
-            "invert": self.invert,
+            "adjustments": self.adjustments.to_dict(),
         }
 
     @staticmethod
@@ -132,8 +155,7 @@ class Layer:
                 else None
             ),
             perspective_fill_canvas=data.get("perspective_fill_canvas", False),
-            contrast=data.get("contrast", 0.0),
-            invert=data.get("invert", False),
+            adjustments=Adjustments.from_dict(data.get("adjustments")),
         )
 
 

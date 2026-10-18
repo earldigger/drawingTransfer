@@ -1,5 +1,5 @@
 """Per-layer pixel operations (the Core Image stand-in): perspective
-correction, display downscaling, and contrast/invert adjustments.
+correction, display downscaling, and value/color adjustments.
 
 Images are uint8 RGBA numpy arrays (channel order R, G, B, A). Every
 function is pure -- it never modifies its input -- which keeps layers
@@ -14,10 +14,10 @@ import math
 import numpy as np
 import cv2
 
-from .models import PerspectiveCorners
+from .models import Adjustments, PerspectiveCorners
 
 MAX_DISPLAY_EDGE = 2400
-CONTRAST_RANGE = 4.0  # contrast=+1 multiplies spread around mid-gray by 4, -1 divides by 4
+TEMPERATURE_STRENGTH = 0.3  # temperature=+1 boosts red 30% and cuts blue 30%
 
 
 def capped_size(w: float, h: float, max_edge: int = MAX_DISPLAY_EDGE) -> tuple[int, int]:
@@ -57,19 +57,57 @@ def downscale_to_max(image: np.ndarray, max_edge: int = MAX_DISPLAY_EDGE) -> np.
     return cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
 
-def adjustment_lut(contrast: float, invert: bool) -> np.ndarray:
-    factor = CONTRAST_RANGE ** float(np.clip(contrast, -1.0, 1.0))
-    values = (np.arange(256, dtype=np.float32) - 127.5) * factor + 127.5
-    lut = np.clip(np.round(values), 0, 255).astype(np.uint8)
+def levels_curve(black: int, gamma: float, white: int, invert: bool = False) -> np.ndarray:
+    """0..1 output for each 0..255 input: optional invert, then Photoshop-
+    style input levels (dark point -> black, light point -> white, midtones
+    bent by gamma)."""
+    x = np.arange(256, dtype=np.float32)
     if invert:
-        lut = 255 - lut
-    return lut
+        x = 255.0 - x
+    span = max(float(white - black), 1.0)
+    t = np.clip((x - black) / span, 0.0, 1.0)
+    return t ** (1.0 / max(gamma, 1e-3))
 
 
-def adjust(image: np.ndarray, contrast: float = 0.0, invert: bool = False) -> np.ndarray:
-    """Contrast around mid-gray and/or RGB inversion; alpha is untouched."""
-    if contrast == 0.0 and not invert:
+def tone_lut(adj: Adjustments) -> np.ndarray:
+    """RGBA lookup table (256, 1, 4) for invert + levels + temperature.
+    Alpha maps to itself; doing all four channels in one LUT call avoids
+    slow per-channel slicing of large images."""
+    curve = levels_curve(adj.black, adj.gamma, adj.white, adj.invert) * 255.0
+    k = TEMPERATURE_STRENGTH * float(np.clip(adj.temperature, -1.0, 1.0))
+    gains = (1.0 + k, 1.0, 1.0 - k)  # R, G, B
+    channels = [np.clip(np.round(curve * g), 0, 255) for g in gains] + [np.arange(256)]
+    return np.stack(channels, axis=-1).astype(np.uint8).reshape(256, 1, 4)
+
+
+def _tone_is_identity(adj: Adjustments) -> bool:
+    return not adj.invert and adj.black == 0 and adj.white == 255 and adj.gamma == 1.0 and adj.temperature == 0.0
+
+
+def _saturate(rgb: np.ndarray, vibrance: float, saturation: float) -> np.ndarray:
+    """Push each pixel away from (or toward) its own gray. Vibrance scales
+    the push by how muted the pixel already is, so strong colors hold."""
+    sat = cv2.extractChannel(cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV), 1)
+    muted = 1.0 - np.arange(256, dtype=np.float32) / 255.0
+    factor_lut = ((1.0 + saturation) * (1.0 + vibrance * muted)).astype(np.float32)
+    factor = cv2.LUT(sat, factor_lut)
+    gray = cv2.cvtColor(cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY), cv2.COLOR_GRAY2RGB)
+    # gray + (color - gray) * factor, as one fast weighted blend
+    return cv2.blendLinear(rgb, gray, factor, 1.0 - factor)
+
+
+def apply_adjustments(image: np.ndarray, adj: Adjustments) -> np.ndarray:
+    """Returns `image` itself when nothing is adjusted; alpha is untouched."""
+    if adj == Adjustments():
         return image
-    out = image.copy()
-    out[..., :3] = cv2.LUT(np.ascontiguousarray(image[..., :3]), adjustment_lut(contrast, invert))
+    out = image if _tone_is_identity(adj) else cv2.LUT(image, tone_lut(adj))
+    if adj.vibrance != 0.0 or adj.saturation != 0.0:
+        rgb = _saturate(
+            cv2.cvtColor(out, cv2.COLOR_RGBA2RGB),
+            float(np.clip(adj.vibrance, -1, 1)),
+            float(np.clip(adj.saturation, -1, 1)),
+        )
+        out_rgba = cv2.cvtColor(rgb, cv2.COLOR_RGB2RGBA)
+        cv2.mixChannels([image], [out_rgba], [3, 3])  # restore original alpha
+        out = out_rgba
     return out
