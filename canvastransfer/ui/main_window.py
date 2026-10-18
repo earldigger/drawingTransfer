@@ -26,6 +26,7 @@ from ..geometry import (
     flip_vertical,
     normalize_quad,
 )
+from ..history import History, Snapshot
 from ..models import BlendMode, CompareMode, Layer, Project, new_id
 from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
 from .canvas_view import CanvasView, LayerEntry
@@ -55,6 +56,7 @@ class MainWindow(QMainWindow):
 
         self.doc: ProjectDocument | None = None
         self.cache = LayerDisplayCache()
+        self.history = History()
         self._canvas_size = (1, 1)
         self._mode = TransformMode.UNIFORM
 
@@ -110,11 +112,19 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction("Add Image Layer…", self._import_image)
 
+        edit_menu = self.menuBar().addMenu("&Edit")
+        self.undo_action = edit_menu.addAction("Undo", QKeySequence.Undo, self._undo)
+        self.redo_action = edit_menu.addAction("Redo", QKeySequence.Redo, self._redo)
+
     def _build_toolbar(self) -> None:
         bar = QToolBar("Transform", self)
         bar.setMovable(False)
         bar.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self.addToolBar(Qt.TopToolBarArea, bar)
+
+        bar.addAction(self.undo_action)
+        bar.addAction(self.redo_action)
+        bar.addSeparator()
 
         self.transform_action = QAction("Transform", self)
         self.transform_action.setCheckable(True)
@@ -122,6 +132,13 @@ class MainWindow(QMainWindow):
         self.transform_action.setToolTip("Show the transform box on the selected layer (T)")
         self.transform_action.toggled.connect(self._on_tool_toggled)
         bar.addAction(self.transform_action)
+
+        self.done_action = bar.addAction("Done", lambda: self._end_session(commit=True))
+        self.done_action.setShortcuts([QKeySequence(Qt.Key_Return), QKeySequence(Qt.Key_Enter)])
+        self.done_action.setToolTip("Keep the transform (Return)")
+        self.cancel_action = bar.addAction("Cancel", lambda: self._end_session(commit=False))
+        self.cancel_action.setShortcut(QKeySequence(Qt.Key_Escape))
+        self.cancel_action.setToolTip("Undo everything since Transform was turned on (Esc)")
         bar.addSeparator()
 
         group = QActionGroup(self)
@@ -147,9 +164,9 @@ class MainWindow(QMainWindow):
         lp = self.layers_panel
         lp.layerSelected.connect(self._on_layer_selected)
         lp.layerVisibilityToggled.connect(lambda lid, v: self._set_layer_attr(lid, "visible", v))
-        lp.layerOpacityChanged.connect(lambda lid, v: self._set_layer_attr(lid, "opacity", v))
+        lp.layerOpacityChanged.connect(lambda lid, v: self._set_layer_attr(lid, "opacity", v, key=("opacity", lid)))
         lp.layerBlendModeChanged.connect(lambda lid, v: self._set_layer_attr(lid, "blend_mode", BlendMode(v)))
-        lp.layerContrastChanged.connect(lambda lid, v: self._set_layer_attr(lid, "contrast", v))
+        lp.layerContrastChanged.connect(lambda lid, v: self._set_layer_attr(lid, "contrast", v, key=("contrast", lid)))
         lp.layerInvertToggled.connect(lambda lid, v: self._set_layer_attr(lid, "invert", v))
         lp.addLayerRequested.connect(self._import_image)
         lp.deleteLayerRequested.connect(self._on_delete_layer)
@@ -169,11 +186,20 @@ class MainWindow(QMainWindow):
         self.compare_panel.setEnabled(has_project)
         for action in [self.transform_action, self.flip_h_action, self.flip_v_action, self.fit_action, *self.mode_actions.values()]:
             action.setEnabled(has_layer)
+        self._update_history_actions()
+
+    def _update_history_actions(self) -> None:
+        self.undo_action.setEnabled(self.doc is not None and self.history.can_undo())
+        self.redo_action.setEnabled(self.doc is not None and self.history.can_redo())
+        self.done_action.setEnabled(self.history.in_session)
+        self.cancel_action.setEnabled(self.history.in_session)
 
     # -- project lifecycle ---------------------------------------------
 
     def _set_document(self, doc: ProjectDocument) -> None:
         self._flush_autosave()
+        self.history.clear()
+        self._set_tool_checked(False)
         self.doc = doc
         self.cache.clear()
         self._blink_on = True
@@ -239,6 +265,72 @@ class MainWindow(QMainWindow):
         self._flush_autosave()
         super().closeEvent(event)
 
+    # -- undo / redo / transform sessions ---------------------------------
+
+    def _snapshot(self) -> Snapshot:
+        return Snapshot(self.doc.project.to_dict(), dict(self.doc.images))
+
+    def _record(self, key=None, transform: bool = False) -> None:
+        """Call before every project change. A non-transform change ends
+        any open transform session first, so Cancel only ever reverts
+        transforms."""
+        if self.history.in_session and not transform:
+            self._end_session(commit=True)
+        self.history.record(self._snapshot(), key)
+        self._update_history_actions()
+
+    def _restore(self, snap: Snapshot) -> None:
+        current = self.doc.project
+        project = Project.from_dict(snap.project)
+        # Compare settings are a viewing choice, not an edit: keep them.
+        project.compare_mode = current.compare_mode
+        project.compare_layer_a = current.compare_layer_a
+        project.compare_layer_b = current.compare_layer_b
+        project.split_position = current.split_position
+        if project.get_layer(current.active_layer_id) is not None:
+            project.active_layer_id = current.active_layer_id
+        self.doc.project = project
+        self.doc.images = dict(snap.images)
+        self._refresh_all()
+        self._restart_blink_if_needed()
+        self._schedule_autosave()
+
+    def _undo(self) -> None:
+        if self.doc is None:
+            return
+        snap = self.history.undo(self._snapshot())
+        if snap is not None:
+            self._restore(snap)
+        self._update_history_actions()
+
+    def _redo(self) -> None:
+        if self.doc is None:
+            return
+        snap = self.history.redo(self._snapshot())
+        if snap is not None:
+            self._restore(snap)
+        self._update_history_actions()
+
+    def _set_tool_checked(self, checked: bool) -> None:
+        self.transform_action.blockSignals(True)
+        self.transform_action.setChecked(checked)
+        self.transform_action.blockSignals(False)
+        self.canvas_view.set_tool(checked, self._mode)
+
+    def _end_session(self, commit: bool) -> None:
+        if not self.history.in_session:
+            return
+        if commit:
+            self.history.commit_session()
+            self.statusBar().showMessage("Transform applied. Undo (⌘Z) reverts it in one step.")
+        else:
+            start = self.history.cancel_session()
+            if start is not None:
+                self._restore(start)
+            self.statusBar().showMessage("Transform cancelled.")
+        self._set_tool_checked(False)
+        self._update_history_actions()
+
     # -- image import -----------------------------------------------------
 
     def _import_image(self) -> None:
@@ -254,6 +346,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Import Failed", f"{exc}\n\nHEIC photos aren't supported yet -- export as JPEG first.")
             return
 
+        self._record()
         layer_id = new_id("layer")
         layer = Layer(id=layer_id, name=Path(path).stem, image_filename=f"{layer_id}.png")
         self.doc.set_layer_image(layer_id, image)
@@ -262,7 +355,7 @@ class MainWindow(QMainWindow):
         self.transform_action.setChecked(True)
         self.statusBar().showMessage(
             "Image fitted to the canvas. Drag inside the box to move, drag handles to scale, "
-            "drag the blue dot to rotate. Press T to hide the box."
+            "drag the blue dot to rotate. Return = Done, Esc = Cancel."
         )
         self._schedule_autosave()
 
@@ -274,15 +367,20 @@ class MainWindow(QMainWindow):
     def _on_layer_selected(self, layer_id: str) -> None:
         if self.doc is None:
             return
+        if self.history.in_session and layer_id != self.doc.project.active_layer_id:
+            # Finish the transform on the old layer; keep transforming the new one.
+            self.history.commit_session()
+            self.history.begin_session()
         self.doc.project.active_layer_id = layer_id
         self.layers_panel.sync_appearance(self._active_layer())
         self.canvas_view.set_active_layer(layer_id)
         self._update_enabled_state()
 
-    def _set_layer_attr(self, layer_id: str, attr: str, value) -> None:
+    def _set_layer_attr(self, layer_id: str, attr: str, value, key=None) -> None:
         layer = self.doc.project.get_layer(layer_id) if self.doc else None
-        if layer is None:
+        if layer is None or getattr(layer, attr) == value:
             return
+        self._record(key)
         setattr(layer, attr, value)
         self._refresh_canvas()
         self._schedule_autosave()
@@ -290,6 +388,7 @@ class MainWindow(QMainWindow):
     def _on_delete_layer(self, layer_id: str) -> None:
         if self.doc is None:
             return
+        self._record()
         self.doc.project.remove_layer(layer_id)
         self.doc.images.pop(layer_id, None)
         self.cache.forget(layer_id)
@@ -300,15 +399,17 @@ class MainWindow(QMainWindow):
         if self.doc is None:
             return
         idx = next((i for i, l in enumerate(self.doc.project.layers) if l.id == layer_id), None)
-        if idx is None:
+        if idx is None or not 0 <= idx + direction < len(self.doc.project.layers):
             return
+        self._record()
         self.doc.project.move_layer(layer_id, idx + direction)
         self._refresh_all()
         self._schedule_autosave()
 
     def _on_rename_layer(self, layer_id: str, new_name: str) -> None:
         layer = self.doc.project.get_layer(layer_id) if self.doc else None
-        if layer:
+        if layer and layer.name != new_name:
+            self._record()
             layer.name = new_name
             self._refresh_all()
             self._schedule_autosave()
@@ -320,6 +421,7 @@ class MainWindow(QMainWindow):
             return
         dialog = PerspectiveDialog(raw, layer.perspective_corners, layer.perspective_fill_canvas, self)
         if dialog.exec() == PerspectiveDialog.Accepted:
+            self._record()
             layer.perspective_corners = dialog.result_corners()
             layer.perspective_fill_canvas = dialog.result_fill_canvas()
             layer.quad = None  # re-place the corrected image
@@ -329,7 +431,13 @@ class MainWindow(QMainWindow):
     # -- transform tool ---------------------------------------------------------
 
     def _on_tool_toggled(self, enabled: bool) -> None:
-        self.canvas_view.set_tool(enabled, self._mode)
+        """Turning Transform on starts a session; turning it off is Done."""
+        if enabled:
+            self.history.begin_session()
+            self.canvas_view.set_tool(True, self._mode)
+            self._update_history_actions()
+        else:
+            self._end_session(commit=True)
 
     def _on_mode_chosen(self, mode: TransformMode) -> None:
         self._mode = mode
@@ -340,6 +448,7 @@ class MainWindow(QMainWindow):
     def _on_quad_committed(self, layer_id: str, quad) -> None:
         layer = self.doc.project.get_layer(layer_id) if self.doc else None
         if layer is not None:
+            self._record(transform=True)
             layer.quad = normalize_quad(quad, *self._canvas_size)
             self._schedule_autosave()
 
@@ -347,6 +456,7 @@ class MainWindow(QMainWindow):
         layer = self._active_layer()
         if layer is None or layer.quad is None:
             return
+        self._record(transform=True)
         quad = denormalize_quad(layer.quad, *self._canvas_size)
         quad = flip_horizontal(quad) if horizontal else flip_vertical(quad)
         layer.quad = normalize_quad(quad, *self._canvas_size)
@@ -357,6 +467,7 @@ class MainWindow(QMainWindow):
         layer = self._active_layer()
         if layer is None:
             return
+        self._record(transform=True)
         layer.quad = None
         self._refresh_canvas()
         self.canvas_view.refit()
@@ -376,8 +487,9 @@ class MainWindow(QMainWindow):
     # -- grid / compare -----------------------------------------------------------
 
     def _on_grid_changed(self, grid) -> None:
-        if self.doc is None:
+        if self.doc is None or grid == self.doc.project.grid:
             return
+        self._record(key=("grid",))
         self.doc.project.grid = grid
         self.canvas_view.set_grid(grid)
         self._schedule_autosave()

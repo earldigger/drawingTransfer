@@ -26,6 +26,12 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   width/height), **Skew**, **Distort**; Flip Horizontal/Vertical; Fit to
   Canvas. Content pushed past the canvas edge is hidden, not lost, and
   shows faintly while the box is active
+- Transform sessions: turning Transform on (T) starts one; **Done**
+  (Return) keeps it as a single undo step, **Cancel** (Esc) reverts
+  everything since Transform was turned on. Any non-transform edit
+  finishes the session first; switching layers continues on the new layer
+- Undo/Redo (Cmd+Z / Shift+Cmd+Z) for every project edit; a slider drag
+  is one step. Compare-mode settings are not undoable (viewing choice)
 - Layers: add, delete, rename (double-click), reorder, show/hide, select
 - Per-layer opacity, Normal/Multiply blend, contrast, invert
 - Grid overlay: rows, columns, opacity, thickness, RGB color picker,
@@ -82,6 +88,7 @@ canvastransfer/
                     proportional/free scale, skew, distort, flip
   image_ops.py      perspective correction, downscaling, contrast/invert
   compare.py        how each layer displays in each compare mode
+  history.py        undo/redo snapshots and transform sessions
   project_io.py     .ctproj package save/load, autosave
   ui/
     canvas_view.py   Qt scene showing all layers + the transform tool

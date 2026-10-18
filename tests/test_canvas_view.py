@@ -1,13 +1,11 @@
 """Renders the real Qt canvas scene offscreen and checks pixels, so blend
 modes, placement, split view, grid and dragging are tested as drawn."""
 
-import numpy as np
 import pytest
 
 from canvastransfer.compare import DisplayState
 from canvastransfer.geometry import TransformMode
-from canvastransfer.models import GridSettings, Layer, Project, CompareMode, BlendMode, new_id
-from canvastransfer.project_io import ProjectDocument
+from canvastransfer.models import GridSettings, CompareMode
 
 SIZE = 100
 FULL = [(0, 0), (SIZE, 0), (SIZE, SIZE), (0, SIZE)]
@@ -153,22 +151,9 @@ def test_no_handles_when_tool_off(view, qapp):
 
 
 def make_window_with_layers(qapp, *sizes):
-    from canvastransfer.ui.main_window import MainWindow
+    from tests.window_helpers import make_window_with_layers as make
 
-    project = Project(name="T", canvas_width=10, canvas_height=10)
-    doc = ProjectDocument(project)
-    layers = []
-    for i, (w, h) in enumerate(sizes):
-        layer = Layer(id=new_id("l"), name=f"L{i}", image_filename=f"{i}.png")
-        img = np.zeros((h, w, 4), dtype=np.uint8)
-        img[..., :3] = 100
-        img[..., 3] = 255
-        doc.set_layer_image(layer.id, img)
-        project.add_layer(layer)
-        layers.append(layer)
-    window = MainWindow()
-    window._set_document(doc)
-    return window, layers
+    return make(*sizes)
 
 
 def test_imported_image_is_fitted_not_cropped(qapp):
