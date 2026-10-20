@@ -1,4 +1,7 @@
 numpy>=1.26
 opencv-python-headless>=4.9
 PySide6>=6.6
+colour-science>=0.4.4
+scipy>=1.11
+pymixbox>=2.0
 pytest>=8.0

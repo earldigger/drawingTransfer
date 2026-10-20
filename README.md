@@ -43,6 +43,27 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   Blink A/B (alternate), Split view
 - Save/open as a `.ctproj` package; autosave (debounced) once saved
 
+### Color Study (side panel tab)
+
+- **Pick Color** (I): click the selected layer to add a numbered swatch.
+  The sample is an average over 1, 5, 11, 21 or 41 px and is taken from
+  that layer's *adjusted* image (after levels / hue-saturation), not from
+  the blended composite. Clicking a numbered marker selects its swatch;
+  markers move with the layer
+- Swatch list with remove, undo, and saving inside the project
+- Tick a swatch to highlight similar areas of its layer in yellow over a
+  grayscale copy; **Highlight tolerance** is a CIELAB distance (dE76):
+  about 2-3 is "just noticeable", 10-15 is "same paint mixture", 30+
+  starts catching neighbouring values of the same hue
+- Details: hex / RGB, CIELAB under D50 (the convention artistpigments.org
+  uses), Munsell notation, value on a 0-10 scale, a warm-cool reading,
+  tints / shades / tones, and the complement
+- Munsell needs colors inside the Munsell renotation data; very dark,
+  saturated colors (deep ultramarine, for example) show the value only
+- Warm-cool and the complement are rules of thumb (CIELAB hue), not a
+  standard; tints, shades and tones are mixed with Mixbox, which behaves
+  like pigment rather than like light
+
 ## What's intentionally skipped
 
 - Camera capture (AVFoundation) -- desktop file import only
@@ -50,6 +71,8 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Automatic rectangle detection (Vision framework)
 - Zoom/pan of the canvas view
 - Everything in the spec's "Future Features" list
+- Paint palette, nearest-paint matching and mixing recipes (planned as
+  Color Study phase 2)
 
 ## Running it
 
@@ -57,6 +80,13 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 pip install -r requirements.txt
 python -m canvastransfer.main
 ```
+
+The window freezes for about a second just after it opens while the color
+library (colour-science) loads; that keeps the first color pick quick.
+
+**License note:** Mixbox (`pymixbox`) is CC BY-NC 4.0, free for
+non-commercial use only. Fine for personal use; a commercial version of
+this app would need a Mixbox license or a different mixing model.
 
 ### macOS: "Could not find the Qt platform plugin 'cocoa'"
 
@@ -77,19 +107,23 @@ pytest
 ```
 
 The suite covers the transform geometry, image operations, compare-mode
-rules, project save/load, and -- rendered offscreen through the real Qt
+rules, project save/load, color math (CIELAB/Munsell checked against
+artistpigments.org values), and -- rendered offscreen through the real Qt
 scene -- blend-mode pixel values, layer placement, split clipping, grid
-color, and mouse-driven dragging.
+color, mouse-driven dragging, color picking and highlight pixels.
 
 ## Architecture
 
 ```
 canvastransfer/
   models.py        Project, Layer (placement quad, perspective corners,
-                    blend, contrast, invert), GridSettings
+                    blend, adjustments), GridSettings, Swatch
   geometry.py       pure transform-tool math: fit, move, rotate,
                     proportional/free scale, skew, distort, flip
-  image_ops.py      perspective correction, downscaling, contrast/invert
+  image_ops.py      perspective correction, downscaling, levels,
+                    hue/saturation, invert
+  color_study.py    sampling, CIELAB/Munsell, warm-cool, complement,
+                    tints/shades/tones (Mixbox), similar-color masks
   compare.py        how each layer displays in each compare mode
   history.py        undo/redo snapshots and transform sessions
   project_io.py     .ctproj package save/load, autosave
@@ -97,7 +131,9 @@ canvastransfer/
     canvas_view.py   live canvas + the transform tool
     canvas_render.py layer compositing (Qt blend modes; Linear Light
                      computed from the pixels underneath) and grid
-    layer_display.py cached per-layer display pixmaps
+    layer_display.py cached per-layer display pixmaps and highlight overlays
+    color_panel.py   Color Study tab: swatches, tolerance, details
+    slider_row.py    slider + number box rows shared by the panels
     main_window.py   toolbar, menus, wiring; plus the side panels
 ```
 

@@ -1,6 +1,6 @@
 """The canvas: composites every layer live (via canvas_render) and hosts
 the Fresco-style transform tool (8 handles + rotation handle on the active
-layer, drag inside to move).
+layer, drag inside to move) and the color picker with its swatch markers.
 """
 
 from __future__ import annotations
@@ -15,12 +15,24 @@ from PySide6.QtWidgets import QGraphicsScene, QGraphicsView
 from ..compare import DisplayState
 from ..geometry import Quad, TransformMode, apply_drag, edge_midpoints, point_in_quad, rotation_handle
 from ..models import BlendMode, GridSettings
-from .canvas_render import RenderLayer, render_canvas
+from .canvas_render import RenderLayer, quad_transform, render_canvas
 
 HANDLE_RADIUS_PX = 6
+MARKER_RADIUS_PX = 11
 HIT_RADIUS_PX = 12
 ROTATE_OFFSET_PX = 34
 ACCENT = QColor(30, 144, 255)
+
+
+@dataclass
+class Marker:
+    swatch_id: str
+    number: int
+    layer_id: str
+    u: float  # position as fractions of the layer image, so it follows the layer
+    v: float
+    rgb: tuple[int, int, int]
+    selected: bool = False
 
 
 @dataclass
@@ -33,6 +45,9 @@ class LayerEntry:
 
 class CanvasView(QGraphicsView):
     quadCommitted = Signal(str, object)  # layer_id, quad in canvas px
+    colorPicked = Signal(float, float)  # scene point clicked in pick mode
+    pickHover = Signal(object)  # scene (x, y) under the cursor in pick mode, or None
+    markerClicked = Signal(str)  # swatch id
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -55,6 +70,11 @@ class CanvasView(QGraphicsView):
         self._drag: tuple | None = None  # (handle, start point, start quad)
         self._buffer: QImage | None = None
         self._scratch: QImage | None = None
+        self._overlays: list[tuple[str, QPixmap]] = []  # (layer id, highlight pixmap)
+        self._markers: list[Marker] = []
+        self._pick_enabled = False
+        self._pick_radius_scene = 0.0
+        self._hover: QPointF | None = None
 
     # -- configuration ------------------------------------------------
 
@@ -67,7 +87,8 @@ class CanvasView(QGraphicsView):
         self._grid = grid
         self.viewport().update()
 
-    def show_layers(self, entries: list[LayerEntry], split_fraction: float | None) -> None:
+    def show_layers(self, entries: list[LayerEntry], split_fraction: float | None,
+                    overlays: list[tuple[str, QPixmap]] | None = None) -> None:
         """Display layers bottom-to-top as described by `entries`."""
         dragging = self._drag_layer()
         self._entries = list(entries)
@@ -77,6 +98,7 @@ class CanvasView(QGraphicsView):
         wanted = {e.layer_id for e in entries}
         self._quads = {k: v for k, v in self._quads.items() if k in wanted}
         self._split_fraction = split_fraction
+        self._overlays = list(overlays or [])
         self.viewport().update()
 
     def entry(self, layer_id: str) -> LayerEntry | None:
@@ -114,7 +136,56 @@ class CanvasView(QGraphicsView):
                 clip = (QRectF(c.left(), c.top(), split_x - c.left(), c.height()) if e.state.clip == "left"
                         else QRectF(split_x, c.top(), c.right() - split_x, c.height()))
             layers.append(RenderLayer(e.pixmap, self._quads[e.layer_id], e.state.opacity, e.state.blend, clip))
+        for layer_id, pixmap in self._overlays:
+            entry = self.entry(layer_id)
+            if entry is not None and entry.state.visible:
+                layers.append(RenderLayer(pixmap, self._quads[layer_id], 1.0, BlendMode.NORMAL))
         return layers
+
+    def set_markers(self, markers: list[Marker]) -> None:
+        self._markers = list(markers)
+        self.viewport().update()
+
+    def set_pick(self, enabled: bool, radius_scene: float = 0.0) -> None:
+        self._pick_enabled = enabled
+        self._pick_radius_scene = radius_scene
+        if enabled:
+            self.viewport().setCursor(Qt.CrossCursor)
+        else:
+            self._hover = None
+            self.viewport().unsetCursor()
+        self.viewport().update()
+
+    def layer_point(self, layer_id: str, scene_x: float, scene_y: float) -> tuple[float, float] | None:
+        """Scene point -> pixel position in the layer's displayed image."""
+        entry = self.entry(layer_id)
+        tf = quad_transform(entry.pixmap, self._quads[layer_id]) if entry else None
+        if tf is None:
+            return None
+        inverse, ok = tf.inverted()
+        if not ok:
+            return None
+        p = inverse.map(QPointF(scene_x, scene_y))
+        return p.x(), p.y()
+
+    def _marker_point(self, m: Marker) -> QPointF | None:
+        entry = self.entry(m.layer_id)
+        if entry is None or not entry.state.visible:
+            return None
+        tf = quad_transform(entry.pixmap, self._quads[m.layer_id])
+        if tf is None:
+            return None
+        return tf.map(QPointF(m.u * entry.pixmap.width(), m.v * entry.pixmap.height()))
+
+    def _marker_at(self, view_pos) -> Marker | None:
+        for m in reversed(self._markers):
+            point = self._marker_point(m)
+            if point is None:
+                continue
+            v = self.mapFromScene(point)
+            if math.hypot(v.x() - view_pos.x(), v.y() - view_pos.y()) <= MARKER_RADIUS_PX:
+                return m
+        return None
 
     def _ghost(self) -> RenderLayer | None:
         if not self._active_editable():
@@ -199,6 +270,18 @@ class CanvasView(QGraphicsView):
         return None
 
     def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and not self._tool_enabled:
+            pos = event.position().toPoint()
+            marker = self._marker_at(pos)
+            if marker is not None:
+                self.markerClicked.emit(marker.swatch_id)
+                event.accept()
+                return
+            if self._pick_enabled:
+                s = self.mapToScene(pos)
+                self.colorPicked.emit(s.x(), s.y())
+                event.accept()
+                return
         if event.button() == Qt.LeftButton:
             pos = event.position().toPoint()
             handle = self._hit(pos)
@@ -211,6 +294,13 @@ class CanvasView(QGraphicsView):
 
     def mouseMoveEvent(self, event):
         pos = event.position().toPoint()
+        if self._pick_enabled:
+            self._hover = self.mapToScene(pos)
+            self.pickHover.emit((self._hover.x(), self._hover.y()))
+            self.viewport().setCursor(Qt.PointingHandCursor if self._marker_at(pos) else Qt.CrossCursor)
+            self.viewport().update()
+            event.accept()
+            return
         if self._drag is not None:
             handle, start, start_quad = self._drag
             s = self.mapToScene(pos)
@@ -220,7 +310,11 @@ class CanvasView(QGraphicsView):
                 self.viewport().update()
             event.accept()
             return
-        self._update_cursor(self._hit(pos))
+        handle = self._hit(pos)
+        if handle is None and not self._tool_enabled and self._marker_at(pos):
+            self.viewport().setCursor(Qt.PointingHandCursor)
+        else:
+            self._update_cursor(handle)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -247,7 +341,53 @@ class CanvasView(QGraphicsView):
         else:
             self.viewport().setCursor(Qt.CrossCursor)
 
+    def leaveEvent(self, event):
+        if self._pick_enabled and self._hover is not None:
+            self._hover = None
+            self.pickHover.emit(None)
+            self.viewport().update()
+        super().leaveEvent(event)
+
+    def _draw_markers(self, painter: QPainter, scale: float) -> None:
+        r = MARKER_RADIUS_PX / scale
+        for m in self._markers:
+            center = self._marker_point(m)
+            if center is None:
+                continue
+            ring = QPen(ACCENT if m.selected else Qt.white, 3 if m.selected else 2)
+            ring.setCosmetic(True)
+            painter.setPen(ring)
+            painter.setBrush(QBrush(QColor(*m.rgb)))
+            painter.drawEllipse(center, r, r)
+            luminance = 0.299 * m.rgb[0] + 0.587 * m.rgb[1] + 0.114 * m.rgb[2]
+            painter.setPen(QPen(Qt.black if luminance > 150 else Qt.white))
+            painter.save()  # draw the number at screen size, whatever the zoom
+            painter.translate(center)
+            painter.scale(1 / scale, 1 / scale)
+            f = painter.font()
+            f.setPixelSize(11)
+            f.setBold(True)
+            painter.setFont(f)
+            painter.drawText(QRectF(-MARKER_RADIUS_PX, -MARKER_RADIUS_PX, 2 * MARKER_RADIUS_PX, 2 * MARKER_RADIUS_PX),
+                             Qt.AlignCenter, str(m.number))
+            painter.restore()
+
+    def _draw_pick_cursor(self, painter: QPainter, scale: float) -> None:
+        if not self._pick_enabled or self._hover is None:
+            return
+        r = max(self._pick_radius_scene, 4 / scale)
+        for color, width in ((Qt.black, 3), (Qt.white, 1.5)):
+            pen = QPen(color, width)
+            pen.setCosmetic(True)
+            painter.setPen(pen)
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(self._hover, r, r)
+
     def drawForeground(self, painter: QPainter, rect: QRectF):
+        scale = self._scale()
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        self._draw_markers(painter, scale)
+        self._draw_pick_cursor(painter, scale)
         if not self._active_editable():
             return
         quad = self._quads[self._active_id]

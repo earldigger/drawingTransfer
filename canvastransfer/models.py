@@ -195,6 +195,32 @@ class GridSettings:
 
 
 @dataclass
+class Swatch:
+    """A color sampled from a layer. (u, v) is where it was picked, as
+    fractions of the layer image's width/height, so its marker follows the
+    layer through every transform."""
+
+    id: str
+    layer_id: str
+    u: float
+    v: float
+    rgb: tuple[int, int, int]
+    highlight: bool = False
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "layer_id": self.layer_id, "u": self.u, "v": self.v,
+                "rgb": list(self.rgb), "highlight": self.highlight}
+
+    @staticmethod
+    def from_dict(data: dict) -> "Swatch":
+        return Swatch(id=data["id"], layer_id=data["layer_id"], u=data["u"], v=data["v"],
+                      rgb=tuple(data["rgb"]), highlight=data.get("highlight", False))
+
+
+DEFAULT_HIGHLIGHT_TOLERANCE = 12.0  # CIELAB distance; ~2.3 is a just-noticeable difference
+
+
+@dataclass
 class Project:
     name: str
     canvas_width: float
@@ -207,6 +233,8 @@ class Project:
     compare_layer_a: str | None = None
     compare_layer_b: str | None = None
     split_position: float = 0.5  # 0..1, used by CompareMode.SPLIT
+    swatches: list[Swatch] = field(default_factory=list)
+    highlight_tolerance: float = DEFAULT_HIGHLIGHT_TOLERANCE
 
     def add_layer(self, layer: Layer) -> None:
         self.layers.append(layer)
@@ -214,8 +242,12 @@ class Project:
 
     def remove_layer(self, layer_id: str) -> None:
         self.layers = [l for l in self.layers if l.id != layer_id]
+        self.swatches = [s for s in self.swatches if s.layer_id != layer_id]
         if self.active_layer_id == layer_id:
             self.active_layer_id = self.layers[-1].id if self.layers else None
+
+    def get_swatch(self, swatch_id: str | None) -> Swatch | None:
+        return next((s for s in self.swatches if s.id == swatch_id), None)
 
     def get_layer(self, layer_id: str | None) -> Layer | None:
         for l in self.layers:
@@ -244,6 +276,8 @@ class Project:
             "compare_layer_a": self.compare_layer_a,
             "compare_layer_b": self.compare_layer_b,
             "split_position": self.split_position,
+            "swatches": [s.to_dict() for s in self.swatches],
+            "highlight_tolerance": self.highlight_tolerance,
         }
 
     @staticmethod
@@ -260,4 +294,6 @@ class Project:
             compare_layer_a=data.get("compare_layer_a"),
             compare_layer_b=data.get("compare_layer_b"),
             split_position=data.get("split_position", 0.5),
+            swatches=[Swatch.from_dict(s) for s in data.get("swatches", [])],
+            highlight_tolerance=data.get("highlight_tolerance", DEFAULT_HIGHLIGHT_TOLERANCE),
         )

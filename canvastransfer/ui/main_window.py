@@ -10,11 +10,13 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QScrollArea,
+    QTabWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
 )
 
+from .. import color_study
 from ..compare import display_states, uses_split_line
 from ..geometry import (
     TransformMode,
@@ -27,9 +29,10 @@ from ..geometry import (
     normalize_quad,
 )
 from ..history import History, Snapshot
-from ..models import BlendMode, CompareMode, Layer, Project, new_id
+from ..models import BlendMode, CompareMode, Layer, Project, Swatch, new_id
 from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
-from .canvas_view import CanvasView, LayerEntry
+from .canvas_view import CanvasView, LayerEntry, Marker
+from .color_panel import ColorStudyPanel
 from .compare_panel import ComparePanel
 from .grid_panel import GridPanel
 from .layer_display import LayerDisplayCache
@@ -59,6 +62,7 @@ class MainWindow(QMainWindow):
         self.history = History()
         self._canvas_size = (1, 1)
         self._mode = TransformMode.UNIFORM
+        self._selected_swatch_id: str | None = None
 
         self._blink_on = True
         self.blink_timer = QTimer(self)
@@ -72,10 +76,14 @@ class MainWindow(QMainWindow):
         self.canvas_view = CanvasView()
         self.setCentralWidget(self.canvas_view)
         self.canvas_view.quadCommitted.connect(self._on_quad_committed)
+        self.canvas_view.colorPicked.connect(self._on_color_picked)
+        self.canvas_view.pickHover.connect(self._on_pick_hover)
+        self.canvas_view.markerClicked.connect(self._select_swatch)
 
         self.layers_panel = LayersPanel()
         self.grid_panel = GridPanel()
         self.compare_panel = ComparePanel()
+        self.color_panel = ColorStudyPanel()
         self._build_side_dock()
         self._build_menu()
         self._build_toolbar()
@@ -93,13 +101,16 @@ class MainWindow(QMainWindow):
             layout.addWidget(panel)
         layout.addStretch(1)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(container)
-        scroll.setMinimumWidth(380)
+        self.side_tabs = QTabWidget()
+        for widget, title in ((container, "Workspace"), (self.color_panel, "Color Study")):
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(widget)
+            scroll.setMinimumWidth(380)
+            self.side_tabs.addTab(scroll, title)
 
-        dock = QDockWidget("Workspace", self)
-        dock.setWidget(scroll)
+        dock = QDockWidget("Panels", self)
+        dock.setWidget(self.side_tabs)
         dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
 
@@ -139,6 +150,14 @@ class MainWindow(QMainWindow):
         self.cancel_action = bar.addAction("Cancel", lambda: self._end_session(commit=False))
         self.cancel_action.setShortcut(QKeySequence(Qt.Key_Escape))
         self.cancel_action.setToolTip("Undo everything since Transform was turned on (Esc)")
+        bar.addSeparator()
+
+        self.pick_action = QAction("Pick Color", self)
+        self.pick_action.setCheckable(True)
+        self.pick_action.setShortcut("I")
+        self.pick_action.setToolTip("Click the selected layer to add a color swatch (I)")
+        self.pick_action.toggled.connect(self._on_pick_toggled)
+        bar.addAction(self.pick_action)
         bar.addSeparator()
 
         group = QActionGroup(self)
@@ -181,13 +200,22 @@ class MainWindow(QMainWindow):
         self.grid_panel.gridChanged.connect(self._on_grid_changed)
         self.compare_panel.settingsChanged.connect(self._on_compare_changed)
 
+        cp = self.color_panel
+        cp.swatchSelected.connect(self._select_swatch)
+        cp.swatchRemoveRequested.connect(self._on_remove_swatch)
+        cp.swatchHighlightToggled.connect(self._on_swatch_highlight)
+        cp.toleranceChanged.connect(self._on_tolerance_changed)
+        cp.sampleSizeChanged.connect(lambda _: self._update_pick_cursor())
+
     def _update_enabled_state(self) -> None:
         has_project = self.doc is not None
         has_layer = has_project and self._active_layer() is not None
         self.layers_panel.setEnabled(has_project)
         self.grid_panel.setEnabled(has_project)
         self.compare_panel.setEnabled(has_project)
-        for action in [self.transform_action, self.flip_h_action, self.flip_v_action, self.fit_action, *self.mode_actions.values()]:
+        self.color_panel.setEnabled(has_project)
+        for action in [self.transform_action, self.flip_h_action, self.flip_v_action, self.fit_action,
+                       self.pick_action, *self.mode_actions.values()]:
             action.setEnabled(has_layer)
         self._update_history_actions()
 
@@ -203,6 +231,8 @@ class MainWindow(QMainWindow):
         self._flush_autosave()
         self.history.clear()
         self._set_tool_checked(False)
+        self.pick_action.setChecked(False)
+        self._selected_swatch_id = None
         self.doc = doc
         self.cache.clear()
         self._blink_on = True
@@ -378,6 +408,8 @@ class MainWindow(QMainWindow):
         self.layers_panel.sync_appearance(self._active_layer())
         self.canvas_view.set_active_layer(layer_id)
         self._update_enabled_state()
+        if self.pick_action.isChecked():
+            self._update_pick_cursor()
 
     def _set_layer_attr(self, layer_id: str, attr: str, value, key=None) -> None:
         layer = self.doc.project.get_layer(layer_id) if self.doc else None
@@ -435,6 +467,8 @@ class MainWindow(QMainWindow):
 
     def _on_tool_toggled(self, enabled: bool) -> None:
         """Turning Transform on starts a session; turning it off is Done."""
+        if enabled and self.pick_action.isChecked():
+            self.pick_action.setChecked(False)
         if enabled:
             self.history.begin_session()
             self.canvas_view.set_tool(True, self._mode)
@@ -534,6 +568,9 @@ class MainWindow(QMainWindow):
         self.layers_panel.refresh(project)
         self.grid_panel.set_grid(project.grid)
         self.compare_panel.refresh_layers(project)
+        if project.get_swatch(self._selected_swatch_id) is None:
+            self._selected_swatch_id = None
+        self.color_panel.refresh(project, self._selected_swatch_id)
         if self.compare_panel.current_layer_a_id() != project.compare_layer_a or \
                 self.compare_panel.current_layer_b_id() != project.compare_layer_b:
             project.compare_layer_a = self.compare_panel.current_layer_a_id()
@@ -552,6 +589,126 @@ class MainWindow(QMainWindow):
                 continue
             entries.append(LayerEntry(layer.id, pixmap, self._placement(layer, pixmap), states[layer.id]))
         split = project.split_position if uses_split_line(project) else None
-        self.canvas_view.show_layers(entries, split)
+        self.canvas_view.show_layers(entries, split, self._highlight_overlays())
+        self._update_markers()
+        if self.pick_action.isChecked():
+            self._update_pick_cursor()
         self.canvas_view.set_grid(project.grid)
         self.canvas_view.set_active_layer(project.active_layer_id)
+
+    # -- color study ------------------------------------------------------------------
+
+    def _on_pick_toggled(self, enabled: bool) -> None:
+        if enabled and self.history.in_session:
+            self._end_session(commit=True)
+        if enabled:
+            self.side_tabs.setCurrentIndex(1)
+            self.statusBar().showMessage("Click the selected layer to add a swatch. Press I to stop picking.")
+        else:
+            self.color_panel.show_hover(None)
+        self._update_pick_cursor()
+
+    def _update_pick_cursor(self) -> None:
+        """Size the cursor ring to the sample area, in canvas units."""
+        radius = 0.0
+        layer = self._active_layer()
+        entry = self.canvas_view.entry(layer.id) if layer else None
+        quad = self.canvas_view.quad(layer.id) if layer else None
+        if entry is not None and quad is not None:
+            width_on_canvas = ((quad[1][0] - quad[0][0]) ** 2 + (quad[1][1] - quad[0][1]) ** 2) ** 0.5
+            radius = (self.color_panel.sample_radius() + 0.5) * width_on_canvas / entry.pixmap.width()
+        self.canvas_view.set_pick(self.pick_action.isChecked(), radius)
+
+    def _sample_at(self, x: float, y: float):
+        """(layer, u, v, rgb) for a scene point on the selected layer, or None."""
+        layer = self._active_layer()
+        if layer is None:
+            return None
+        image = self.cache.adjusted_image(self.doc, layer, self._canvas_size)
+        point = self.canvas_view.layer_point(layer.id, x, y)
+        if image is None or point is None:
+            return None
+        rgb = color_study.sample_average(image, point[0], point[1], self.color_panel.sample_radius())
+        if rgb is None:
+            return None
+        h, w = image.shape[:2]
+        return layer, point[0] / w, point[1] / h, rgb
+
+    def _on_pick_hover(self, point) -> None:
+        sample = self._sample_at(*point) if point is not None and self.doc else None
+        self.color_panel.show_hover(sample[3] if sample else None)
+
+    def _on_color_picked(self, x: float, y: float) -> None:
+        if self.doc is None:
+            return
+        sample = self._sample_at(x, y)
+        if sample is None:
+            self.statusBar().showMessage("Click inside the selected layer to pick a color.")
+            return
+        layer, u, v, rgb = sample
+        self._record()
+        swatch = Swatch(id=new_id("swatch"), layer_id=layer.id, u=u, v=v, rgb=rgb)
+        self.doc.project.swatches.append(swatch)
+        self._selected_swatch_id = swatch.id
+        self._refresh_color_study()
+        self.statusBar().showMessage(f"Added swatch {len(self.doc.project.swatches)}: {color_study.hex_code(rgb)}")
+        self._schedule_autosave()
+
+    def _select_swatch(self, swatch_id: str) -> None:
+        if self.doc is None or self.doc.project.get_swatch(swatch_id) is None:
+            return
+        self._selected_swatch_id = swatch_id
+        self.side_tabs.setCurrentIndex(1)
+        self.color_panel.refresh(self.doc.project, swatch_id)
+        self._update_markers()
+
+    def _on_remove_swatch(self, swatch_id: str) -> None:
+        swatches = self.doc.project.swatches if self.doc else []
+        index = next((i for i, s in enumerate(swatches) if s.id == swatch_id), None)
+        if index is None:
+            return
+        self._record()
+        swatches.pop(index)
+        neighbor = swatches[min(index, len(swatches) - 1)] if swatches else None
+        self._selected_swatch_id = neighbor.id if neighbor else None
+        self._refresh_color_study()
+        self._schedule_autosave()
+
+    def _on_swatch_highlight(self, swatch_id: str, on: bool) -> None:
+        swatch = self.doc.project.get_swatch(swatch_id) if self.doc else None
+        if swatch is None or swatch.highlight == on:
+            return
+        self._record()
+        swatch.highlight = on
+        self._refresh_color_study()
+        self._schedule_autosave()
+
+    def _on_tolerance_changed(self, tolerance: float) -> None:
+        if self.doc is None or tolerance == self.doc.project.highlight_tolerance:
+            return
+        self._record(key=("tolerance",))
+        self.doc.project.highlight_tolerance = tolerance
+        self._refresh_canvas()
+        self._schedule_autosave()
+
+    def _refresh_color_study(self) -> None:
+        self.color_panel.refresh(self.doc.project, self._selected_swatch_id)
+        self._refresh_canvas()
+
+    def _highlight_overlays(self) -> list:
+        project = self.doc.project
+        overlays = []
+        for layer in project.layers:
+            colors = [s.rgb for s in project.swatches if s.highlight and s.layer_id == layer.id]
+            pixmap = self.cache.highlight_pixmap(self.doc, layer, self._canvas_size, colors,
+                                                 project.highlight_tolerance) if colors else None
+            if pixmap is not None:
+                overlays.append((layer.id, pixmap))
+        return overlays
+
+    def _update_markers(self) -> None:
+        project = self.doc.project
+        self.canvas_view.set_markers([
+            Marker(s.id, number, s.layer_id, s.u, s.v, s.rgb, s.id == self._selected_swatch_id)
+            for number, s in enumerate(project.swatches, start=1)
+        ])
