@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -294,7 +294,10 @@ class LayersPanel(QWidget):
     def _on_item_changed(self, item: QListWidgetItem):
         if self._updating:
             return
-        self.layerVisibilityToggled.emit(item.data(LAYER_ID_ROLE), item.checkState() == Qt.Checked)
+        # emitted after Qt has finished with this click: the handler rebuilds the
+        # list, which would otherwise delete the item while its signal is running
+        item_id, on = item.data(LAYER_ID_ROLE), item.checkState() == Qt.Checked
+        QTimer.singleShot(0, lambda: self.layerVisibilityToggled.emit(item_id, on))
 
     def _on_item_double_clicked(self, item: QListWidgetItem):
         new_name, ok = QInputDialog.getText(self, "Rename Layer", "Name:", text=item.text())

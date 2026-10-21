@@ -128,6 +128,7 @@ def test_highlight_marks_similar_pixels_yellow(window, qapp):
     from PySide6.QtCore import Qt
 
     item.setCheckState(Qt.Checked)
+    qapp.processEvents()  # applied just after the click
     assert w.doc.project.swatches[0].highlight
     img = w.canvas_view.render_canvas_image()
     left = img.pixelColor(round(cw * 0.25), round(cw * 0.5))
@@ -135,6 +136,7 @@ def test_highlight_marks_similar_pixels_yellow(window, qapp):
     assert (left.red(), left.green(), left.blue()) == cs.HIGHLIGHT_RGB
     assert right.red() == right.green() == right.blue()  # non-matching area shown in gray
     w.color_panel.swatch_list.item(0).setCheckState(Qt.Unchecked)  # list is rebuilt after each change
+    qapp.processEvents()
     img = w.canvas_view.render_canvas_image()
     c = img.pixelColor(round(cw * 0.25), round(cw * 0.5))
     assert (c.red(), c.green(), c.blue()) == COYOTE

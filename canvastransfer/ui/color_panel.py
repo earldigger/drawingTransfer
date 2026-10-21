@@ -3,7 +3,7 @@ highlight tolerance, and details for the selected swatch."""
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, QSize, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -330,7 +330,10 @@ class ColorStudyPanel(QWidget):
     def _on_item_changed(self, item: QListWidgetItem):
         if self._updating:
             return
-        self.swatchHighlightToggled.emit(item.data(SWATCH_ID_ROLE), item.checkState() == Qt.Checked)
+        # emitted after Qt has finished with this click: the handler rebuilds the
+        # list, which would otherwise delete the item while its signal is running
+        item_id, on = item.data(SWATCH_ID_ROLE), item.checkState() == Qt.Checked
+        QTimer.singleShot(0, lambda: self.swatchHighlightToggled.emit(item_id, on))
 
     def _emit_remove(self):
         swatch_id = self._current_id()

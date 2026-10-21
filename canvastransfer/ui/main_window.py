@@ -5,6 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
     QDockWidget,
     QFileDialog,
     QMainWindow,
@@ -38,7 +39,8 @@ from .compare_panel import ComparePanel
 from .grid_panel import GridPanel
 from .layer_display import LayerDisplayCache
 from .layers_panel import LayersPanel
-from .paint_library import PaintLibraryDialog, library_path
+from .library_location import library_path
+from .paint_library import PaintLibraryDialog
 from .paint_panel import PaintMatchPanel
 from .new_project_dialog import NewProjectDialog
 from .perspective_dialog import PerspectiveDialog
@@ -97,6 +99,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("Create or open a project to begin.")
         self._update_enabled_state()
+        QApplication.instance().applicationStateChanged.connect(self._on_app_state_changed)
 
     # -- layout -------------------------------------------------------
 
@@ -137,6 +140,8 @@ class MainWindow(QMainWindow):
         color_menu = self.menuBar().addMenu("&Color")
         self.paint_library_action = color_menu.addAction("Paint Library…", self.open_paint_library)
         color_menu.addAction("Palettes…", lambda: self.open_paint_library(palettes=True))
+        color_menu.addSeparator()
+        color_menu.addAction("Paint Library Location…", self.change_library_location)
 
     def _build_toolbar(self) -> None:
         bar = QToolBar("Transform", self)
@@ -741,6 +746,32 @@ class MainWindow(QMainWindow):
         self.library_dialog.show()
         self.library_dialog.raise_()
         self.library_dialog.activateWindow()
+
+    def change_library_location(self) -> None:
+        self.open_paint_library()
+        self.library_dialog.change_location()
+
+    def _on_app_state_changed(self, state) -> None:
+        if state == Qt.ApplicationActive:
+            self.reload_library_if_changed()
+
+    def reload_library_if_changed(self) -> bool:
+        """Pick up changes Dropbox synced in from another computer. Checked
+        whenever the app comes to the front."""
+        library = self.paint_library
+        if not library.changed_on_disk():
+            return False
+        try:
+            fresh = PaintLibrary.load(library.path)
+        except (OSError, ValueError, TypeError, KeyError):
+            return False  # mid-sync or damaged: try again next time
+        library.replace_with(fresh)
+        self.paint_panel.reload_library()
+        if self.library_dialog is not None:
+            self.library_dialog.refresh()
+            self.library_dialog.refresh_palettes()
+        self.statusBar().showMessage("Paint library reloaded: it was changed on another computer.")
+        return True
 
     def _update_paint_target(self) -> None:
         swatch = self.doc.project.get_swatch(self._selected_swatch_id) if self.doc else None

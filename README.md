@@ -67,14 +67,27 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 ### Paints (side panel tab) and the Paint Library (Color menu)
 
 - **Paint Library**: your paints grouped by medium (Oil, Watercolor, ...),
-  each with brand, code, pigments, opacity and its masstone color
-  (CIELAB D50). Star favorites; untick **Use** to leave a paint out of
-  matches. Stored in `paints.json` in the app's data folder (on a Mac,
-  `~/Library/Application Support/Canvas Transfer`), shared by all projects
+  each with brand, code (the maker's catalog number), price series,
+  pigments, opacity, drying time and its masstone color (CIELAB D50). Star
+  favorites; untick **Use** to leave a paint out of matches
+- **The library is the master copy**, saved on every change to one
+  `paints.json` shared by all projects. By default it is in the app's data
+  folder (on a Mac, `~/Library/Application Support/Canvas Transfer`);
+  **Change Location…** (or Color > Paint Library Location…) moves it to a
+  folder such as Dropbox. If that folder already has a library you choose
+  to use it or replace it (after a backup copy). The app reloads the file
+  when it comes to the front and the file was changed elsewhere, and if it
+  must save over such a change it first keeps a `paints.other-<time>.json`
+  copy. Avoid editing on two computers at the same moment
 - **Import Saved Page**: in your browser, open your artistpigments.org
   collection and use File > Save Page As; import that `.html` file.
-  Importing again updates the site data and keeps your favorites, Use
-  choices and stand-ins; paints no longer on the page are kept
+  Importing again adds new paints and updates site data, but **your edits
+  win**: every field you change in the app (color, name, pigments, series,
+  ...) is marked ✎ and keeps your value; the import summary lists where
+  the site now says something different. **Revert to Site Data** takes the
+  site's values back. The site never blanks out a value you have. Drying
+  time, favorites, Use, stand-ins and palettes are yours alone; paints no
+  longer on the page are kept
 - **Add Paint / Edit**: paste the CIELAB D50 line from a paint's "All color
   measurement details" (or a hex code) for paints that aren't on the site
 - **Stand-ins**: a paint without color data borrows a similar paint's

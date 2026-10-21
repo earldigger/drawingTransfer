@@ -71,7 +71,11 @@ class PaintDialog(QDialog):
         self.pigments.setPlaceholderText("e.g. PB29, PW6")
         form.addRow("Brand", self.brand)
         form.addRow("Name", self.name)
+        self.code.setToolTip("The maker's catalog number for the color, e.g. 036")
+        self.series = QLineEdit(paint.series if paint else "")
+        self.series.setToolTip("The maker's price series, e.g. A or 3")
         form.addRow("Code", self.code)
+        form.addRow("Series", self.series)
         form.addRow("Pigments", self.pigments)
 
         self.opacity = QComboBox()
@@ -80,12 +84,16 @@ class PaintDialog(QDialog):
             self.opacity.addItem(label, key)
         self.opacity.setCurrentIndex(max(0, self.opacity.findData(paint.opacity if paint else "")))
         form.addRow("Opacity", self.opacity)
+        self.drying = QLineEdit(paint.drying if paint else "")
+        self.drying.setPlaceholderText("e.g. fast, medium, 3-5 days")
+        form.addRow("Drying time", self.drying)
 
         color_row = QHBoxLayout()
         self.color_text = QLineEdit()
         self.color_text.setPlaceholderText("Paste the L*a*b* (D50) line, e.g. 13.26  22.45  -50.80")
         if paint and paint.lab:
             self.color_text.setText("{:.2f}  {:.2f}  {:.2f}".format(*paint.lab))
+        self._initial_color_text = self.color_text.text()
         self.color_text.textChanged.connect(self._update_preview)
         self.chip = QLabel()
         self.chip.setFixedSize(QSize(40, 24))
@@ -176,16 +184,21 @@ class PaintDialog(QDialog):
 
     def result_paint(self) -> Paint:
         """The edited paint (the same object when editing)."""
-        lab = parse_lab_text(self.color_text.text())
         p = self.paint or Paint(id=new_manual_id(), medium="", brand="", name="", source="Entered by hand")
-        if self.paint is not None and lab != p.lab and lab is not None:
-            p.source = "Entered by hand"
+        before = p.site_values()
+        if self.color_text.text() != self._initial_color_text:  # the box shows 2 decimals; keep exact values
+            lab = parse_lab_text(self.color_text.text())
+            if lab is not None:
+                p.source = "Entered by hand"
+            p.lab = lab
         p.medium = self._medium_key()
         p.brand = self.brand.text().strip()
         p.name = self.name.text().strip()
         p.code = self.code.text().strip()
+        p.series = self.series.text().strip()
         p.pigments = self._pigment_list()
         p.opacity = self.opacity.currentData()
-        p.lab = lab
-        p.stand_in = self.stand_in.currentData() if lab is None else None
+        p.drying = self.drying.text().strip()
+        p.stand_in = self.stand_in.currentData() if p.lab is None else None
+        p.note_edits(before)
         return p

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths, Qt, QUrl, Signal
+from PySide6.QtCore import Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QFont
 from PySide6.QtWidgets import (
     QComboBox,
@@ -36,28 +36,24 @@ from ..paints import (
     Paint,
     PaintLibrary,
     Palette,
+    field_label,
     medium_label,
     new_palette_id,
     parse_collection_html,
 )
+from .library_location import choose_folder, move_library
 from .paint_dialog import OFF_SCREEN_NOTE, PaintDialog, paint_chip
 from .palette_dialog import PaletteDialog
 
 PAINT_ID_ROLE = Qt.UserRole + 1
 SOURCE_ROLE = Qt.UserRole + 2  # ("palette", id) or ("template", key)
-COL_FAVORITE, COL_USE, COL_NAME, COL_BRAND, COL_CODE, COL_PIGMENTS, COL_OPACITY, COL_DATA = range(8)
-HEADERS = ["★", "Use", "Paint", "Brand", "Code", "Pigments", "Opacity", "Color data"]
-
-
-def library_path() -> Path:
-    """paints.json in the app's data folder (on a Mac:
-    ~/Library/Application Support/Canvas Transfer). CANVASTRANSFER_DATA_DIR
-    overrides it, which the tests use."""
-    import os
-
-    override = os.environ.get("CANVASTRANSFER_DATA_DIR")
-    base = Path(override) if override else Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation))
-    return base / "paints.json"
+(COL_FAVORITE, COL_USE, COL_NAME, COL_BRAND, COL_CODE, COL_SERIES, COL_PIGMENTS, COL_OPACITY, COL_DRYING,
+ COL_DATA) = range(10)
+HEADERS = ["★", "Use", "Paint", "Brand", "Code", "Series", "Pigments", "Opacity", "Drying", "Color data"]
+HEADER_TIPS = {COL_CODE: "The maker's catalog number for the color",
+               COL_SERIES: "The maker's price series (from artistpigments.org, or entered by you)",
+               COL_DRYING: "Drying time, entered by you"}
+EDITED_MARK = " ✎"
 
 
 def color_data_text(library: PaintLibrary, paint: Paint) -> tuple[str, str, bool]:
@@ -98,14 +94,21 @@ class PaintLibraryDialog(QDialog):
         self.edit_button.clicked.connect(self.edit_selected)
         self.delete_button = QPushButton("Delete")
         self.delete_button.clicked.connect(self.delete_selected)
+        self.revert_button = QPushButton("Revert to Site Data")
+        self.revert_button.setToolTip("Undo your edits to this paint's site fields (name, pigments, color, ...) and "
+                                      "use the values from the last import. Drying time and your choices stay.")
+        self.revert_button.clicked.connect(self.revert_selected)
         self.web_button = QPushButton("Open Web Page")
         self.web_button.clicked.connect(self.open_web_page)
-        for b in (self.import_button, self.add_button, self.edit_button, self.delete_button, self.web_button):
+        for b in (self.import_button, self.add_button, self.edit_button, self.delete_button, self.revert_button,
+                  self.web_button):
             buttons.addWidget(b)
         buttons.addStretch(1)
 
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(HEADERS)
+        for col, tip in HEADER_TIPS.items():
+            self.tree.headerItem().setToolTip(col, tip)
         self.tree.setRootIsDecorated(True)
         self.tree.setUniformRowHeights(True)
         header = self.tree.header()
@@ -119,6 +122,15 @@ class PaintLibraryDialog(QDialog):
         self.summary.setStyleSheet("color: gray;")
         close = QPushButton("Close")
         close.clicked.connect(self.close)
+        self.location_label = QLabel()
+        self.location_label.setStyleSheet("color: gray;")
+        self.location_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.location_button = QPushButton("Change Location…")
+        self.location_button.setToolTip("Keep the library file in another folder, such as Dropbox")
+        self.location_button.clicked.connect(self.change_location)
+        location = QHBoxLayout()
+        location.addWidget(self.location_label, 1)
+        location.addWidget(self.location_button)
         bottom = QHBoxLayout()
         bottom.addWidget(self.summary, 1)
         bottom.addWidget(close)
@@ -133,6 +145,7 @@ class PaintLibraryDialog(QDialog):
 
         v = QVBoxLayout(self)
         v.addWidget(self.tabs, 1)
+        v.addLayout(location)
         v.addLayout(bottom)
         self.refresh()
         self.refresh_palettes()
@@ -214,11 +227,17 @@ class PaintLibraryDialog(QDialog):
                 lab = self.library.color_of(p)
                 rgb = cs.lab_d50_to_srgb(lab)[0] if lab else None
                 item.setIcon(COL_NAME, paint_chip(rgb, dashed=p.lab is None))
-                item.setText(COL_NAME, p.name)
+                item.setText(COL_NAME, p.name + (EDITED_MARK if p.edited else ""))
+                item.setToolTip(COL_NAME, f"{p.label()}" + (
+                    f"\nEdited in the app: {', '.join(field_label(f) for f in p.edited)}. "
+                    "Importing again keeps your values." if p.edited else
+                    ("\nAdded by hand" if p.manual else "")))
                 item.setText(COL_BRAND, p.brand)
                 item.setText(COL_CODE, p.code)
+                item.setText(COL_SERIES, p.series)
                 item.setText(COL_PIGMENTS, ", ".join(p.pigments))
                 item.setText(COL_OPACITY, OPACITY_LABELS.get(p.opacity, p.opacity))
+                item.setText(COL_DRYING, p.drying)
                 text, tip, off = color_data_text(self.library, p)
                 item.setText(COL_DATA, text)
                 item.setToolTip(COL_DATA, tip)
@@ -241,6 +260,7 @@ class PaintLibraryDialog(QDialog):
                              f"{missing} without color data · ⚠ = can't be shown exactly on screen" if total else
                              "No paints yet. Save your artistpigments.org collection page in your browser "
                              "(File > Save Page As), then click Import Saved Page.")
+        self.location_label.setText(f"Saved in: {self.library.path}" if self.library.path else "Not saved")
         self._updating = False
         self._update_buttons()
 
@@ -400,6 +420,7 @@ class PaintLibraryDialog(QDialog):
         for b in (self.edit_button, self.delete_button):
             b.setEnabled(paint is not None)
         self.web_button.setEnabled(bool(paint and paint.url))
+        self.revert_button.setEnabled(bool(paint and paint.edited and paint.site))
 
     def _changed(self, select_id: str | None = None) -> None:
         self.library.changed()
@@ -421,7 +442,15 @@ class PaintLibraryDialog(QDialog):
             paint.enabled = item.checkState(COL_USE) == Qt.Checked
         else:
             return
-        self._changed(paint.id)
+        self.library.changed()
+        # rebuild the tree after Qt has finished with this item's click: rebuilding
+        # now would delete the item while its signal is still running (a crash)
+        QTimer.singleShot(0, lambda pid=paint.id: self._after_check(pid))
+
+    def _after_check(self, paint_id: str) -> None:
+        self.refresh(paint_id)
+        self.refresh_palettes()
+        self.libraryChanged.emit()
 
     def import_page(self, path: str | None = None) -> None:
         if not path:
@@ -435,19 +464,28 @@ class PaintLibraryDialog(QDialog):
         except (OSError, ValueError) as e:
             QMessageBox.warning(self, "Import", str(e))
             return
-        added, updated = self.library.merge(paints)
+        report = self.library.merge(paints)
         self.refresh()
         self.refresh_palettes()
         self.libraryChanged.emit()
-        no_data = [self.library.get(p.id) for p in paints if p.lab is None]
+        mine = [self.library.get(p.id) for p in paints]
+        no_data = [p for p in mine if p.lab is None]
         without = [p for p in no_data if self.library.color_of(p) is None]
-        kept = len(self.library.paints) - added - updated
-        QMessageBox.information(
-            self, "Import",
-            f"“{title}”: {added} paints added, {updated} updated.\n\n"
-            f"{len(no_data) - len(without)} paints without color data use a stand-in; "
-            f"{len(without)} have none yet and are left out of matching."
-            + (f"\n\n{kept} paints already in the library but not on this page were kept." if kept else ""))
+        others = len(self.library.paints) - report.added - report.updated
+        edited = [p for p in mine if p.edited]
+        text = (f"“{title}”: {report.added} paints added, {report.updated} updated.\n\n"
+                f"{len(no_data) - len(without)} paints without color data use a stand-in; "
+                f"{len(without)} have none yet and are left out of matching.")
+        if edited:
+            text += f"\n\nYour edits were kept on {len(edited)} paints."
+        if report.kept:
+            lines = [f"  • {p.name}: {', '.join(field_label(f) for f in fields)}" for p, fields in report.kept[:12]]
+            more = f"\n  … and {len(report.kept) - 12} more" if len(report.kept) > 12 else ""
+            text += ("\nThe site has different values where you edited (yours kept; "
+                     "use Revert to Site Data to take the site's):\n" + "\n".join(lines) + more)
+        if others:
+            text += f"\n\n{others} paints in the library but not on this page were kept."
+        QMessageBox.information(self, "Import", text)
 
     def add_paint(self) -> None:
         current = self.library.get(self.selected_id())
@@ -465,6 +503,25 @@ class PaintLibraryDialog(QDialog):
         if dialog.exec() == QDialog.Accepted:
             dialog.result_paint()
             self._changed(paint.id)
+
+    def revert_selected(self) -> None:
+        paint = self.library.get(self.selected_id())
+        if paint is None or not paint.edited:
+            return
+        fields = ", ".join(field_label(f) for f in paint.edited)
+        if QMessageBox.question(self, "Revert to Site Data",
+                                f"Replace your {fields} for {paint.name} with the values from the last "
+                                "import?") != QMessageBox.Yes:
+            return
+        paint.revert_to_site()
+        self._changed(paint.id)
+
+    def change_location(self) -> None:
+        folder = choose_folder(self)
+        if folder is not None and move_library(self.library, folder, self):
+            self.refresh()
+            self.refresh_palettes()
+            self.libraryChanged.emit()
 
     def delete_selected(self) -> None:
         paint = self.library.get(self.selected_id())

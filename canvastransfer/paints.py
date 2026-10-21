@@ -5,6 +5,10 @@ Paints come from a saved artistpigments.org collection page (File > Save
 Page As in the browser) or are entered by hand. A paint without color data
 can borrow the color of a similar paint ("stand-in"): chosen by hand, or
 picked automatically by matching pigments and names.
+
+The library is the master copy. Each imported paint remembers the site's
+values from the last import; fields you change in the app differ from those
+and are kept when the page is imported again.
 """
 
 from __future__ import annotations
@@ -14,6 +18,9 @@ import html
 import json
 import re
 import uuid
+import os
+import shutil
+import time
 from dataclasses import asdict, dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path
@@ -29,6 +36,10 @@ SOURCE_LABELS = {
     "Manufacturer data (Munsell)": "From the maker's Munsell notation (less exact)",
     "Entered by hand": "Entered by hand",
 }
+# fields that come from artistpigments.org; the ones you can also edit in the app
+SITE_FIELDS = ("medium", "brand", "name", "code", "series", "pigments", "opacity", "lab", "source", "url")
+EDITABLE_FIELDS = ("medium", "brand", "name", "code", "series", "pigments", "opacity", "lab")
+FIELD_LABELS = {"medium": "group", "lab": "color (Lab)"}
 # words that describe a paint line rather than its color, ignored when comparing names
 NAME_NOISE = {"genuine", "hue", "extra", "no", "the", "de", "of", "mars"}
 
@@ -43,16 +54,20 @@ class Paint:
     medium: str
     brand: str
     name: str
-    code: str = ""
+    code: str = ""  # the maker's catalog number, e.g. "036" or "6001721 (220)"
+    series: str = ""  # the maker's price series, e.g. "A", "3"
     pigments: list[str] = field(default_factory=list)
     opacity: str = ""
     lab: tuple[float, float, float] | None = None  # CIELAB D50 of the masstone
     source: str = ""
     url: str = ""
     # yours, kept when the collection is imported again
+    drying: str = ""  # drying time, as you write it ("fast", "2-3 days")
     favorite: bool = False
     enabled: bool = True  # offered in matches and mixes
     stand_in: str | None = None  # None: automatic, "": no stand-in, else a paint id
+    edited: list[str] = field(default_factory=list)  # site fields you changed in the app
+    site: dict = field(default_factory=dict)  # the site's values at the last import
 
     @property
     def manual(self) -> bool:
@@ -76,6 +91,47 @@ class Paint:
         if known.get("lab") is not None:
             known["lab"] = tuple(float(v) for v in known["lab"])
         return cls(**known)
+
+    def site_values(self) -> dict:
+        return {f: _plain(getattr(self, f)) for f in SITE_FIELDS}
+
+    def note_edits(self, before: dict) -> None:
+        """Record which site fields now hold your values, after an edit in the
+        app. `before` is site_values() from just before the edit."""
+        if self.manual:
+            return
+        edited = set(self.edited)
+        for f in EDITABLE_FIELDS:
+            now = _plain(getattr(self, f))
+            if self.site:
+                (edited.add if now != self.site.get(f) else edited.discard)(f)
+            elif now != before.get(f):  # imported before site values were kept
+                edited.add(f)
+        self.edited = [f for f in EDITABLE_FIELDS if f in edited]
+
+    def revert_to_site(self) -> None:
+        for f in SITE_FIELDS:
+            if f in self.site:
+                value = self.site[f]
+                setattr(self, f, tuple(value) if f == "lab" and value is not None else value)
+        self.edited = []
+
+
+def _plain(value):
+    """A field value in a form that compares and saves cleanly."""
+    if isinstance(value, tuple):
+        return [round(float(v), 4) for v in value]
+    if isinstance(value, list):
+        return list(value)
+    return value
+
+
+def _empty(value) -> bool:
+    return value is None or value == "" or value == []
+
+
+def field_label(name: str) -> str:
+    return FIELD_LABELS.get(name, name)
 
 
 def new_manual_id() -> str:
@@ -143,9 +199,16 @@ class _CollectionParser(HTMLParser):
         super().__init__()
         self.items: dict[str, dict] = {}
         self.dots: dict[str, dict] = {}
+        self.series: dict[str, str] = {}
+        self._row: str | None = None  # paint of the full-list row being read
+        self._series_for: str | None = None
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        if tag == "div" and a.get("id", "").startswith("paint-") and "data-paint-id" in a:
+            self._row = a["data-paint-id"]
+        if tag == "span" and a.get("title") == "Price series" and self._row:
+            self._series_for = self._row
         if tag == "span" and a.get("class") == "color" and "data-l" in a and "data-paint-id" in a:
             self.dots.setdefault(a["data-paint-id"], a)
         elif tag == "div" and "data-paint-id" in a and "data-brand-id" in a:
@@ -154,6 +217,11 @@ class _CollectionParser(HTMLParser):
             for key, value in a.items():
                 if value and not merged.get(key):
                     merged[key] = value
+
+    def handle_data(self, data):
+        if self._series_for and data.strip():
+            self.series.setdefault(self._series_for, data.strip())
+            self._series_for = None
 
 
 def _tooltip_small(text: str) -> str:
@@ -188,8 +256,8 @@ def parse_collection_html(text: str) -> tuple[str, list[Paint]]:
             m = re.search(rf'/brands/[^"/]+/{re.escape(pid)}-[^"/]+(?=")', text)
             url = SITE + m.group(0) if m else ""
         paints.append(Paint(id=pid, medium=it.get("data-medium-id", "") or "other", brand=brand, name=name,
-                            code=code, pigments=pigments, opacity=it.get("data-transparency", ""),
-                            lab=lab, source=source, url=url))
+                            code=code, series=parser.series.get(pid, ""), pigments=pigments,
+                            opacity=it.get("data-transparency", ""), lab=lab, source=source, url=url))
     m = re.search(r'update_attr\?attr=name"[^>]*?raw-value="([^"]*)"', text)
     title = html.unescape(m.group(1)).strip() if m else ""
     return title or "collection", paints
@@ -224,6 +292,13 @@ def _pigment_set(paint: Paint) -> frozenset[str]:
 
 # -- the library -------------------------------------------------------------
 
+@dataclass
+class ImportReport:
+    added: int = 0
+    updated: int = 0
+    kept: list[tuple[Paint, list[str]]] = field(default_factory=list)  # your edits where the site differs
+
+
 class PaintLibrary:
     def __init__(self, paints: list[Paint] | None = None, path: Path | None = None,
                  palettes: list[Palette] | None = None):
@@ -231,6 +306,7 @@ class PaintLibrary:
         self.palettes: list[Palette] = list(palettes or [])
         self.path = path
         self.revision = 0  # bumped on every change, so results can be cached
+        self._stamp = self._disk_stamp()
 
     # storage
     @classmethod
@@ -246,10 +322,41 @@ class PaintLibrary:
         if self.path is None:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
+        if self._stamp is not None and self.path.exists() and self.changed_on_disk():
+            # someone else (another computer, via Dropbox) changed the file since we read it:
+            # keep their version next to ours rather than silently overwriting it
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            shutil.copy2(self.path, self.path.with_name(f"{self.path.stem}.other-{stamp}.json"))
+        tmp = self.path.with_name(self.path.name + ".tmp")
         tmp.write_text(json.dumps({"version": LIBRARY_VERSION, "paints": [p.to_dict() for p in self.paints],
                                    "palettes": [p.to_dict() for p in self.palettes]}, indent=1), encoding="utf-8")
         tmp.replace(self.path)
+        self._stamp = self._disk_stamp()
+
+    def _disk_stamp(self) -> tuple | None:
+        try:
+            st = os.stat(self.path) if self.path else None
+        except OSError:
+            return None
+        return (st.st_mtime_ns, st.st_size) if st else None
+
+    def changed_on_disk(self) -> bool:
+        """True when the file was changed by someone else since this library
+        last read or wrote it (e.g. Dropbox syncing an edit from another Mac)."""
+        return self.path is not None and self._disk_stamp() != self._stamp
+
+    def move_to(self, path: Path) -> None:
+        """Save to `path` from now on, overwriting whatever is there."""
+        self.path = Path(path)
+        self._stamp = self._disk_stamp()
+        self.changed()
+
+    def replace_with(self, other: "PaintLibrary") -> None:
+        """Take over another library's contents and file, keeping this object
+        (the panels hold on to it)."""
+        self.paints, self.palettes, self.path = other.paints, other.palettes, other.path
+        self._stamp = self._disk_stamp()
+        self.revision += 1
 
     def changed(self) -> None:
         self.revision += 1
@@ -288,22 +395,41 @@ class PaintLibrary:
                 palette.paint_ids.remove(paint_id)
         self.changed()
 
-    def merge(self, imported: list[Paint]) -> tuple[int, int]:
-        """Add new paints and refresh the site data of known ones, keeping
-        your favorites, on/off choices and stand-ins. Nothing is removed.
-        Returns (added, updated)."""
-        added = updated = 0
+    def merge(self, imported: list[Paint]) -> "ImportReport":
+        """Add new paints and refresh the site data of known ones. Your edits
+        win: a field you changed in the app keeps your value (the report
+        lists where the site now says something else), and the site never
+        blanks out a value you have. Favorites, Use, stand-ins, drying times
+        and palettes are yours alone. Nothing is removed."""
+        report = ImportReport()
         for new in imported:
+            site = new.site_values()
             old = self.get(new.id)
             if old is None:
+                new.site = site
                 self.paints.append(new)
-                added += 1
+                report.added += 1
                 continue
-            for name in ("medium", "brand", "name", "code", "pigments", "opacity", "lab", "source", "url"):
-                setattr(old, name, getattr(new, name))
-            updated += 1
+            if not old.site:  # imported before site values were kept: treat differences as your edits
+                old.edited = [f for f in EDITABLE_FIELDS
+                              if f in old.edited or (not _empty(_plain(getattr(old, f)))
+                                                     and _plain(getattr(old, f)) != site[f])]
+            differs = []
+            for f in SITE_FIELDS:
+                mine = _plain(getattr(old, f))
+                if f in old.edited or (f == "source" and "lab" in old.edited):
+                    if f in old.edited and not _empty(site[f]) and site[f] != mine:
+                        differs.append(f)
+                    continue
+                if _empty(site[f]) and not _empty(mine):
+                    continue
+                setattr(old, f, getattr(new, f))
+            old.site = site
+            report.updated += 1
+            if differs:
+                report.kept.append((old, differs))
         self.changed()
-        return added, updated
+        return report
 
     # stand-ins
     def auto_stand_in(self, paint: Paint) -> Paint | None:

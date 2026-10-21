@@ -117,7 +117,8 @@ def test_parse_hex_as_srgb():
 def test_reimport_updates_site_data_and_keeps_your_choices(tmp_path):
     _, paints = sample()
     lib = PaintLibrary(path=tmp_path / "paints.json")
-    assert lib.merge(paints) == (8, 0)
+    report = lib.merge(paints)
+    assert (report.added, report.updated) == (8, 0)
     delft = lib.get("dyoq9")
     delft.favorite, delft.enabled = True, False
     by_name(lib.paints, "Anise").stand_in = "dyoq9"
@@ -126,7 +127,8 @@ def test_reimport_updates_site_data_and_keeps_your_choices(tmp_path):
     lib.add(manual)
     _, again = sample()
     by_name(again, "Old Delft Blue").lab = (6.0, 9.0, -20.0)  # the site re-measured it
-    assert lib.merge(again) == (0, 8)
+    report = lib.merge(again)
+    assert (report.added, report.updated, report.kept) == (0, 8, [])
     delft = lib.get("dyoq9")
     assert delft.lab == (6.0, 9.0, -20.0)
     assert delft.favorite and not delft.enabled

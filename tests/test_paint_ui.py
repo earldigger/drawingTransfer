@@ -8,6 +8,7 @@ import pytest
 
 from canvastransfer.models import Layer, Project, new_id
 from canvastransfer.paints import PaintLibrary
+from canvastransfer.ui.paint_library import COL_DATA, COL_NAME, EDITED_MARK
 from canvastransfer.project_io import ProjectDocument
 
 FIXTURE = Path(__file__).parent / "fixtures" / "collection_sample.html"
@@ -59,7 +60,7 @@ def tree_rows(dialog):
         group = dialog.tree.topLevelItem(g)
         for c in range(group.childCount()):
             item = group.child(c)
-            rows[item.text(2)] = (group.text(2), item)
+            rows[item.text(COL_NAME).replace(EDITED_MARK, '')] = (group.text(COL_NAME), item)
     return rows
 
 
@@ -80,21 +81,22 @@ def test_import_groups_paints_by_medium_and_saves(window, data_dir):
     rows = tree_rows(dialog)
     assert rows["Old Delft Blue"][0].startswith("Oil")
     assert rows["Viridian"][0].startswith("Watercolor")
-    assert "Stand-in: Cadmium Red Medium" in rows["Medium Cadmium red (Genuine)"][1].text(7)
-    assert rows["Anise"][1].text(7) == "No color data"
-    assert rows["Cadmium Red Medium"][1].text(7).startswith("⚠")  # outside what a screen can show
+    assert "Stand-in: Cadmium Red Medium" in rows["Medium Cadmium red (Genuine)"][1].text(COL_DATA)
+    assert rows["Anise"][1].text(COL_DATA) == "No color data"
+    assert rows["Cadmium Red Medium"][1].text(COL_DATA).startswith("⚠")  # outside what a screen can show
     assert "8 paints added" in messages[-1]
     assert len(PaintLibrary.load(tmp / "paints.json").paints) == 8
 
 
-def test_favorite_and_use_checkboxes(window):
+def test_favorite_and_use_checkboxes(window, qapp):
     from PySide6.QtCore import Qt
 
     dialog = imported(window)
     item = tree_rows(dialog)["Old Delft Blue"][1]
     item.setCheckState(0, Qt.Checked)
     assert window.paint_library.get("dyoq9").favorite
-    item = tree_rows(dialog)["Old Delft Blue"][1]  # the tree is rebuilt after a change
+    qapp.processEvents()  # the tree is rebuilt just after the click
+    item = tree_rows(dialog)["Old Delft Blue"][1]
     item.setCheckState(1, Qt.Unchecked)
     assert not window.paint_library.get("dyoq9").enabled
     assert not PaintLibrary.load(window.paint_library.path).get("dyoq9").enabled
