@@ -136,6 +136,7 @@ class MainWindow(QMainWindow):
 
         color_menu = self.menuBar().addMenu("&Color")
         self.paint_library_action = color_menu.addAction("Paint Library…", self.open_paint_library)
+        color_menu.addAction("Palettes…", lambda: self.open_paint_library(palettes=True))
 
     def _build_toolbar(self) -> None:
         bar = QToolBar("Transform", self)
@@ -217,6 +218,7 @@ class MainWindow(QMainWindow):
         cp.toleranceChanged.connect(self._on_tolerance_changed)
         cp.sampleSizeChanged.connect(lambda _: self._update_pick_cursor())
         self.paint_panel.openLibraryRequested.connect(self.open_paint_library)
+        self.paint_panel.openPalettesRequested.connect(lambda: self.open_paint_library(palettes=True))
 
     def _update_enabled_state(self) -> None:
         has_project = self.doc is not None
@@ -731,10 +733,11 @@ class MainWindow(QMainWindow):
                                 f"It was set aside as {damaged.name}; starting with an empty library.")
             return PaintLibrary(path=path)
 
-    def open_paint_library(self) -> None:
+    def open_paint_library(self, palettes: bool = False) -> None:
         if self.library_dialog is None:
             self.library_dialog = PaintLibraryDialog(self.paint_library, self)
             self.library_dialog.libraryChanged.connect(self.paint_panel.reload_library)
+        self.library_dialog.tabs.setCurrentIndex(1 if palettes else 0)
         self.library_dialog.show()
         self.library_dialog.raise_()
         self.library_dialog.activateWindow()

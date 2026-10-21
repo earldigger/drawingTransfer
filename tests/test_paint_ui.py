@@ -158,7 +158,7 @@ def test_paints_tab_matches_selected_swatch(window, qapp):
     window.side_tabs.setCurrentIndex(2)
     qapp.processEvents()
     panel = window.paint_panel
-    assert panel.group.currentData() == "oil"
+    assert panel.group.currentData() == "medium:oil"
     assert "Titanium White" in panel.lightener.currentText()
     result = panel.result()
     assert result.singles and result.pairs
@@ -172,11 +172,11 @@ def test_watercolor_group_lightens_with_water(window, qapp):
     add_swatch(window, qapp)
     window.side_tabs.setCurrentIndex(2)
     panel = window.paint_panel
-    panel.group.setCurrentIndex(panel.group.findData("watercolor"))
+    panel.select_source("medium:watercolor")
     qapp.processEvents()
     assert panel.lightener.currentData() == "water"
     assert all(p.medium == "watercolor" or p.id == "water" for r in panel.result().singles for p, _ in r.parts)
-    panel.group.setCurrentIndex(panel.group.findData("oil"))
+    panel.select_source("medium:oil")
     assert "Titanium White" in panel.lightener.currentText()
 
 

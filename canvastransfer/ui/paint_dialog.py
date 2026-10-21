@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -19,6 +20,22 @@ from .. import color_study as cs
 from ..paints import MEDIUM_LABELS, OPACITY_LABELS, Paint, PaintLibrary, medium_label, new_manual_id, parse_lab_text
 
 OFF_SCREEN_NOTE = "⚠ Brighter or more saturated than a screen can show; shown and mixed as the nearest screen color."
+
+
+def paint_chip(rgb, size: int = 18, dashed: bool = False) -> QIcon:
+    pm = QPixmap(size, size)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    if rgb is None:
+        p.setPen(QPen(QColor(140, 140, 140), 1, Qt.DashLine))
+        p.setBrush(Qt.NoBrush)
+    else:
+        p.setPen(QPen(QColor(90, 90, 90), 1, Qt.DashLine if dashed else Qt.SolidLine))
+        p.setBrush(QColor(*rgb))
+    p.drawRoundedRect(1, 1, size - 2, size - 2, 3, 3)
+    p.end()
+    return QIcon(pm)
 
 
 def chip_style(rgb) -> str:
@@ -115,9 +132,11 @@ class PaintDialog(QDialog):
         auto = self.library.auto_stand_in(probe)
         self.stand_in.addItem(f"Automatic ({auto.name if auto else 'none found'})", None)
         self.stand_in.addItem("None", "")
-        for p in sorted(self.library.in_medium(probe.medium), key=lambda p: p.name):
-            if p.lab is not None and (self.paint is None or p.id != self.paint.id):
-                self.stand_in.addItem(f"{p.name} — {p.brand}", p.id)
+        others = [p for p in self.library.paints if p.lab is not None and (self.paint is None or p.id != self.paint.id)]
+        others.sort(key=lambda p: (p.medium != probe.medium, p.medium, p.name))
+        for p in others:  # same group first; another group's paint can be chosen by hand
+            group = "" if p.medium == probe.medium else f"  ({medium_label(p.medium)})"
+            self.stand_in.addItem(f"{p.name} — {p.brand}{group}", p.id)
         index = self.stand_in.findData(keep)
         self.stand_in.setCurrentIndex(index if index >= 0 else 0)
         self.stand_in.blockSignals(False)

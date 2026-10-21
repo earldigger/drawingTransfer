@@ -1,31 +1,50 @@
 """The Paint Library window: your paints grouped by medium, with import from
 a saved artistpigments.org collection page, add / edit / delete, favorites,
-and which paints are offered in matches."""
+and which paints are offered in matches; plus your limited palettes and the
+classic ones, filled from the paints you own."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 from PySide6.QtCore import QStandardPaths, Qt, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QColor, QDesktopServices, QFont
 from PySide6.QtWidgets import (
+    QComboBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSplitter,
+    QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from .. import color_study as cs
-from ..paints import OPACITY_LABELS, SOURCE_LABELS, Paint, PaintLibrary, medium_label, parse_collection_html
-from .paint_dialog import OFF_SCREEN_NOTE, PaintDialog
+from .. import palettes
+from ..paints import (
+    OPACITY_LABELS,
+    SOURCE_LABELS,
+    Paint,
+    PaintLibrary,
+    Palette,
+    medium_label,
+    new_palette_id,
+    parse_collection_html,
+)
+from .paint_dialog import OFF_SCREEN_NOTE, PaintDialog, paint_chip
+from .palette_dialog import PaletteDialog
 
 PAINT_ID_ROLE = Qt.UserRole + 1
+SOURCE_ROLE = Qt.UserRole + 2  # ("palette", id) or ("template", key)
 COL_FAVORITE, COL_USE, COL_NAME, COL_BRAND, COL_CODE, COL_PIGMENTS, COL_OPACITY, COL_DATA = range(8)
 HEADERS = ["★", "Use", "Paint", "Brand", "Code", "Pigments", "Opacity", "Color data"]
 
@@ -39,22 +58,6 @@ def library_path() -> Path:
     override = os.environ.get("CANVASTRANSFER_DATA_DIR")
     base = Path(override) if override else Path(QStandardPaths.writableLocation(QStandardPaths.AppDataLocation))
     return base / "paints.json"
-
-
-def paint_chip(rgb, size: int = 18, dashed: bool = False) -> QIcon:
-    pm = QPixmap(size, size)
-    pm.fill(Qt.transparent)
-    p = QPainter(pm)
-    p.setRenderHint(QPainter.Antialiasing)
-    if rgb is None:
-        p.setPen(QPen(QColor(140, 140, 140), 1, Qt.DashLine))
-        p.setBrush(Qt.NoBrush)
-    else:
-        p.setPen(QPen(QColor(90, 90, 90), 1, Qt.DashLine if dashed else Qt.SolidLine))
-        p.setBrush(QColor(*rgb))
-    p.drawRoundedRect(1, 1, size - 2, size - 2, 3, 3)
-    p.end()
-    return QIcon(pm)
 
 
 def color_data_text(library: PaintLibrary, paint: Paint) -> tuple[str, str, bool]:
@@ -120,11 +123,68 @@ class PaintLibraryDialog(QDialog):
         bottom.addWidget(self.summary, 1)
         bottom.addWidget(close)
 
+        paints_page = QWidget()
+        pv = QVBoxLayout(paints_page)
+        pv.addLayout(buttons)
+        pv.addWidget(self.tree, 1)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(paints_page, "Paints")
+        self.tabs.addTab(self._build_palettes_page(), "Palettes")
+
         v = QVBoxLayout(self)
-        v.addLayout(buttons)
-        v.addWidget(self.tree, 1)
+        v.addWidget(self.tabs, 1)
         v.addLayout(bottom)
         self.refresh()
+        self.refresh_palettes()
+
+    def _build_palettes_page(self) -> QWidget:
+        page = QWidget()
+        buttons = QHBoxLayout()
+        self.new_palette_button = QPushButton("New Palette…")
+        self.new_palette_button.clicked.connect(self.new_palette)
+        self.edit_palette_button = QPushButton("Edit…")
+        self.edit_palette_button.clicked.connect(self.edit_palette)
+        self.duplicate_palette_button = QPushButton("Duplicate as My Palette")
+        self.duplicate_palette_button.setToolTip("Copy this palette into one of yours, which you can change")
+        self.duplicate_palette_button.clicked.connect(self.duplicate_palette)
+        self.delete_palette_button = QPushButton("Delete")
+        self.delete_palette_button.clicked.connect(self.delete_palette)
+        for b in (self.new_palette_button, self.edit_palette_button, self.duplicate_palette_button,
+                  self.delete_palette_button):
+            buttons.addWidget(b)
+        buttons.addStretch(1)
+
+        self.palette_list = QListWidget()
+        self.palette_list.currentItemChanged.connect(lambda *_: self._show_palette())
+        self.palette_list.itemDoubleClicked.connect(lambda *_: self.edit_palette())
+
+        right = QWidget()
+        rv = QVBoxLayout(right)
+        rv.setContentsMargins(0, 0, 0, 0)
+        row = QHBoxLayout()
+        self.palette_medium_label = QLabel("Fill from")
+        self.palette_medium = QComboBox()
+        self.palette_medium.setToolTip("Which of your paint groups a classic palette is filled from")
+        self.palette_medium.currentIndexChanged.connect(lambda *_: self._show_palette())
+        row.addWidget(self.palette_medium_label)
+        row.addWidget(self.palette_medium)
+        row.addStretch(1)
+        rv.addLayout(row)
+        self.palette_note = QLabel()
+        self.palette_note.setWordWrap(True)
+        rv.addWidget(self.palette_note)
+        self.palette_contents = QListWidget()
+        self.palette_contents.setSelectionMode(QListWidget.NoSelection)
+        rv.addWidget(self.palette_contents, 1)
+
+        split = QSplitter()
+        split.addWidget(self.palette_list)
+        split.addWidget(right)
+        split.setSizes([300, 700])
+        v = QVBoxLayout(page)
+        v.addLayout(buttons)
+        v.addWidget(split, 1)
+        return page
 
     # -- display ---------------------------------------------------------------
 
@@ -184,6 +244,153 @@ class PaintLibraryDialog(QDialog):
         self._updating = False
         self._update_buttons()
 
+    # -- palettes ------------------------------------------------------------
+
+    def open_palettes_tab(self) -> None:
+        self.tabs.setCurrentIndex(1)
+
+    def refresh_palettes(self, select: tuple | None = None) -> None:
+        select = select or self.selected_source()
+        self.palette_list.blockSignals(True)
+        self.palette_list.clear()
+        bold = QFont()
+        bold.setBold(True)
+
+        def header(text):
+            item = QListWidgetItem(text)
+            item.setFont(bold)
+            item.setFlags(Qt.ItemIsEnabled)
+            self.palette_list.addItem(item)
+
+        header("My palettes")
+        if not self.library.palettes:
+            note = QListWidgetItem("   (none yet: New Palette, or duplicate a classic one)")
+            note.setFlags(Qt.ItemIsEnabled)
+            note.setForeground(QColor(130, 130, 130))
+            self.palette_list.addItem(note)
+        for p in self.library.palettes:
+            item = QListWidgetItem(f"{p.name}   ({medium_label(p.medium)}, {len(p.paint_ids)})")
+            item.setData(SOURCE_ROLE, ("palette", p.id))
+            self.palette_list.addItem(item)
+        header("Classic palettes")
+        for t in palettes.TEMPLATES:
+            item = QListWidgetItem(t.name)
+            item.setData(SOURCE_ROLE, ("template", t.key))
+            item.setToolTip(t.note)
+            self.palette_list.addItem(item)
+        current = None
+        for i in range(self.palette_list.count()):
+            if self.palette_list.item(i).data(SOURCE_ROLE) == select:
+                current = self.palette_list.item(i)
+        self.palette_list.blockSignals(False)
+        keep = self.palette_medium.currentData()
+        self.palette_medium.blockSignals(True)
+        self.palette_medium.clear()
+        for m in self.library.media() or ["oil"]:
+            self.palette_medium.addItem(medium_label(m), m)
+        self.palette_medium.setCurrentIndex(max(0, self.palette_medium.findData(keep)))
+        self.palette_medium.blockSignals(False)
+        if current is not None:
+            self.palette_list.setCurrentItem(current)
+        self._show_palette()
+
+    def selected_source(self) -> tuple | None:
+        item = self.palette_list.currentItem() if hasattr(self, "palette_list") else None
+        data = item.data(SOURCE_ROLE) if item else None
+        return tuple(data) if data else None
+
+    def select_source(self, source: tuple) -> None:
+        for i in range(self.palette_list.count()):
+            if self.palette_list.item(i).data(SOURCE_ROLE) == source:
+                self.palette_list.setCurrentRow(i)
+
+    def _add_content_row(self, paint: Paint | None, text: str, tip: str = "", warn: bool = False) -> None:
+        lab = self.library.color_of(paint) if paint else None
+        rgb = cs.lab_d50_to_srgb(lab)[0] if lab else None
+        item = QListWidgetItem(paint_chip(rgb, size=22, dashed=bool(paint) and paint.lab is None), text)
+        item.setToolTip(tip)
+        if warn:
+            item.setForeground(QColor(170, 60, 60))
+        self.palette_contents.addItem(item)
+
+    def _show_palette(self) -> None:
+        self.palette_contents.clear()
+        source = self.selected_source()
+        kind = source[0] if source else None
+        self.palette_medium.setVisible(kind == "template")
+        self.palette_medium_label.setVisible(kind == "template")
+        self.edit_palette_button.setEnabled(kind == "palette")
+        self.delete_palette_button.setEnabled(kind == "palette")
+        self.duplicate_palette_button.setEnabled(kind is not None)
+        if kind == "palette":
+            palette = self.library.get_palette(source[1])
+            self.palette_note.setText(f"<b>{palette.name}</b> — {medium_label(palette.medium)}")
+            for paint in self.library.palette_paints(palette):
+                has_color = self.library.color_of(paint) is not None
+                self._add_content_row(paint, f"{paint.name} — {paint.brand}"
+                                      + ("" if has_color else "   (no color data: left out of mixing)"),
+                                      paint.label(), warn=not has_color)
+        elif kind == "template":
+            filled = palettes.fill(palettes.template(source[1]), self.library, self.palette_medium.currentData())
+            self.palette_note.setText(f"<b>{filled.template.name}</b><br>{filled.template.note}")
+            for f in filled.roles:
+                if f.paint is None:
+                    self._add_content_row(None, f"{f.role.name}:  none of your paints fits", warn=True)
+                else:
+                    self._add_content_row(f.paint, f"{f.role.name}:  {f.paint.name} — {f.paint.brand}"
+                                          + ("   (substitute)" if f.substitute else ""), f.paint.label())
+        else:
+            self.palette_note.setText("Select a palette.")
+
+    def _palette_changed(self, select: tuple | None) -> None:
+        self.library.changed()
+        self.refresh_palettes(select)
+        self.libraryChanged.emit()
+
+    def new_palette(self) -> None:
+        dialog = PaletteDialog(self.library, medium=self.palette_medium.currentData() or "oil", parent=self)
+        if dialog.exec() == QDialog.Accepted:
+            palette = dialog.result_palette()
+            self.library.palettes.append(palette)
+            self._palette_changed(("palette", palette.id))
+
+    def edit_palette(self) -> None:
+        source = self.selected_source()
+        palette = self.library.get_palette(source[1]) if source and source[0] == "palette" else None
+        if palette is None:
+            return
+        dialog = PaletteDialog(self.library, palette, parent=self)
+        if dialog.exec() == QDialog.Accepted:
+            dialog.result_palette()
+            self._palette_changed(("palette", palette.id))
+
+    def duplicate_palette(self) -> None:
+        source = self.selected_source()
+        if source is None:
+            return
+        if source[0] == "palette":
+            original = self.library.get_palette(source[1])
+            copy = Palette(new_palette_id(), f"{original.name} copy", original.medium, list(original.paint_ids))
+        else:
+            filled = palettes.fill(palettes.template(source[1]), self.library, self.palette_medium.currentData())
+            copy = Palette(new_palette_id(), f"My {filled.template.name}", filled.medium,
+                           [p.id for p in filled.paints()])
+        self.library.palettes.append(copy)
+        self._palette_changed(("palette", copy.id))
+
+    def delete_palette(self) -> None:
+        source = self.selected_source()
+        palette = self.library.get_palette(source[1]) if source and source[0] == "palette" else None
+        if palette is None:
+            return
+        if QMessageBox.question(self, "Delete Palette", f"Delete the palette “{palette.name}”? "
+                                "The paints stay in your library.") != QMessageBox.Yes:
+            return
+        self.library.palettes.remove(palette)
+        self._palette_changed(None)
+
+    # -- paints ------------------------------------------------------------------
+
     def selected_id(self) -> str | None:
         item = self.tree.currentItem()
         return item.data(0, PAINT_ID_ROLE) if item else None
@@ -197,6 +404,7 @@ class PaintLibraryDialog(QDialog):
     def _changed(self, select_id: str | None = None) -> None:
         self.library.changed()
         self.refresh(select_id)
+        self.refresh_palettes()
         self.libraryChanged.emit()
 
     # -- actions ---------------------------------------------------------------
@@ -229,6 +437,7 @@ class PaintLibraryDialog(QDialog):
             return
         added, updated = self.library.merge(paints)
         self.refresh()
+        self.refresh_palettes()
         self.libraryChanged.emit()
         no_data = [self.library.get(p.id) for p in paints if p.lab is None]
         without = [p for p in no_data if self.library.color_of(p) is None]
@@ -265,6 +474,7 @@ class PaintLibraryDialog(QDialog):
             return
         self.library.remove(paint.id)
         self.refresh()
+        self.refresh_palettes()
         self.libraryChanged.emit()
 
     def open_web_page(self) -> None:

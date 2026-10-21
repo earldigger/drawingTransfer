@@ -1,5 +1,6 @@
 """Paints tab: the selected swatch matched to your paints, as single paints
-(lightened with white or water) and two-paint mixes."""
+(lightened with white or water) and two-paint mixes. Mix from a whole
+paint group, one of your palettes, or a classic limited palette."""
 
 from __future__ import annotations
 
@@ -20,8 +21,9 @@ from PySide6.QtWidgets import (
 )
 
 from .. import color_study as cs
+from .. import palettes
 from ..mixing import WATER, MatchResult, Recipe, closeness, find_recipes
-from ..paints import PaintLibrary, medium_label
+from ..paints import Paint, PaintLibrary, medium_label
 from .paint_dialog import chip_style
 
 ICON_SIZE = QSize(64, 40)
@@ -48,6 +50,7 @@ def recipe_icon(target, recipe: Recipe) -> QIcon:
 
 class PaintMatchPanel(QWidget):
     openLibraryRequested = Signal()
+    openPalettesRequested = Signal()
 
     def __init__(self, library: PaintLibrary, parent=None):
         super().__init__(parent)
@@ -56,7 +59,7 @@ class PaintMatchPanel(QWidget):
         self._result: MatchResult | None = None
         self._dirty = True
         self._updating = False
-        self._lightener_choice: dict[str, str] = {}  # medium -> what the user chose to lighten with
+        self._lightener_choice: dict[str, str] = {}  # "Mix from" choice -> what the user chose to lighten with
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -73,19 +76,30 @@ class PaintMatchPanel(QWidget):
         tv.addLayout(row)
         form = QFormLayout()
         self.group = QComboBox()
+        self.group.setToolTip("Mix from all your paints in a group, one of your palettes, or a classic palette")
         self.group.currentIndexChanged.connect(self._on_group_changed)
-        form.addRow("Paints", self.group)
+        form.addRow("Mix from", self.group)
         self.lightener = QComboBox()
         self.lightener.setToolTip("What lightens the mixes: one of your whites, or water for watercolor")
         self.lightener.currentIndexChanged.connect(self._on_setting_changed)
         form.addRow("Lighten with", self.lightener)
         tv.addLayout(form)
+        self.palette_label = QLabel()
+        self.palette_label.setWordWrap(True)
+        self.palette_label.setStyleSheet("color: gray;")
+        tv.addWidget(self.palette_label)
         self.favorites_only = QCheckBox("Favorites only")
         self.favorites_only.toggled.connect(self._on_setting_changed)
         tv.addWidget(self.favorites_only)
+        buttons = QHBoxLayout()
+        buttons.addStretch(1)
+        self.palettes_button = QPushButton("Palettes…")
+        self.palettes_button.clicked.connect(self.openPalettesRequested.emit)
         self.library_button = QPushButton("Paint Library…")
         self.library_button.clicked.connect(self.openLibraryRequested.emit)
-        tv.addWidget(self.library_button, alignment=Qt.AlignRight)
+        buttons.addWidget(self.palettes_button)
+        buttons.addWidget(self.library_button)
+        tv.addLayout(buttons)
         layout.addWidget(top)
 
         self.singles = self._result_list()
@@ -124,16 +138,29 @@ class PaintMatchPanel(QWidget):
     # -- outward-facing API --------------------------------------------------
 
     def reload_library(self) -> None:
-        """Refill the group and lightener choices after the library changed."""
+        """Refill the Mix from and lightener choices after the library changed."""
         self._updating = True
         keep = self.group.currentData()
         self.group.clear()
-        for medium in self.library.media():
+        media = self.library.media()
+        for medium in media:
             count = sum(1 for p in self.library.in_medium(medium) if self.library.color_of(p) is not None)
-            self.group.addItem(f"{medium_label(medium)} ({count} with color)", medium)
-        index = self.group.findData(keep)
+            self.group.addItem(f"All {medium_label(medium).lower()} paints ({count} with color)", f"medium:{medium}")
+        if self.library.palettes:
+            self.group.insertSeparator(self.group.count())
+            for p in self.library.palettes:
+                self.group.addItem(f"{p.name}  ({medium_label(p.medium).lower()}, {len(p.paint_ids)})",
+                                   f"palette:{p.id}")
+        classics = [(t, m) for m in media for t in palettes.TEMPLATES
+                    if sum(f.paint is not None for f in palettes.fill(t, self.library, m).roles) >= 2]
+        if classics:
+            self.group.insertSeparator(self.group.count())
+            for t, m in classics:
+                self.group.addItem(f"{t.name}  (classic, {medium_label(m).lower()})", f"template:{t.key}:{m}")
+        index = self.group.findData(keep) if keep else -1  # separators have no data
         self.group.setCurrentIndex(index if index >= 0 else 0)
         self._fill_lighteners()
+        self._describe_selection()
         self._updating = False
         self._dirty = True
         self._recompute()
@@ -146,15 +173,55 @@ class PaintMatchPanel(QWidget):
     def result(self) -> MatchResult | None:
         return self._result
 
+    def select_source(self, key: str) -> None:
+        """Choose what to mix from by its key, e.g. "medium:oil", "palette:<id>"
+        or "template:zorn:oil"."""
+        index = self.group.findData(key)
+        if index >= 0:
+            self.group.setCurrentIndex(index)
+
+    def selection(self) -> tuple[str | None, list[Paint], str]:
+        """(medium, paints to mix from, description) for the Mix from choice."""
+        key = self.group.currentData() or ""
+        kind, _, rest = key.partition(":")
+        if kind == "medium":
+            paints = [p for p in self.library.in_medium(rest)
+                      if p.enabled and (p.favorite or not self.favorites_only.isChecked())]
+            return rest, paints, ""
+        if kind == "palette":
+            palette = self.library.get_palette(rest)
+            if palette is None:
+                return None, [], ""
+            paints = self.library.palette_paints(palette)
+            missing = [p.name for p in paints if self.library.color_of(p) is None]
+            text = ", ".join(p.name for p in paints)
+            if missing:
+                text += f".  No color data (left out): {', '.join(missing)}"
+            return palette.medium, paints, text
+        if kind == "template":
+            key_, _, medium = rest.partition(":")
+            filled = palettes.fill(palettes.template(key_), self.library, medium)
+            parts = [f"{f.paint.name}{' (for ' + f.role.name.lower() + ')' if f.substitute else ''}"
+                     for f in filled.roles if f.paint is not None]
+            text = ", ".join(parts)
+            empty = [f.role.name.lower() for f in filled.roles if f.paint is None]
+            if empty:
+                text += f".  None of your paints fits: {', '.join(empty)}"
+            return medium, filled.paints(), text
+        return None, [], ""
+
     # -- internals ---------------------------------------------------------
 
     def _fill_lighteners(self) -> None:
-        medium = self.group.currentData()
-        keep = self._lightener_choice.get(medium)
+        """Whites of the group, water and nothing. A palette's own white is
+        chosen first, then the last choice for this Mix from entry."""
+        medium, selected, _ = self.selection()
+        keep = self._lightener_choice.get(self.group.currentData())
         self.lightener.blockSignals(True)
         self.lightener.clear()
         whites = [p for p in self.library.in_medium(medium or "") if p.is_white and self.library.color_of(p)]
-        whites.sort(key=lambda p: (not p.favorite, "titanium" not in p.name.lower(), p.name))
+        in_selection = {p.id for p in selected}
+        whites.sort(key=lambda p: (p.id not in in_selection, not p.favorite, "titanium" not in p.name.lower(), p.name))
         for p in whites:
             self.lightener.addItem(f"{p.name} — {p.brand}", p.id)
         self.lightener.addItem("Water (paper white)", WATER.id)
@@ -165,10 +232,23 @@ class PaintMatchPanel(QWidget):
         self.lightener.setCurrentIndex(index)
         self.lightener.blockSignals(False)
 
+    def _describe_selection(self) -> None:
+        kind = (self.group.currentData() or "").partition(":")[0]
+        _, _, text = self.selection()
+        if kind == "template":
+            name = self.group.currentData().split(":")[1]
+            self.palette_label.setToolTip(palettes.template(name).note)
+        else:
+            self.palette_label.setToolTip("")
+        self.palette_label.setText(text)
+        self.palette_label.setVisible(bool(text))
+        self.favorites_only.setEnabled(kind == "medium")
+
     def _on_group_changed(self, _index) -> None:
         if self._updating:
             return
         self._fill_lighteners()
+        self._describe_selection()
         self._on_setting_changed()
 
     def _on_setting_changed(self, *_args) -> None:
@@ -197,13 +277,11 @@ class PaintMatchPanel(QWidget):
             return
         self.target_chip.setStyleSheet(chip_style(rgb))
         self.target_label.setText(f"<b>{cs.hex_code(rgb)}</b>  RGB {rgb[0]}, {rgb[1]}, {rgb[2]}")
-        medium = self.group.currentData()
-        if medium is None:
+        if self.group.currentData() is None:
             self.target_label.setText(self.target_label.text() + "<br>Your paint library is empty: open the "
                                       "Paint Library and import your saved collection page.")
             return
-        paints = [p for p in self.library.in_medium(medium)
-                  if p.enabled and (p.favorite or not self.favorites_only.isChecked())]
+        _, paints, _ = self.selection()
         choice = self.lightener.currentData()
         lightener = WATER if choice == WATER.id else (None if choice == NO_LIGHTENER else self.library.get(choice))
         self._result = find_recipes(rgb, self.library, paints, lightener)
@@ -212,7 +290,7 @@ class PaintMatchPanel(QWidget):
 
     def _show(self, widget: QListWidget, recipes: list[Recipe]) -> None:
         if not recipes:
-            item = QListWidgetItem("No paints with color data in this group.")
+            item = QListWidgetItem("No paints with color data to mix from.")
             widget.addItem(item)
             return
         for r in recipes:

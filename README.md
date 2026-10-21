@@ -91,6 +91,27 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   are clipped to the nearest screen color before mixing. * marks paints
   mixed with a stand-in's color
 
+### Limited palettes (Color > Palettes…)
+
+- **Mix from** on the Paints tab: all paints of a group, one of your
+  palettes, or a classic palette
+- **Your palettes**: New Palette, then tick the paints (one medium per
+  palette). A palette is used as-is, even paints with Use unticked; paints
+  without color data are listed but left out of mixing. A palette's own
+  white is picked as the lightener
+- **Classic palettes**, filled from the paints you own (ticked Use): Zorn,
+  Sargent (as commonly cited), Classical four-color, Primary triad, Split
+  primary, Earth palette. Each role ("Vermilion", "Cool blue") takes the
+  paint whose pigments and name fit best; a modern substitute (cadmium red
+  for vermilion, titanium for lead white) is marked, and roles nothing
+  fits are listed. **Duplicate as My Palette** turns one into a palette
+  you can edit
+- Zorn's four colors are well documented. Published "Sargent palettes" vary
+  and are poorly sourced, so that one is a convention, not a record
+- A stand-in chosen by hand may come from another group, e.g. an oil
+  viridian borrowing a watercolor viridian's color (flagged, and binders do
+  change color); automatic stand-ins stay within the group
+
 ## What's intentionally skipped
 
 - Camera capture (AVFoundation) -- desktop file import only
@@ -153,6 +174,7 @@ canvastransfer/
                     tints/shades/tones (Mixbox), similar-color masks
   paints.py         paint library, saved-page import, stand-ins
   mixing.py         nearest paints and Mixbox mixing recipes
+  palettes.py       classic limited palettes and filling them from your paints
   compare.py        how each layer displays in each compare mode
   history.py        undo/redo snapshots and transform sessions
   project_io.py     .ctproj package save/load, autosave
@@ -165,6 +187,7 @@ canvastransfer/
     paint_panel.py   Paints tab: matches for the selected swatch
     paint_library.py Paint Library window
     paint_dialog.py  Add / Edit Paint
+    palette_dialog.py New / Edit Palette
     slider_row.py    slider + number box rows shared by the panels
     main_window.py   toolbar, menus, wiring; plus the side panels
 ```

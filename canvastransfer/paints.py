@@ -82,6 +82,27 @@ def new_manual_id() -> str:
     return f"manual-{uuid.uuid4().hex[:10]}"
 
 
+@dataclass
+class Palette:
+    """A limited palette you made: a named set of paints from one medium."""
+
+    id: str
+    name: str
+    medium: str
+    paint_ids: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Palette":
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+def new_palette_id() -> str:
+    return f"palette-{uuid.uuid4().hex[:10]}"
+
+
 # -- reading pasted color text -------------------------------------------
 
 # a number not glued to a letter or a degree sign, so "D50 2°" in a pasted line is skipped
@@ -204,8 +225,10 @@ def _pigment_set(paint: Paint) -> frozenset[str]:
 # -- the library -------------------------------------------------------------
 
 class PaintLibrary:
-    def __init__(self, paints: list[Paint] | None = None, path: Path | None = None):
+    def __init__(self, paints: list[Paint] | None = None, path: Path | None = None,
+                 palettes: list[Palette] | None = None):
         self.paints: list[Paint] = list(paints or [])
+        self.palettes: list[Palette] = list(palettes or [])
         self.path = path
         self.revision = 0  # bumped on every change, so results can be cached
 
@@ -216,15 +239,16 @@ class PaintLibrary:
         if not path.exists():
             return cls(path=path)
         data = json.loads(path.read_text(encoding="utf-8"))
-        return cls([Paint.from_dict(d) for d in data.get("paints", [])], path=path)
+        return cls([Paint.from_dict(d) for d in data.get("paints", [])], path=path,
+                   palettes=[Palette.from_dict(d) for d in data.get("palettes", [])])
 
     def save(self) -> None:
         if self.path is None:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"version": LIBRARY_VERSION, "paints": [p.to_dict() for p in self.paints]},
-                                  indent=1), encoding="utf-8")
+        tmp.write_text(json.dumps({"version": LIBRARY_VERSION, "paints": [p.to_dict() for p in self.paints],
+                                   "palettes": [p.to_dict() for p in self.palettes]}, indent=1), encoding="utf-8")
         tmp.replace(self.path)
 
     def changed(self) -> None:
@@ -243,6 +267,12 @@ class PaintLibrary:
     def in_medium(self, medium: str) -> list[Paint]:
         return [p for p in self.paints if p.medium == medium]
 
+    def get_palette(self, palette_id: str | None) -> Palette | None:
+        return next((p for p in self.palettes if p.id == palette_id), None)
+
+    def palette_paints(self, palette: Palette) -> list[Paint]:
+        return [p for p in (self.get(i) for i in palette.paint_ids) if p is not None]
+
     # editing
     def add(self, paint: Paint) -> None:
         self.paints.append(paint)
@@ -253,6 +283,9 @@ class PaintLibrary:
         for p in self.paints:
             if p.stand_in == paint_id:
                 p.stand_in = None
+        for palette in self.palettes:
+            if paint_id in palette.paint_ids:
+                palette.paint_ids.remove(paint_id)
         self.changed()
 
     def merge(self, imported: list[Paint]) -> tuple[int, int]:
@@ -289,6 +322,8 @@ class PaintLibrary:
         return max(good, key=lambda s: (s[0], s[1]))[2] if good else None
 
     def stand_in_for(self, paint: Paint) -> Paint | None:
+        """Automatic stand-ins stay within the paint's medium; one chosen by
+        hand may come from any medium (e.g. a watercolor for an oil)."""
         if paint.lab is not None or paint.stand_in == "":
             return None
         if paint.stand_in:
