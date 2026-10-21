@@ -64,6 +64,33 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   standard; tints, shades and tones are mixed with Mixbox, which behaves
   like pigment rather than like light
 
+### Paints (side panel tab) and the Paint Library (Color menu)
+
+- **Paint Library**: your paints grouped by medium (Oil, Watercolor, ...),
+  each with brand, code, pigments, opacity and its masstone color
+  (CIELAB D50). Star favorites; untick **Use** to leave a paint out of
+  matches. Stored in `paints.json` in the app's data folder (on a Mac,
+  `~/Library/Application Support/Canvas Transfer`), shared by all projects
+- **Import Saved Page**: in your browser, open your artistpigments.org
+  collection and use File > Save Page As; import that `.html` file.
+  Importing again updates the site data and keeps your favorites, Use
+  choices and stand-ins; paints no longer on the page are kept
+- **Add Paint / Edit**: paste the CIELAB D50 line from a paint's "All color
+  measurement details" (or a hex code) for paints that aren't on the site
+- **Stand-ins**: a paint without color data borrows a similar paint's
+  color, chosen automatically (same pigments, else a near-identical name)
+  or picked by hand in Edit. Stand-ins stay inside their own medium
+- **Paints tab**: the selected swatch matched to the chosen group, as one
+  paint lightened with a white (or water, for watercolor) and as two
+  paints plus white, ranked by CIEDE2000 difference. Mixing uses Mixbox,
+  the same model the artistpigments.org mixer uses
+- Mixbox treats every paint as equally strong, so the recipes are good at
+  naming paints and weak on amounts: strong pigments (phthalos) need much
+  less than they say, weak ones more
+- ⚠ marks paints whose color can't be shown on screen (many cadmiums); they
+  are clipped to the nearest screen color before mixing. * marks paints
+  mixed with a stand-in's color
+
 ## What's intentionally skipped
 
 - Camera capture (AVFoundation) -- desktop file import only
@@ -71,8 +98,8 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Automatic rectangle detection (Vision framework)
 - Zoom/pan of the canvas view
 - Everything in the spec's "Future Features" list
-- Paint palette, nearest-paint matching and mixing recipes (planned as
-  Color Study phase 2)
+- Suggestions for paints you don't own (planned as Color Study phase 3)
+- Spectral (Kubelka-Munk) mixing from measured curves
 
 ## Running it
 
@@ -124,6 +151,8 @@ canvastransfer/
                     hue/saturation, invert
   color_study.py    sampling, CIELAB/Munsell, warm-cool, complement,
                     tints/shades/tones (Mixbox), similar-color masks
+  paints.py         paint library, saved-page import, stand-ins
+  mixing.py         nearest paints and Mixbox mixing recipes
   compare.py        how each layer displays in each compare mode
   history.py        undo/redo snapshots and transform sessions
   project_io.py     .ctproj package save/load, autosave
@@ -133,6 +162,9 @@ canvastransfer/
                      computed from the pixels underneath) and grid
     layer_display.py cached per-layer display pixmaps and highlight overlays
     color_panel.py   Color Study tab: swatches, tolerance, details
+    paint_panel.py   Paints tab: matches for the selected swatch
+    paint_library.py Paint Library window
+    paint_dialog.py  Add / Edit Paint
     slider_row.py    slider + number box rows shared by the panels
     main_window.py   toolbar, menus, wiring; plus the side panels
 ```

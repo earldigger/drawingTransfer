@@ -66,6 +66,41 @@ def lab_d50(rgb: RGB) -> np.ndarray:
     return _colour().XYZ_to_Lab(_adapt(_xyz_d65(rgb), "D65", "D50"), _illuminants()["D50"])
 
 
+@lru_cache(maxsize=1)
+def _srgb_to_xyz_d50() -> tuple[np.ndarray, np.ndarray]:
+    """Linear-sRGB-to-XYZ (Bradford-adapted to D50) matrix and the D50 white."""
+    c, ill = _colour(), _illuminants()
+    m = c.sRGB_to_XYZ(np.eye(3), illuminant=ill["D50"], chromatic_adaptation_transform="Bradford").T
+    return m, c.xy_to_XYZ(ill["D50"])
+
+
+def srgb_to_lab_d50(rgb01: np.ndarray) -> np.ndarray:
+    """Many sRGB colors (floats 0..1, shape (..., 3)) to CIELAB D50 at once.
+    Same result as lab_d50, written out in NumPy because it runs on every
+    candidate mix when searching for recipes."""
+    m, white = _srgb_to_xyz_d50()
+    rgb01 = np.asarray(rgb01, dtype=np.float64)
+    linear = np.where(rgb01 <= 0.04045, rgb01 / 12.92, ((rgb01 + 0.055) / 1.055) ** 2.4)
+    t = (linear @ m.T) / white
+    f = np.where(t > (6 / 29) ** 3, np.cbrt(t), t / (3 * (6 / 29) ** 2) + 4 / 29)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], axis=-1)
+
+
+def lab_d50_to_srgb(lab) -> tuple[RGB, bool]:
+    """Screen color for a CIELAB D50 value, and whether it fits on screen.
+    Colors outside sRGB (many cadmiums, for example) are clipped."""
+    c, ill = _colour(), _illuminants()
+    xyz = c.Lab_to_XYZ(np.asarray(lab, dtype=float), ill["D50"])
+    rgb = c.XYZ_to_sRGB(xyz, illuminant=ill["D50"], chromatic_adaptation_transform="Bradford")
+    in_gamut = bool(np.all(rgb >= -0.5 / 255) and np.all(rgb <= 1 + 0.5 / 255))
+    return tuple(int(round(v)) for v in np.clip(rgb, 0, 1) * 255), in_gamut
+
+
+def delta_e(lab1, lab2) -> np.ndarray:
+    """CIEDE2000 color difference; about 1 is just visible side by side."""
+    return _colour().delta_E(lab1, lab2, method="CIE 2000")
+
+
 @lru_cache(maxsize=512)
 def munsell(rgb: RGB) -> tuple[str | None, float]:
     """(Munsell notation or None, Munsell value 0..10). Munsell is defined

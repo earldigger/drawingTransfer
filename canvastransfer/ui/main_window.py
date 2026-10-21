@@ -30,6 +30,7 @@ from ..geometry import (
 )
 from ..history import History, Snapshot
 from ..models import BlendMode, CompareMode, Layer, Project, Swatch, new_id
+from ..paints import PaintLibrary
 from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
 from .canvas_view import CanvasView, LayerEntry, Marker
 from .color_panel import ColorStudyPanel
@@ -37,6 +38,8 @@ from .compare_panel import ComparePanel
 from .grid_panel import GridPanel
 from .layer_display import LayerDisplayCache
 from .layers_panel import LayersPanel
+from .paint_library import PaintLibraryDialog, library_path
+from .paint_panel import PaintMatchPanel
 from .new_project_dialog import NewProjectDialog
 from .perspective_dialog import PerspectiveDialog
 
@@ -84,6 +87,9 @@ class MainWindow(QMainWindow):
         self.grid_panel = GridPanel()
         self.compare_panel = ComparePanel()
         self.color_panel = ColorStudyPanel()
+        self.paint_library = self._load_paint_library()
+        self.paint_panel = PaintMatchPanel(self.paint_library)
+        self.library_dialog: PaintLibraryDialog | None = None
         self._build_side_dock()
         self._build_menu()
         self._build_toolbar()
@@ -102,7 +108,8 @@ class MainWindow(QMainWindow):
         layout.addStretch(1)
 
         self.side_tabs = QTabWidget()
-        for widget, title in ((container, "Workspace"), (self.color_panel, "Color Study")):
+        for widget, title in ((container, "Workspace"), (self.color_panel, "Color Study"),
+                              (self.paint_panel, "Paints")):
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setWidget(widget)
@@ -126,6 +133,9 @@ class MainWindow(QMainWindow):
         edit_menu = self.menuBar().addMenu("&Edit")
         self.undo_action = edit_menu.addAction("Undo", QKeySequence.Undo, self._undo)
         self.redo_action = edit_menu.addAction("Redo", QKeySequence.Redo, self._redo)
+
+        color_menu = self.menuBar().addMenu("&Color")
+        self.paint_library_action = color_menu.addAction("Paint Library…", self.open_paint_library)
 
     def _build_toolbar(self) -> None:
         bar = QToolBar("Transform", self)
@@ -206,6 +216,7 @@ class MainWindow(QMainWindow):
         cp.swatchHighlightToggled.connect(self._on_swatch_highlight)
         cp.toleranceChanged.connect(self._on_tolerance_changed)
         cp.sampleSizeChanged.connect(lambda _: self._update_pick_cursor())
+        self.paint_panel.openLibraryRequested.connect(self.open_paint_library)
 
     def _update_enabled_state(self) -> None:
         has_project = self.doc is not None
@@ -571,6 +582,7 @@ class MainWindow(QMainWindow):
         if project.get_swatch(self._selected_swatch_id) is None:
             self._selected_swatch_id = None
         self.color_panel.refresh(project, self._selected_swatch_id)
+        self._update_paint_target()
         if self.compare_panel.current_layer_a_id() != project.compare_layer_a or \
                 self.compare_panel.current_layer_b_id() != project.compare_layer_b:
             project.compare_layer_a = self.compare_panel.current_layer_a_id()
@@ -602,7 +614,7 @@ class MainWindow(QMainWindow):
         if enabled and self.history.in_session:
             self._end_session(commit=True)
         if enabled:
-            self.side_tabs.setCurrentIndex(1)
+            self._show_color_tab()
             self.statusBar().showMessage("Click the selected layer to add a swatch. Press I to stop picking.")
         else:
             self.color_panel.show_hover(None)
@@ -658,8 +670,9 @@ class MainWindow(QMainWindow):
         if self.doc is None or self.doc.project.get_swatch(swatch_id) is None:
             return
         self._selected_swatch_id = swatch_id
-        self.side_tabs.setCurrentIndex(1)
+        self._show_color_tab()
         self.color_panel.refresh(self.doc.project, swatch_id)
+        self._update_paint_target()
         self._update_markers()
 
     def _on_remove_swatch(self, swatch_id: str) -> None:
@@ -693,7 +706,42 @@ class MainWindow(QMainWindow):
 
     def _refresh_color_study(self) -> None:
         self.color_panel.refresh(self.doc.project, self._selected_swatch_id)
+        self._update_paint_target()
         self._refresh_canvas()
+
+    def _show_color_tab(self) -> None:
+        """Bring Color Study forward, unless Paints (which also follows the
+        selected swatch) is already showing."""
+        if self.side_tabs.currentWidget().widget() is not self.paint_panel:
+            self.side_tabs.setCurrentIndex(1)
+
+    # -- paints -------------------------------------------------------------------
+
+    def _load_paint_library(self) -> PaintLibrary:
+        path = library_path()
+        try:
+            return PaintLibrary.load(path)
+        except (OSError, ValueError, TypeError, KeyError) as e:
+            damaged = path.with_name(path.stem + ".damaged.json")
+            try:
+                path.replace(damaged)
+            except OSError:
+                pass
+            QMessageBox.warning(self, "Paint Library", f"Couldn't read the paint library ({e}). "
+                                f"It was set aside as {damaged.name}; starting with an empty library.")
+            return PaintLibrary(path=path)
+
+    def open_paint_library(self) -> None:
+        if self.library_dialog is None:
+            self.library_dialog = PaintLibraryDialog(self.paint_library, self)
+            self.library_dialog.libraryChanged.connect(self.paint_panel.reload_library)
+        self.library_dialog.show()
+        self.library_dialog.raise_()
+        self.library_dialog.activateWindow()
+
+    def _update_paint_target(self) -> None:
+        swatch = self.doc.project.get_swatch(self._selected_swatch_id) if self.doc else None
+        self.paint_panel.set_target(swatch.rgb if swatch else None)
 
     def _highlight_overlays(self) -> list:
         project = self.doc.project
