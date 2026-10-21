@@ -110,13 +110,15 @@ def test_add_paint_by_pasting_lab(window, qapp):
     d = PaintDialog(lib)
     d.brand.setText("Old Holland Classic Oil Colours")
     d.name.setText("Ultramarine Blue")
-    d.code.setText("036")
+    d.lightfastness.setCurrentText("I")
+    d.drying.setText("medium")
     d.pigments.setText("pb29")
     d.color_text.setText("CIELAB D50 2°: L* 13.26  a* 22.45  b* -50.80")
     assert "#03196C" in d.color_note.text()
     assert not d.stand_in.isEnabled()
     paint = d.result_paint()
     assert paint.lab == (13.26, 22.45, -50.80) and paint.pigments == ["PB29"] and paint.manual
+    assert (paint.lightfastness, paint.drying) == ("I", "medium")
     lib.add(paint)
     # the Charvin PB29 now borrows its color automatically
     assert lib.stand_in_for(lib.get("68xmv")).name == "Ultramarine Blue"

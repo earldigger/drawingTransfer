@@ -47,12 +47,15 @@ from .palette_dialog import PaletteDialog
 
 PAINT_ID_ROLE = Qt.UserRole + 1
 SOURCE_ROLE = Qt.UserRole + 2  # ("palette", id) or ("template", key)
-(COL_FAVORITE, COL_USE, COL_NAME, COL_BRAND, COL_CODE, COL_SERIES, COL_PIGMENTS, COL_OPACITY, COL_DRYING,
+(COL_FAVORITE, COL_USE, COL_NAME, COL_BRAND, COL_SERIES, COL_PIGMENTS, COL_OPACITY, COL_LIGHTFAST, COL_DRYING,
  COL_DATA) = range(10)
-HEADERS = ["★", "Use", "Paint", "Brand", "Code", "Series", "Pigments", "Opacity", "Drying", "Color data"]
-HEADER_TIPS = {COL_CODE: "The maker's catalog number for the color",
-               COL_SERIES: "The maker's price series (from artistpigments.org, or entered by you)",
-               COL_DRYING: "Drying time, entered by you"}
+HEADERS = ["★", "Use", "Paint", "Brand", "Series", "Pigments", "Opacity", "Lightfast", "Drying", "Color data"]
+LIGHTFAST_TIP = ("Lightfastness as artistpigments.org shows it. ASTM I = excellent, II = very good, III = not "
+                 "sufficiently lightfast. A plain rating (I, E) or stars (★★★, or ★★★★☆ out of 5) is the maker's "
+                 "own scale; more is better.")
+HEADER_TIPS = {COL_SERIES: "The maker's price series (from artistpigments.org, or entered by you)",
+               COL_LIGHTFAST: LIGHTFAST_TIP,
+               COL_DRYING: "Drying time, entered by you (it is on each paint's own artistpigments.org page)"}
 EDITED_MARK = " ✎"
 
 
@@ -233,10 +236,11 @@ class PaintLibraryDialog(QDialog):
                     "Importing again keeps your values." if p.edited else
                     ("\nAdded by hand" if p.manual else "")))
                 item.setText(COL_BRAND, p.brand)
-                item.setText(COL_CODE, p.code)
                 item.setText(COL_SERIES, p.series)
                 item.setText(COL_PIGMENTS, ", ".join(p.pigments))
                 item.setText(COL_OPACITY, OPACITY_LABELS.get(p.opacity, p.opacity))
+                item.setText(COL_LIGHTFAST, p.lightfastness)
+                item.setToolTip(COL_LIGHTFAST, LIGHTFAST_TIP)
                 item.setText(COL_DRYING, p.drying)
                 text, tip, off = color_data_text(self.library, p)
                 item.setText(COL_DATA, text)

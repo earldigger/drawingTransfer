@@ -30,6 +30,7 @@ def test_parse_saved_collection_page():
     delft = by_name(paints, "Old Delft Blue")
     assert delft.brand == "Old Holland Classic Oil Colours" and delft.code == "220"
     assert delft.pigments == ["PB60"] and delft.opacity == "O" and delft.medium == "oil"
+    assert delft.lightfastness == "I" and delft.series == "C"
     assert delft.lab == pytest.approx((5.385, 9.614, -19.735))
     assert delft.source == "Chart"
     assert delft.url == "https://artistpigments.org/brands/old-holland-classic-oil-colours/dyoq9-old-delft-blue"

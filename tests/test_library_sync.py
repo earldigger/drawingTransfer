@@ -35,6 +35,31 @@ def test_series_read_from_the_page():
     assert series["Viridian"] == ""  # not every paint lists one
 
 
+def test_lightfastness_read_as_the_site_shows_it():
+    rating = {p.name: p.lightfastness for p in sample()}
+    assert rating["Old Delft Blue"] == "I"  # the maker's own scale
+    assert rating["Titanium White"] == "ASTM I"
+    assert rating["Light Ultramarine Blue"] == "★★★" and rating["Anise"] == "★★☆"
+
+
+def test_lightfastness_text_combines_stars_and_astm():
+    from canvastransfer.paints import _lightfastness_text
+
+    assert _lightfastness_text(["★★★", "ASTM:", "I"]) == "★★★ · ASTM I"
+    assert _lightfastness_text(["ASTM:", "II"]) == "ASTM II"
+    assert _lightfastness_text([]) == ""
+
+
+def test_your_lightfastness_survives_reimport():
+    lib = imported()
+    anise = lib.get("m27hg")
+    edit(anise, lightfastness="ASTM II")
+    assert anise.edited == ["lightfastness"]
+    report = lib.merge(sample())
+    assert anise.lightfastness == "ASTM II"
+    assert [(p.id, f) for p, f in report.kept] == [("m27hg", ["lightfastness"])]
+
+
 def test_your_lab_survives_reimport_of_a_paint_without_site_data():
     lib = imported()
     anise = lib.get("m27hg")
@@ -248,20 +273,23 @@ def row(dialog, name):
     raise KeyError(name)
 
 
-def test_series_and_drying_columns_and_edit_dialog(window):
+def test_series_lightfast_drying_columns_and_edit_dialog(window):
     from canvastransfer.ui.paint_dialog import PaintDialog
-    from canvastransfer.ui.paint_library import COL_CODE, COL_DRYING, COL_NAME, COL_SERIES, EDITED_MARK
+    from canvastransfer.ui.paint_library import HEADERS
+    from canvastransfer.ui.paint_library import COL_DRYING, COL_LIGHTFAST, COL_NAME, COL_SERIES, EDITED_MARK
 
     w, _ = window
     dlg = w.library_dialog
     item = row(dlg, "Old Delft Blue")
-    assert (item.text(COL_CODE), item.text(COL_SERIES), item.text(COL_DRYING)) == ("220", "C", "")
+    assert (item.text(COL_SERIES), item.text(COL_LIGHTFAST), item.text(COL_DRYING)) == ("C", "I", "")
+    assert HEADERS.count("Code") == 0
     delft = w.paint_library.get("dyoq9")
     d = PaintDialog(w.paint_library, delft)
     d.drying.setText("slow")
     d.result_paint()  # OK without touching the color
     assert delft.drying == "slow" and delft.edited == [] and delft.lab == pytest.approx((5.385, 9.614, -19.735))
     d = PaintDialog(w.paint_library, delft)
+    assert d.lightfastness.currentText() == "I" and not hasattr(d, "code")
     d.color_text.setText("6 9 -20")
     d.series.setText("D")
     d.result_paint()

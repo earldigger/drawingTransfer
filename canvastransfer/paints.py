@@ -37,8 +37,9 @@ SOURCE_LABELS = {
     "Entered by hand": "Entered by hand",
 }
 # fields that come from artistpigments.org; the ones you can also edit in the app
-SITE_FIELDS = ("medium", "brand", "name", "code", "series", "pigments", "opacity", "lab", "source", "url")
-EDITABLE_FIELDS = ("medium", "brand", "name", "code", "series", "pigments", "opacity", "lab")
+SITE_FIELDS = ("medium", "brand", "name", "code", "series", "pigments", "opacity", "lightfastness", "lab", "source",
+               "url")
+EDITABLE_FIELDS = ("medium", "brand", "name", "series", "pigments", "opacity", "lightfastness", "lab")
 FIELD_LABELS = {"medium": "group", "lab": "color (Lab)"}
 # words that describe a paint line rather than its color, ignored when comparing names
 NAME_NOISE = {"genuine", "hue", "extra", "no", "the", "de", "of", "mars"}
@@ -58,6 +59,7 @@ class Paint:
     series: str = ""  # the maker's price series, e.g. "A", "3"
     pigments: list[str] = field(default_factory=list)
     opacity: str = ""
+    lightfastness: str = ""  # as the site shows it: "ASTM I", the maker's "I", or stars "★★★"
     lab: tuple[float, float, float] | None = None  # CIELAB D50 of the masstone
     source: str = ""
     url: str = ""
@@ -78,7 +80,7 @@ class Paint:
         return bool(self.pigments) and all(p.upper().startswith("PW") for p in self.pigments)
 
     def label(self) -> str:
-        return f"{self.brand} {self.code} {self.name}".replace("  ", " ").strip()
+        return f"{self.brand} {self.name}".strip()
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -200,8 +202,10 @@ class _CollectionParser(HTMLParser):
         self.items: dict[str, dict] = {}
         self.dots: dict[str, dict] = {}
         self.series: dict[str, str] = {}
+        self.lightfastness: dict[str, list[str]] = {}
         self._row: str | None = None  # paint of the full-list row being read
         self._series_for: str | None = None
+        self._lightfastness_for: str | None = None
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -209,6 +213,10 @@ class _CollectionParser(HTMLParser):
             self._row = a["data-paint-id"]
         if tag == "span" and a.get("title") == "Price series" and self._row:
             self._series_for = self._row
+        if tag == "i" and a.get("title") == "Lightfastness" and self._row:
+            # the rating follows the icon up to the end of its <div>: "I", "★★★", "ASTM: <strong>I</strong>"
+            self._lightfastness_for = self._row
+            self.lightfastness.setdefault(self._row, [])
         if tag == "span" and a.get("class") == "color" and "data-l" in a and "data-paint-id" in a:
             self.dots.setdefault(a["data-paint-id"], a)
         elif tag == "div" and "data-paint-id" in a and "data-brand-id" in a:
@@ -218,10 +226,23 @@ class _CollectionParser(HTMLParser):
                 if value and not merged.get(key):
                     merged[key] = value
 
+    def handle_endtag(self, tag):
+        if tag == "div":
+            self._lightfastness_for = None
+
     def handle_data(self, data):
         if self._series_for and data.strip():
             self.series.setdefault(self._series_for, data.strip())
             self._series_for = None
+        if self._lightfastness_for and data.strip():
+            self.lightfastness[self._lightfastness_for].append(data.strip())
+
+
+def _lightfastness_text(pieces: list[str]) -> str:
+    """["★★★", "ASTM:", "I"] -> "★★★ · ASTM I"."""
+    text = " ".join(pieces).replace("ASTM:", "ASTM")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text.replace(" ASTM", " · ASTM") if not text.startswith("ASTM") else text
 
 
 def _tooltip_small(text: str) -> str:
@@ -257,7 +278,9 @@ def parse_collection_html(text: str) -> tuple[str, list[Paint]]:
             url = SITE + m.group(0) if m else ""
         paints.append(Paint(id=pid, medium=it.get("data-medium-id", "") or "other", brand=brand, name=name,
                             code=code, series=parser.series.get(pid, ""), pigments=pigments,
-                            opacity=it.get("data-transparency", ""), lab=lab, source=source, url=url))
+                            opacity=it.get("data-transparency", ""),
+                            lightfastness=_lightfastness_text(parser.lightfastness.get(pid, [])),
+                            lab=lab, source=source, url=url))
     m = re.search(r'update_attr\?attr=name"[^>]*?raw-value="([^"]*)"', text)
     title = html.unescape(m.group(1)).strip() if m else ""
     return title or "collection", paints

@@ -67,9 +67,12 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 ### Paints (side panel tab) and the Paint Library (Color menu)
 
 - **Paint Library**: your paints grouped by medium (Oil, Watercolor, ...),
-  each with brand, code (the maker's catalog number), price series,
-  pigments, opacity, drying time and its masstone color (CIELAB D50). Star
-  favorites; untick **Use** to leave a paint out of matches
+  each with brand, price series, pigments, opacity, lightfastness, drying
+  time and its masstone color (CIELAB D50). Lightfastness is imported as
+  the site shows it: an ASTM rating ("ASTM I"), the maker's own rating
+  ("I"), or stars ("★★★", "★★★★☆"). Drying time is only on each paint's
+  own page, so you type it in Add Paint / Edit. Star favorites; untick
+  **Use** to leave a paint out of matches
 - **The library is the master copy**, saved on every change to one
   `paints.json` shared by all projects. By default it is in the app's data
   folder (on a Mac, `~/Library/Application Support/Canvas Transfer`);
@@ -83,7 +86,7 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   collection and use File > Save Page As; import that `.html` file.
   Importing again adds new paints and updates site data, but **your edits
   win**: every field you change in the app (color, name, pigments, series,
-  ...) is marked ✎ and keeps your value; the import summary lists where
+  lightfastness, ...) is marked ✎ and keeps your value; the import summary lists where
   the site now says something different. **Revert to Site Data** takes the
   site's values back. The site never blanks out a value you have. Drying
   time, favorites, Use, stand-ins and palettes are yours alone; paints no

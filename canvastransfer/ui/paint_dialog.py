@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from .. import color_study as cs
 from ..paints import MEDIUM_LABELS, OPACITY_LABELS, Paint, PaintLibrary, medium_label, new_manual_id, parse_lab_text
 
+LIGHTFAST_CHOICES = ["", "ASTM I", "ASTM II", "ASTM III", "★★★", "★★☆", "★☆☆", "★★★★★", "★★★★☆", "★★★☆☆"]
 OFF_SCREEN_NOTE = "⚠ Brighter or more saturated than a screen can show; shown and mixed as the nearest screen color."
 
 
@@ -66,15 +67,12 @@ class PaintDialog(QDialog):
 
         self.brand = QLineEdit(paint.brand if paint else "")
         self.name = QLineEdit(paint.name if paint else "")
-        self.code = QLineEdit(paint.code if paint else "")
         self.pigments = QLineEdit(", ".join(paint.pigments) if paint else "")
         self.pigments.setPlaceholderText("e.g. PB29, PW6")
         form.addRow("Brand", self.brand)
         form.addRow("Name", self.name)
-        self.code.setToolTip("The maker's catalog number for the color, e.g. 036")
         self.series = QLineEdit(paint.series if paint else "")
         self.series.setToolTip("The maker's price series, e.g. A or 3")
-        form.addRow("Code", self.code)
         form.addRow("Series", self.series)
         form.addRow("Pigments", self.pigments)
 
@@ -84,6 +82,13 @@ class PaintDialog(QDialog):
             self.opacity.addItem(label, key)
         self.opacity.setCurrentIndex(max(0, self.opacity.findData(paint.opacity if paint else "")))
         form.addRow("Opacity", self.opacity)
+        self.lightfastness = QComboBox()
+        self.lightfastness.setEditable(True)
+        self.lightfastness.addItems(LIGHTFAST_CHOICES)
+        self.lightfastness.setCurrentText(paint.lightfastness if paint else "")
+        self.lightfastness.setToolTip("ASTM I = excellent, II = very good; or the maker's own rating or stars. "
+                                      "Pick one or type what the paint's page shows.")
+        form.addRow("Lightfastness", self.lightfastness)
         self.drying = QLineEdit(paint.drying if paint else "")
         self.drying.setPlaceholderText("e.g. fast, medium, 3-5 days")
         form.addRow("Drying time", self.drying)
@@ -194,10 +199,10 @@ class PaintDialog(QDialog):
         p.medium = self._medium_key()
         p.brand = self.brand.text().strip()
         p.name = self.name.text().strip()
-        p.code = self.code.text().strip()
         p.series = self.series.text().strip()
         p.pigments = self._pigment_list()
         p.opacity = self.opacity.currentData()
+        p.lightfastness = self.lightfastness.currentText().strip()
         p.drying = self.drying.text().strip()
         p.stand_in = self.stand_in.currentData() if p.lab is None else None
         p.note_edits(before)
