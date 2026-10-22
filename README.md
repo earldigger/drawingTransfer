@@ -232,3 +232,19 @@ recomputed for display and cached.
   multiply `compositingFilter` for live interaction.
 - Camera capture and rectangle detection are new work with no prototype
   equivalent here.
+
+### Requests for the iPhone / iPad app
+
+- **Start screen** with New Project, Recent Projects and Open Project.
+  (On iOS the "launch screen" is only a static image shown while the app
+  loads; this is the first screen after it.) Two ways to build it:
+  - SwiftUI `DocumentGroup` (the system document browser): New, Recents and
+    Browse come built in, including iCloud Drive and Dropbox through the
+    Files app, with little code. Looks like Pages/Numbers.
+  - A custom gallery of project thumbnails (like Procreate or Fresco): New
+    and Open buttons, recent projects as cards showing the latest canvas
+    photo. More work; recents and file access must be kept by the app
+    (security-scoped bookmarks).
+- The paint library in Dropbox: an iOS app can't use a folder path the way
+  the desktop prototype does. It would pick the file once through the Files
+  app (Dropbox shows up there) and keep a security-scoped bookmark to it.
