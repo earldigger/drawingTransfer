@@ -13,6 +13,13 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 
 ## What's implemented
 
+- Start screen (shown when no project is open): New Project, Open Project,
+  and recent projects as thumbnail cards; click one to open it,
+  right-click to remove it or show it in Finder. File > Close Project
+  returns to it, File > Open Recent lists the same projects. Projects
+  appear once saved; the thumbnail (`thumbnail.png` in the project) is
+  refreshed on save, on close, and at most every 10 s while autosaving.
+  Closing a never-saved project that has layers asks whether to save it
 - Project creation with canvas width/height/units (in/cm)
 - Image import (file picker); phone photos are rotated upright from their
   EXIF orientation
@@ -205,6 +212,8 @@ canvastransfer/
     paint_dialog.py  Add / Edit Paint
     palette_dialog.py New / Edit Palette
     slider_row.py    slider + number box rows shared by the panels
+    start_screen.py  start screen with recent project cards
+    recent_projects.py the recent projects list
     main_window.py   toolbar, menus, wiring; plus the side panels
 ```
 

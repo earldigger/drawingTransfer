@@ -14,3 +14,12 @@ def qapp():
 
     app = QApplication.instance() or QApplication([])
     yield app
+
+
+@pytest.fixture(autouse=True)
+def no_save_prompt(monkeypatch):
+    """Closing a window with a never-saved project asks whether to save it;
+    tests answer "don't save" unless they set their own answer."""
+    from canvastransfer.ui.main_window import MainWindow
+
+    monkeypatch.setattr(MainWindow, "_ask_save_unsaved", lambda self, name: "discard")

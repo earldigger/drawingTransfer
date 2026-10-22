@@ -200,6 +200,15 @@ class CanvasView(QGraphicsView):
                       self._render_layers(), self._grid, self._split_x())
         return image
 
+    def render_thumbnail(self, max_edge: int = 480) -> QImage:
+        """The composited canvas scaled so its longer side is `max_edge`."""
+        w, h = self._canvas.width(), self._canvas.height()
+        scale = max_edge / max(w, h, 1)
+        image = QImage(QSize(max(1, round(w * scale)), max(1, round(h * scale))), QImage.Format_ARGB32_Premultiplied)
+        transform = QTransform.fromTranslate(-self._canvas.left(), -self._canvas.top()) * QTransform.fromScale(scale, scale)
+        render_canvas(image, transform, self._canvas, self._render_layers(), self._grid, self._split_x())
+        return image
+
     def _split_x(self) -> float | None:
         return None if self._split_fraction is None else self._canvas.width() * self._split_fraction
 

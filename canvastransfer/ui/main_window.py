@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -11,6 +12,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QScrollArea,
+    QStackedWidget,
     QTabWidget,
     QToolBar,
     QVBoxLayout,
@@ -44,9 +46,12 @@ from .paint_library import PaintLibraryDialog
 from .paint_panel import PaintMatchPanel
 from .new_project_dialog import NewProjectDialog
 from .perspective_dialog import PerspectiveDialog
+from .recent_projects import THUMBNAIL_FILE, add_recent, recent_projects, remove_recent
+from .start_screen import StartScreen
 
 IMAGE_FILE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp)"
 AUTOSAVE_DELAY_MS = 500
+THUMBNAIL_INTERVAL_S = 10  # autosave refreshes the project's thumbnail at most this often
 
 MODE_LABELS = [
     (TransformMode.UNIFORM, "Proportional", "Corner and edge handles scale evenly, keeping proportions"),
@@ -79,7 +84,16 @@ class MainWindow(QMainWindow):
         self._autosave_timer.timeout.connect(self._autosave_now)
 
         self.canvas_view = CanvasView()
-        self.setCentralWidget(self.canvas_view)
+        self.start_screen = StartScreen()
+        self.start_screen.newRequested.connect(self._new_project)
+        self.start_screen.openRequested.connect(self._open_project)
+        self.start_screen.recentChosen.connect(self._open_recent)
+        self.stack = QStackedWidget()
+        self.stack.addWidget(self.start_screen)
+        self.stack.addWidget(self.canvas_view)
+        self.setCentralWidget(self.stack)
+        self._thumbnail_time = 0.0
+        self._on_start_screen = False
         self.canvas_view.quadCommitted.connect(self._on_quad_committed)
         self.canvas_view.colorPicked.connect(self._on_color_picked)
         self.canvas_view.pickHover.connect(self._on_pick_hover)
@@ -123,15 +137,21 @@ class MainWindow(QMainWindow):
         dock.setWidget(self.side_tabs)
         dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
         self.addDockWidget(Qt.RightDockWidgetArea, dock)
+        self.side_dock = dock
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("&File")
         file_menu.addAction("New Project…", QKeySequence.New, self._new_project)
         file_menu.addAction("Open Project…", QKeySequence.Open, self._open_project)
-        file_menu.addAction("Save", QKeySequence.Save, self._save_project)
-        file_menu.addAction("Save As…", QKeySequence.SaveAs, self._save_project_as)
+        self.recent_menu = file_menu.addMenu("Open Recent")
+        self.recent_menu.aboutToShow.connect(self._fill_recent_menu)
         file_menu.addSeparator()
-        file_menu.addAction("Add Image Layer…", self._import_image)
+        self.close_action = file_menu.addAction("Close Project", QKeySequence.Close, self.close_project)
+        self.close_action.setToolTip("Close the project and go back to the start screen")
+        self.save_action = file_menu.addAction("Save", QKeySequence.Save, self._save_project)
+        self.save_as_action = file_menu.addAction("Save As…", QKeySequence.SaveAs, self._save_project_as)
+        file_menu.addSeparator()
+        self.add_layer_action = file_menu.addAction("Add Image Layer…", self._import_image)
 
         edit_menu = self.menuBar().addMenu("&Edit")
         self.undo_action = edit_menu.addAction("Undo", QKeySequence.Undo, self._undo)
@@ -146,6 +166,7 @@ class MainWindow(QMainWindow):
     def _build_toolbar(self) -> None:
         bar = QToolBar("Transform", self)
         bar.setMovable(False)
+        self.tool_bar = bar
         bar.setToolButtonStyle(Qt.ToolButtonTextOnly)
         self.addToolBar(Qt.TopToolBarArea, bar)
 
@@ -232,6 +253,15 @@ class MainWindow(QMainWindow):
         self.grid_panel.setEnabled(has_project)
         self.compare_panel.setEnabled(has_project)
         self.color_panel.setEnabled(has_project)
+        for action in (self.close_action, self.save_action, self.save_as_action, self.add_layer_action):
+            action.setEnabled(has_project)
+        # no project: the start screen, without the editing toolbar and panels
+        self.stack.setCurrentWidget(self.canvas_view if has_project else self.start_screen)
+        self.tool_bar.setVisible(has_project)
+        self.side_dock.setVisible(has_project)
+        if not has_project and not self._on_start_screen:
+            self.start_screen.refresh()  # recents may have changed while a project was open
+        self._on_start_screen = not has_project
         for action in [self.transform_action, self.flip_h_action, self.flip_v_action, self.fit_action,
                        self.pick_action, *self.mode_actions.values()]:
             action.setEnabled(has_layer)
@@ -247,6 +277,7 @@ class MainWindow(QMainWindow):
 
     def _set_document(self, doc: ProjectDocument) -> None:
         self._flush_autosave()
+        self._write_thumbnail(force=True)
         self.history.clear()
         self._set_tool_checked(False)
         self.pick_action.setChecked(False)
@@ -261,6 +292,8 @@ class MainWindow(QMainWindow):
         self._restart_blink_if_needed()
 
     def _new_project(self) -> None:
+        if not self._confirm_leave():
+            return
         dialog = NewProjectDialog(self)
         if dialog.exec() != NewProjectDialog.Accepted:
             return
@@ -269,16 +302,91 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"New project '{name}' ({width:g} x {height:g} {units.value}) -- not saved yet.")
 
     def _open_project(self) -> None:
-        path = QFileDialog.getExistingDirectory(self, "Open Project (.ctproj folder)")
-        if not path:
+        if not self._confirm_leave():
             return
+        path = QFileDialog.getExistingDirectory(self, "Open Project (.ctproj folder)")
+        if path:
+            self.open_project_path(path)
+
+    def _open_recent(self, path: str) -> None:
+        if self.doc is not None and self.doc.package_dir is not None and \
+                Path(path).resolve() == Path(self.doc.package_dir).resolve():
+            return  # already open
+        if not self._confirm_leave():
+            return
+        if not self.open_project_path(path):
+            if QMessageBox.question(self, "Open Recent", "Remove it from the recent projects?") == QMessageBox.Yes:
+                remove_recent(path)
+                self.start_screen.refresh()
+
+    def open_project_path(self, path: str | Path) -> bool:
         try:
             doc = load_project(path)
         except Exception as exc:
-            QMessageBox.critical(self, "Open Project Failed", str(exc))
-            return
+            QMessageBox.critical(self, "Open Project Failed", f"Couldn't open {path}:\n{exc}")
+            return False
         self._set_document(doc)
+        add_recent(doc.package_dir, doc.project.name)
         self.statusBar().showMessage(f"Opened '{doc.project.name}' from {path}")
+        return True
+
+    def _fill_recent_menu(self) -> None:
+        self.recent_menu.clear()
+        recents = recent_projects()
+        for r in recents:
+            self.recent_menu.addAction(r.name, lambda p=str(r.path): self._open_recent(p)).setToolTip(str(r.path))
+        if not recents:
+            self.recent_menu.addAction("No recent projects").setEnabled(False)
+
+    def close_project(self) -> bool:
+        """Back to the start screen. False if the user cancelled."""
+        if self.doc is None:
+            return True
+        if not self._confirm_leave():
+            return False
+        self._flush_autosave()
+        self._write_thumbnail(force=True)
+        self.history.clear()
+        self._set_tool_checked(False)
+        self.pick_action.setChecked(False)
+        self._selected_swatch_id = None
+        self.doc = None
+        self.cache.clear()
+        self.blink_timer.stop()
+        self.canvas_view.show_layers([], None)
+        self._update_paint_target()
+        self._update_enabled_state()
+        self.statusBar().showMessage("Create or open a project to begin.")
+        return True
+
+    def _confirm_leave(self) -> bool:
+        """Before closing the current project: a project that was never
+        saved but has layers would be lost, so offer to save it."""
+        doc = self.doc
+        if doc is None or doc.package_dir is not None or not doc.project.layers:
+            return True
+        choice = self._ask_save_unsaved(doc.project.name)
+        if choice == "save":
+            self._save_project_as()
+            return self.doc.package_dir is not None
+        return choice == "discard"
+
+    def _ask_save_unsaved(self, name: str) -> str | None:
+        """'save', 'discard' or None (cancel)."""
+        answer = QMessageBox.question(
+            self, "Unsaved Project", f"“{name}” has never been saved. Save it before closing?",
+            QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Save)
+        return {QMessageBox.Save: "save", QMessageBox.Discard: "discard"}.get(answer)
+
+    def _write_thumbnail(self, force: bool = False) -> None:
+        """Save a small picture of the canvas in the project, for the start screen."""
+        doc = self.doc
+        if doc is None or doc.package_dir is None or not doc.project.layers:
+            return
+        if not force and time.monotonic() - self._thumbnail_time < THUMBNAIL_INTERVAL_S:
+            return
+        self._thumbnail_time = time.monotonic()
+        self.canvas_view.render_thumbnail().save(str(Path(doc.package_dir) / THUMBNAIL_FILE))
 
     def _save_project(self) -> None:
         if self.doc is None:
@@ -287,6 +395,8 @@ class MainWindow(QMainWindow):
             self._save_project_as()
             return
         save_project(self.doc, self.doc.package_dir)
+        self._write_thumbnail(force=True)
+        add_recent(self.doc.package_dir, self.doc.project.name)
         self.statusBar().showMessage(f"Saved to {self.doc.package_dir}")
 
     def _save_project_as(self) -> None:
@@ -297,6 +407,8 @@ class MainWindow(QMainWindow):
         if not path:
             return
         save_project(self.doc, path)
+        self._write_thumbnail(force=True)
+        add_recent(self.doc.package_dir, self.doc.project.name)
         self.statusBar().showMessage(f"Saved to {path} -- changes now autosave.")
 
     def _schedule_autosave(self) -> None:
@@ -304,8 +416,8 @@ class MainWindow(QMainWindow):
             self._autosave_timer.start()
 
     def _autosave_now(self) -> None:
-        if self.doc is not None:
-            autosave(self.doc)
+        if self.doc is not None and autosave(self.doc):
+            self._write_thumbnail()
 
     def _flush_autosave(self) -> None:
         if self._autosave_timer.isActive():
@@ -313,7 +425,11 @@ class MainWindow(QMainWindow):
             self._autosave_now()
 
     def closeEvent(self, event):
+        if not self._confirm_leave():
+            event.ignore()
+            return
         self._flush_autosave()
+        self._write_thumbnail(force=True)
         super().closeEvent(event)
 
     # -- undo / redo / transform sessions ---------------------------------
