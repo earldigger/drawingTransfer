@@ -110,7 +110,7 @@ class LayerDisplayCache:
         return cached
 
     def simplified(self, doc: ProjectDocument, layer: Layer, canvas_size: tuple[int, int], settings: tuple):
-        """(Simplified, its pixmap, its Lab) for settings (count, smoothing, values)."""
+        """(Simplified, its pixmap, its Lab) for SimplifySettings.key()."""
         entry = self._adjusted_entry(doc, layer, canvas_size)
         if entry is None:
             return None
@@ -118,8 +118,9 @@ class LayerDisplayCache:
         cached = self._simplified.get(layer.id)
         if cached and cached[0] == key:
             return cached[1:]
-        count, smoothing, values = settings
-        result = color_study.simplify(downscale_to_max(entry[1], SIMPLIFY_MAX_EDGE), count, smoothing, values)
+        count, smoothing, values, fixed_scale = settings
+        result = color_study.simplify(downscale_to_max(entry[1], SIMPLIFY_MAX_EDGE), count, smoothing, values,
+                                      fixed_scale)
         cached = (key, result, rgba_to_qpixmap(result.image), color_study.lab_image(result.image))
         self._simplified[layer.id] = cached
         return cached[1:]

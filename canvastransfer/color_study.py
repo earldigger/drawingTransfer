@@ -268,12 +268,25 @@ class Simplified:
 SIMPLIFY_SAMPLE = 20_000  # pixels used to find the colors; all pixels are then assigned
 
 
-def simplify(image_rgba: np.ndarray, count: int, smoothing: int = 2, values: bool = False) -> Simplified:
+def value_scale(steps: int) -> list[RGB]:
+    """`steps` grays splitting lightness (CIELAB L*, close to Munsell value
+    x 10) into equal bands from black to white, each at its band's middle:
+    5 steps are L* 10, 30, 50, 70, 90."""
+    centers = (np.arange(steps) + 0.5) * 100.0 / steps
+    lab = np.column_stack([centers, np.zeros(steps), np.zeros(steps)]).reshape(1, -1, 3).astype(np.float32)
+    srgb = cv2.cvtColor(lab, cv2.COLOR_Lab2RGB)[0]
+    return [tuple(int(round(v)) for v in np.clip(c, 0, 1) * 255) for c in srgb]
+
+
+def simplify(image_rgba: np.ndarray, count: int, smoothing: int = 2, values: bool = False,
+             fixed_scale: bool = False) -> Simplified:
     """Reduce the image to `count` colors, or `count` gray values when
     `values`. Smoothing (0..6) first flattens texture and noise, then
     removes specks from the result, so shapes read as simple masses.
     Colors are found by k-means clustering in CIELAB, so they are the
-    image's own dominant colors, not a fixed palette."""
+    image's own dominant colors, not a fixed palette. With `fixed_scale`
+    the values are instead equal steps from black to white (value_scale),
+    the same for every image; steps the image doesn't reach cover 0%."""
     rgb = np.ascontiguousarray(image_rgba[..., :3])
     alpha = image_rgba[..., 3]
     if smoothing > 0:
@@ -284,8 +297,10 @@ def simplify(image_rgba: np.ndarray, count: int, smoothing: int = 2, values: boo
     lab[..., 0] *= 100.0 / 255.0
     lab[..., 1:] -= 128.0
     visible = alpha > 0
-    features = lab[visible][:, :1] if values else lab[visible]
     labels = np.full(alpha.shape, -1, dtype=np.int16)
+    if values and fixed_scale:
+        return _fixed_values(image_rgba, lab[..., 0], visible, labels, count, smoothing)
+    features = lab[visible][:, :1] if values else lab[visible]
     if len(features) == 0:
         return Simplified(image_rgba.copy(), labels, [], [])
     rng = np.random.default_rng(0)
@@ -320,6 +335,22 @@ def simplify(image_rgba: np.ndarray, count: int, smoothing: int = 2, values: boo
     counts = np.bincount(labels[visible], minlength=k)
     shares = (counts / max(1, counts.sum())).tolist()
     return Simplified(out, labels, colors, shares)
+
+
+def _fixed_values(image_rgba, lightness, visible, labels, steps, smoothing) -> Simplified:
+    band = np.clip((lightness * steps / 100.0).astype(np.int16), 0, steps - 1)
+    labels[visible] = band[visible]
+    if smoothing > 0:
+        # fixed thresholds split a surface that sits right on a band edge into specks,
+        # so clean up harder than the fitted modes do
+        size = 3 if smoothing == 1 else (5 if smoothing < 4 else 7)
+        cleaned = cv2.medianBlur((labels + 1).astype(np.uint8), size).astype(np.int16) - 1
+        labels = np.where(visible, np.maximum(cleaned, 0), -1).astype(np.int16)
+    colors = value_scale(steps)
+    out = image_rgba.copy()
+    out[visible, :3] = np.array(colors, dtype=np.uint8)[labels[visible]]
+    counts = np.bincount(labels[visible], minlength=steps)
+    return Simplified(out, labels, colors, (counts / max(1, counts.sum())).tolist())
 
 
 def region_points(labels: np.ndarray, count: int) -> list[tuple[float, float] | None]:

@@ -72,8 +72,13 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   starts catching neighbouring values of the same hue
 - **Simplify** the selected layer to a few flat colors, or to gray values
   for a value study: choose how many (2-24 colors, 2-10 values) and how
-  much smoothing (flattens texture, removes specks). The colors are the
-  image's own dominant ones (k-means clustering in CIELAB), shown as a
+  much smoothing (flattens texture, removes specks). Three modes:
+  *Colors* and *Values (fitted to the image)* find the image's own
+  dominant colors or values (k-means clustering in CIELAB); *Value scale
+  (equal steps)* splits lightness into equal bands from black to white,
+  the same for every image (5 steps: L* 10, 30, 50, 70, 90, roughly
+  Munsell values 1, 3, 5, 7, 9), so steps a photo doesn't reach show as
+  empty. The result is shown as a
   strip as wide as the area each covers; **Add Colors as Swatches** puts
   one swatch inside the largest area of each. While it is on, picking and
   highlighting use the simplified colors. Saved with the project; not an

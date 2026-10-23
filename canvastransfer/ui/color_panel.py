@@ -205,8 +205,12 @@ class ColorStudyPanel(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Show"))
         self.simplify_mode = QComboBox()
-        self.simplify_mode.addItem("Colors", False)
-        self.simplify_mode.addItem("Values (grays)", True)
+        self.simplify_mode.addItem("Colors", "colors")
+        self.simplify_mode.addItem("Values (fitted to the image)", "values")
+        self.simplify_mode.addItem("Value scale (equal steps)", "scale")
+        self.simplify_mode.setItemData(1, "Gray values placed where this image's values cluster", Qt.ToolTipRole)
+        self.simplify_mode.setItemData(2, "Equal steps from black to white, the same for every image "
+                                          "(5 steps: L* 10, 30, 50, 70, 90)", Qt.ToolTipRole)
         self.simplify_mode.currentIndexChanged.connect(self._on_simplify_mode)
         row.addWidget(self.simplify_mode, 1)
         v.addLayout(row)
@@ -324,7 +328,8 @@ class ColorStudyPanel(QWidget):
         self._simplify = SimplifySettings.from_dict(settings.to_dict())
         self._updating = True
         self.simplify_check.setChecked(settings.enabled)
-        self.simplify_mode.setCurrentIndex(1 if settings.values else 0)
+        self.simplify_mode.setCurrentIndex(self.simplify_mode.findData(
+            ("scale" if settings.fixed_scale else "values") if settings.values else "colors"))
         self._update_simplify_widgets()
         self._updating = False
 
@@ -336,7 +341,7 @@ class ColorStudyPanel(QWidget):
         st = self._simplify
         was = self._updating
         self._updating = True
-        self.simplify_count.label.setText("Values:" if st.values else "Colors:")
+        self.simplify_count.label.setText(("Steps:" if st.fixed_scale else "Values:") if st.values else "Colors:")
         self.simplify_count.set_range(2, 10 if st.values else 24)
         self.simplify_count.set(st.value_steps if st.values else st.colors)
         self.simplify_smoothing.set(st.smoothing)
@@ -349,7 +354,9 @@ class ColorStudyPanel(QWidget):
     def _on_simplify_mode(self, _index) -> None:
         if self._updating:
             return
-        self._simplify.values = bool(self.simplify_mode.currentData())
+        mode = self.simplify_mode.currentData()
+        self._simplify.values = mode != "colors"
+        self._simplify.fixed_scale = mode == "scale"
         self._update_simplify_widgets()
         self._emit_simplify_now()
 

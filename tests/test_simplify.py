@@ -290,3 +290,53 @@ def test_safe_names():
 
     assert safe_name('a/b:c*?"<>|') == "a-b-c------"
     assert safe_name("  ..  ") == "Untitled Project"
+
+
+# -- fixed value scale -------------------------------------------------------------------
+
+def gray_bars(*grays, h=10, w=10):
+    img = np.zeros((h, w * len(grays), 4), dtype=np.uint8)
+    img[..., 3] = 255
+    for i, g in enumerate(grays):
+        img[:, i * w:(i + 1) * w, :3] = g
+    return img
+
+
+def test_value_scale_is_equal_lightness_steps():
+    for steps in (3, 5, 9):
+        lightness = [cs.lab_d65(c)[0] for c in cs.value_scale(steps)]
+        want = [(i + 0.5) * 100 / steps for i in range(steps)]
+        assert np.allclose(lightness, want, atol=0.6)
+
+
+def test_fixed_scale_puts_each_value_in_its_band():
+    # L* about 6, 38, 58, 81, 98 -> bands 0, 1, 2, 4, 4 of five
+    result = cs.simplify(gray_bars(20, 90, 140, 200, 250), 5, smoothing=0, values=True, fixed_scale=True)
+    assert result.colors == cs.value_scale(5)
+    assert [round(x, 2) for x in result.shares] == [0.2, 0.2, 0.2, 0.0, 0.4]  # nothing in band 3
+
+
+def test_fixed_scale_is_the_same_for_every_image():
+    dark = cs.simplify(gray_bars(20, 40, 60), 5, 0, values=True, fixed_scale=True)
+    light = cs.simplify(gray_bars(180, 220, 250), 5, 0, values=True, fixed_scale=True)
+    assert dark.colors == light.colors
+    assert dark.shares[3:] == [0.0, 0.0] and light.shares[:2] == [0.0, 0.0]
+    fitted = cs.simplify(gray_bars(20, 40, 60), 3, 0, values=True)  # the fitted mode spreads over what's there
+    assert len(fitted.colors) == 3 and fitted.colors != cs.value_scale(3)
+
+
+def test_value_scale_mode_in_the_panel(window, qapp):
+    w, _ = window
+    panel = w.color_panel
+    panel.simplify_check.setChecked(True)
+    panel.simplify_mode.setCurrentIndex(panel.simplify_mode.findData("scale"))
+    qapp.processEvents()
+    st = w.doc.project.simplify
+    assert st.values and st.fixed_scale and panel.simplify_count.label.text() == "Steps:"
+    assert panel.simplify_palette.colors() == cs.value_scale(st.value_steps)
+    assert pixel(w, 0.15, 0.5) in cs.value_scale(st.value_steps)
+    panel.simplify_mode.setCurrentIndex(panel.simplify_mode.findData("values"))
+    qapp.processEvents()
+    assert w.doc.project.simplify.values and not w.doc.project.simplify.fixed_scale
+    w.color_panel.set_simplify(SimplifySettings(enabled=True, values=True, fixed_scale=True))
+    assert panel.simplify_mode.currentData() == "scale"

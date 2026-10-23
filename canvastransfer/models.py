@@ -226,15 +226,17 @@ class SimplifySettings:
 
     enabled: bool = False
     values: bool = False  # gray values instead of colors
+    fixed_scale: bool = False  # values: equal steps from black to white, instead of fitted to the image
     colors: int = 8  # how many colors in color mode
     value_steps: int = 5  # how many values in value mode
     smoothing: int = 2  # 0..6
 
     def key(self) -> tuple[int, int, bool]:
-        return (self.value_steps if self.values else self.colors, self.smoothing, self.values)
+        return (self.value_steps if self.values else self.colors, self.smoothing, self.values,
+                self.values and self.fixed_scale)
 
     def to_dict(self) -> dict:
-        return {"enabled": self.enabled, "values": self.values, "colors": self.colors,
+        return {"enabled": self.enabled, "values": self.values, "fixed_scale": self.fixed_scale, "colors": self.colors,
                 "value_steps": self.value_steps, "smoothing": self.smoothing}
 
     @staticmethod
