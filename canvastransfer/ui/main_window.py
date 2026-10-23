@@ -46,6 +46,7 @@ from .paint_library import PaintLibraryDialog
 from .paint_panel import PaintMatchPanel
 from .new_project_dialog import NewProjectDialog
 from .perspective_dialog import PerspectiveDialog
+from .projects_folder import choose_projects_folder, new_project_path, projects_folder, set_projects_folder
 from .recent_projects import THUMBNAIL_FILE, add_recent, recent_projects, remove_recent
 from .start_screen import StartScreen
 
@@ -88,6 +89,7 @@ class MainWindow(QMainWindow):
         self.start_screen.newRequested.connect(self._new_project)
         self.start_screen.openRequested.connect(self._open_project)
         self.start_screen.recentChosen.connect(self._open_recent)
+        self.start_screen.folderChangeRequested.connect(self.change_projects_folder)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.start_screen)
         self.stack.addWidget(self.canvas_view)
@@ -150,6 +152,8 @@ class MainWindow(QMainWindow):
         self.close_action.setToolTip("Close the project and go back to the start screen")
         self.save_action = file_menu.addAction("Save", QKeySequence.Save, self._save_project)
         self.save_as_action = file_menu.addAction("Save As…", QKeySequence.SaveAs, self._save_project_as)
+        file_menu.addSeparator()
+        file_menu.addAction("Projects Folder…", self.change_projects_folder)
         file_menu.addSeparator()
         self.add_layer_action = file_menu.addAction("Add Image Layer…", self._import_image)
 
@@ -243,6 +247,8 @@ class MainWindow(QMainWindow):
         cp.swatchHighlightToggled.connect(self._on_swatch_highlight)
         cp.toleranceChanged.connect(self._on_tolerance_changed)
         cp.sampleSizeChanged.connect(lambda _: self._update_pick_cursor())
+        cp.simplifyChanged.connect(self._on_simplify_changed)
+        cp.addSimplifiedSwatchesRequested.connect(self._add_simplified_swatches)
         self.paint_panel.openLibraryRequested.connect(self.open_paint_library)
         self.paint_panel.openPalettesRequested.connect(lambda: self.open_paint_library(palettes=True))
 
@@ -298,13 +304,29 @@ class MainWindow(QMainWindow):
         if dialog.exec() != NewProjectDialog.Accepted:
             return
         name, width, height, units = dialog.values()
-        self._set_document(ProjectDocument(Project(name=name, canvas_width=width, canvas_height=height, units=units)))
-        self.statusBar().showMessage(f"New project '{name}' ({width:g} x {height:g} {units.value}) -- not saved yet.")
+        self.create_project(Project(name=name, canvas_width=width, canvas_height=height, units=units))
+
+    def create_project(self, project: Project) -> None:
+        """Open a new project, saved straight away in the projects folder so
+        it autosaves and shows on the start screen."""
+        self._set_document(ProjectDocument(project))
+        path = new_project_path(project.name)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            save_project(self.doc, path)
+        except OSError as e:
+            QMessageBox.warning(self, "New Project", f"Couldn't save the project in {path.parent} ({e}).\n"
+                                "It is open but not saved; use File > Save As, or choose another projects folder.")
+            return
+        add_recent(path, project.name)
+        self.statusBar().showMessage(f"New project '{project.name}' saved in {path.parent}; changes autosave.")
 
     def _open_project(self) -> None:
         if not self._confirm_leave():
             return
-        path = QFileDialog.getExistingDirectory(self, "Open Project (.ctproj folder)")
+        folder = projects_folder()
+        path = QFileDialog.getExistingDirectory(self, "Open Project (.ctproj folder)",
+                                                str(folder if folder.is_dir() else Path.home()))
         if path:
             self.open_project_path(path)
 
@@ -329,6 +351,14 @@ class MainWindow(QMainWindow):
         add_recent(doc.package_dir, doc.project.name)
         self.statusBar().showMessage(f"Opened '{doc.project.name}' from {path}")
         return True
+
+    def change_projects_folder(self) -> None:
+        folder = choose_projects_folder(self)
+        if folder is None:
+            return
+        set_projects_folder(folder)
+        self.start_screen.refresh()
+        self.statusBar().showMessage(f"New projects will be saved in {folder}")
 
     def _fill_recent_menu(self) -> None:
         self.recent_menu.clear()
@@ -454,6 +484,7 @@ class MainWindow(QMainWindow):
         project.compare_layer_a = current.compare_layer_a
         project.compare_layer_b = current.compare_layer_b
         project.split_position = current.split_position
+        project.simplify = current.simplify  # a way of looking, not an edit
         if project.get_layer(current.active_layer_id) is not None:
             project.active_layer_id = current.active_layer_id
         self.doc.project = project
@@ -541,6 +572,8 @@ class MainWindow(QMainWindow):
         self.doc.project.active_layer_id = layer_id
         self.layers_panel.sync_appearance(self._active_layer())
         self.canvas_view.set_active_layer(layer_id)
+        if self.doc.project.simplify.enabled:
+            self._refresh_canvas()  # Simplify follows the selected layer
         self._update_enabled_state()
         if self.pick_action.isChecked():
             self._update_pick_cursor()
@@ -705,6 +738,7 @@ class MainWindow(QMainWindow):
         if project.get_swatch(self._selected_swatch_id) is None:
             self._selected_swatch_id = None
         self.color_panel.refresh(project, self._selected_swatch_id)
+        self.color_panel.set_simplify(project.simplify)
         self._update_paint_target()
         if self.compare_panel.current_layer_a_id() != project.compare_layer_a or \
                 self.compare_panel.current_layer_b_id() != project.compare_layer_b:
@@ -730,6 +764,7 @@ class MainWindow(QMainWindow):
             self._update_pick_cursor()
         self.canvas_view.set_grid(project.grid)
         self.canvas_view.set_active_layer(project.active_layer_id)
+        self._show_simplified_palette()
 
     # -- color study ------------------------------------------------------------------
 
@@ -763,10 +798,16 @@ class MainWindow(QMainWindow):
         point = self.canvas_view.layer_point(layer.id, x, y)
         if image is None or point is None:
             return None
-        rgb = color_study.sample_average(image, point[0], point[1], self.color_panel.sample_radius())
+        h, w = image.shape[:2]
+        simplified = self._simplified(layer)
+        if simplified is not None:  # pick what the canvas shows: one flat color
+            flat = simplified[0].image
+            sh, sw = flat.shape[:2]
+            rgb = color_study.sample_average(flat, point[0] * sw / w, point[1] * sh / h, 0)
+        else:
+            rgb = color_study.sample_average(image, point[0], point[1], self.color_panel.sample_radius())
         if rgb is None:
             return None
-        h, w = image.shape[:2]
         return layer, point[0] / w, point[1] / h, rgb
 
     def _on_pick_hover(self, point) -> None:
@@ -893,20 +934,70 @@ class MainWindow(QMainWindow):
         swatch = self.doc.project.get_swatch(self._selected_swatch_id) if self.doc else None
         self.paint_panel.set_target(swatch.rgb if swatch else None)
 
+    def _simplified(self, layer: Layer):
+        """(Simplified, pixmap, lab) when Simplify is on and `layer` is the selected layer."""
+        settings = self.doc.project.simplify
+        if not settings.enabled or layer.id != self.doc.project.active_layer_id:
+            return None
+        return self.cache.simplified(self.doc, layer, self._canvas_size, settings.key())
+
     def _highlight_overlays(self) -> list:
+        """Per layer, what is drawn over it: highlights (each swatch in its
+        own color) or else the simplified image."""
         project = self.doc.project
         overlays = []
         for layer in project.layers:
-            colors = [s.rgb for s in project.swatches if s.highlight and s.layer_id == layer.id]
-            pixmap = self.cache.highlight_pixmap(self.doc, layer, self._canvas_size, colors,
-                                                 project.highlight_tolerance) if colors else None
+            simplified = self._simplified(layer)
+            colors = [(s.rgb, color_study.highlight_color(i)) for i, s in enumerate(project.swatches)
+                      if s.highlight and s.layer_id == layer.id]
+            pixmap = None
+            if colors:
+                pixmap = self.cache.highlight_pixmap(self.doc, layer, self._canvas_size, colors,
+                                                     project.highlight_tolerance,
+                                                     project.simplify.key() if simplified else None)
+            elif simplified is not None:
+                pixmap = simplified[1]
             if pixmap is not None:
                 overlays.append((layer.id, pixmap))
         return overlays
 
+    def _on_simplify_changed(self, settings) -> None:
+        if self.doc is None:
+            return
+        self.doc.project.simplify = settings
+        self._refresh_canvas()
+        self._schedule_autosave()
+
+    def _show_simplified_palette(self) -> None:
+        layer = self._active_layer()
+        simplified = self._simplified(layer) if layer is not None else None
+        result = simplified[0] if simplified else None
+        self.color_panel.show_simplified(result.colors if result else [], result.shares if result else [])
+
+    def _add_simplified_swatches(self) -> None:
+        layer = self._active_layer()
+        simplified = self._simplified(layer) if layer is not None else None
+        if simplified is None:
+            return
+        result = simplified[0]
+        existing = {s.rgb for s in self.doc.project.swatches if s.layer_id == layer.id}
+        points = color_study.region_points(result.labels, len(result.colors))
+        new = [Swatch(new_id("swatch"), layer.id, uv[0], uv[1], rgb)
+               for rgb, uv in zip(result.colors, points) if uv is not None and rgb not in existing]
+        if not new:
+            self.statusBar().showMessage("Those colors are already swatches.")
+            return
+        self._record()
+        self.doc.project.swatches.extend(new)
+        self._selected_swatch_id = new[0].id
+        self._refresh_color_study()
+        self.statusBar().showMessage(f"Added {len(new)} swatches from the simplified colors.")
+        self._schedule_autosave()
+
     def _update_markers(self) -> None:
         project = self.doc.project
         self.canvas_view.set_markers([
-            Marker(s.id, number, s.layer_id, s.u, s.v, s.rgb, s.id == self._selected_swatch_id)
+            Marker(s.id, number, s.layer_id, s.u, s.v, s.rgb, s.id == self._selected_swatch_id,
+                   color_study.highlight_color(number - 1) if s.highlight else None)
             for number, s in enumerate(project.swatches, start=1)
         ])

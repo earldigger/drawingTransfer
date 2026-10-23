@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from dataclasses import dataclass
 from functools import lru_cache
 
 import cv2
@@ -19,7 +20,19 @@ import numpy as np
 
 RGB = tuple[int, int, int]
 
-HIGHLIGHT_RGB = (255, 236, 0)
+# one highlight color per swatch (by its number), bright and far apart in hue so
+# several highlighted ranges can be told apart over the grayscale image
+HIGHLIGHT_COLORS = (
+    (255, 236, 0),    # yellow
+    (0, 224, 255),    # cyan
+    (255, 60, 200),   # magenta
+    (90, 255, 70),    # green
+    (255, 140, 0),    # orange
+    (70, 120, 255),   # blue
+    (255, 40, 40),    # red
+    (185, 95, 255),   # violet
+)
+HIGHLIGHT_RGB = HIGHLIGHT_COLORS[0]
 MIX_STEPS = (0.0, 0.2, 0.4, 0.6, 0.8, 0.94)  # share of the added white/black/gray
 WHITE, BLACK, GRAY = (255, 255, 255), (0, 0, 0), (128, 128, 128)
 
@@ -203,11 +216,123 @@ def similarity_mask(lab: np.ndarray, colors: list[RGB], tolerance: float) -> np.
     return mask
 
 
-def highlight_overlay(image_rgba: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    """Grayscale copy of the image with matching pixels painted bright
-    yellow, keeping the image's own transparency."""
+def highlight_color(index: int) -> RGB:
+    """The highlight color for swatch number index + 1 (repeats after eight)."""
+    return HIGHLIGHT_COLORS[index % len(HIGHLIGHT_COLORS)]
+
+
+def similarity_labels(lab: np.ndarray, colors: list[RGB], tolerance: float) -> np.ndarray:
+    """For each pixel, the index of the closest of `colors` within
+    `tolerance`, or -1. Where ranges overlap, the closer swatch wins, so
+    each pixel shows one swatch's highlight."""
+    labels = np.full(lab.shape[:2], -1, dtype=np.int16)
+    best = np.full(lab.shape[:2], float(tolerance) ** 2, dtype=np.float32)
+    for i, rgb in enumerate(colors):
+        ref = lab_image(np.array([[[*rgb, 255]]], dtype=np.uint8))[0, 0]
+        diff = lab - ref
+        dist = (diff * diff).sum(axis=2)
+        closer = dist <= best
+        labels[closer] = i
+        best[closer] = dist[closer]
+    return labels
+
+
+def highlight_overlay(image_rgba: np.ndarray, mask: np.ndarray, colors: list[RGB] | None = None) -> np.ndarray:
+    """Grayscale copy of the image with matching pixels painted bright,
+    keeping the image's own transparency. `mask` is either a boolean mask
+    (painted yellow) or labels from similarity_labels, painted with
+    `colors[label]`."""
+    if mask.dtype == bool:
+        mask, colors = np.where(mask, 0, -1), [HIGHLIGHT_RGB]
     gray = cv2.cvtColor(cv2.cvtColor(image_rgba, cv2.COLOR_RGBA2GRAY), cv2.COLOR_GRAY2RGB)
     out = cv2.cvtColor(gray, cv2.COLOR_RGB2RGBA)
-    out[mask, :3] = HIGHLIGHT_RGB
+    for i, rgb in enumerate(colors):
+        out[mask == i, :3] = rgb
     cv2.mixChannels([image_rgba], [out], [3, 3])
     return out
+
+
+
+# -- simplify ------------------------------------------------------------------
+
+@dataclass
+class Simplified:
+    """An image reduced to a few flat colors (or values)."""
+
+    image: np.ndarray  # RGBA uint8, the same size as the input
+    labels: np.ndarray  # int16 per pixel: index into colors, -1 where transparent
+    colors: list[RGB]  # darkest first
+    shares: list[float]  # fraction of the visible pixels each color covers
+
+
+SIMPLIFY_SAMPLE = 20_000  # pixels used to find the colors; all pixels are then assigned
+
+
+def simplify(image_rgba: np.ndarray, count: int, smoothing: int = 2, values: bool = False) -> Simplified:
+    """Reduce the image to `count` colors, or `count` gray values when
+    `values`. Smoothing (0..6) first flattens texture and noise, then
+    removes specks from the result, so shapes read as simple masses.
+    Colors are found by k-means clustering in CIELAB, so they are the
+    image's own dominant colors, not a fixed palette."""
+    rgb = np.ascontiguousarray(image_rgba[..., :3])
+    alpha = image_rgba[..., 3]
+    if smoothing > 0:
+        rgb = cv2.medianBlur(rgb, 2 * smoothing + 1)
+        rgb = cv2.bilateralFilter(rgb, 5 + 2 * smoothing, 10 + 8 * smoothing, 5 + 3 * smoothing)
+    # 8-bit Lab is ~50x faster than float and plenty for clustering; rescale to L 0..100, a/b centered
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2Lab).astype(np.float32)
+    lab[..., 0] *= 100.0 / 255.0
+    lab[..., 1:] -= 128.0
+    visible = alpha > 0
+    features = lab[visible][:, :1] if values else lab[visible]
+    labels = np.full(alpha.shape, -1, dtype=np.int16)
+    if len(features) == 0:
+        return Simplified(image_rgba.copy(), labels, [], [])
+    rng = np.random.default_rng(0)
+    sample = features if len(features) <= SIMPLIFY_SAMPLE else features[rng.choice(len(features), SIMPLIFY_SAMPLE, replace=False)]
+    k = int(max(1, min(count, len(sample))))
+    cv2.setRNGSeed(1)
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 25, 0.2)
+    _, _, centers = cv2.kmeans(np.ascontiguousarray(sample, dtype=np.float32), k, None, criteria, 1,
+                               cv2.KMEANS_PP_CENTERS)
+    centers = centers[np.argsort(centers[:, 0])]  # darkest first
+    assigned = np.zeros(len(features), dtype=np.int16)
+    best = np.full(len(features), np.inf, dtype=np.float32)
+    for i, c in enumerate(centers):  # one center at a time keeps memory small
+        d = ((features - c) ** 2).sum(axis=1)
+        closer = d < best
+        assigned[closer] = i
+        best[closer] = d[closer]
+    used = np.flatnonzero(np.bincount(assigned, minlength=k))  # an image with fewer colors than asked
+    centers = centers[used]
+    k = len(used)
+    assigned = np.searchsorted(used, assigned).astype(np.int16)
+    labels[visible] = assigned
+    if smoothing > 0:  # remove specks; labels are ordered by lightness, so the median picks a neighbor
+        cleaned = cv2.medianBlur((labels + 1).astype(np.uint8), 3 if smoothing < 4 else 5).astype(np.int16) - 1
+        labels = np.where(visible, np.maximum(cleaned, 0), -1).astype(np.int16)
+    lab_centers = np.column_stack([centers[:, 0], np.zeros(k), np.zeros(k)]) if values else centers
+    srgb = cv2.cvtColor(lab_centers.reshape(1, -1, 3).astype(np.float32), cv2.COLOR_Lab2RGB)[0]  # float Lab here
+    colors = [tuple(int(round(v)) for v in np.clip(c, 0, 1) * 255) for c in srgb]
+    palette = np.array(colors, dtype=np.uint8)
+    out = image_rgba.copy()
+    out[visible, :3] = palette[labels[visible]]
+    counts = np.bincount(labels[visible], minlength=k)
+    shares = (counts / max(1, counts.sum())).tolist()
+    return Simplified(out, labels, colors, shares)
+
+
+def region_points(labels: np.ndarray, count: int) -> list[tuple[float, float] | None]:
+    """For each color of a simplified image, a spot well inside its largest
+    area, as (u, v) fractions of the image: where to put its swatch marker."""
+    h, w = labels.shape
+    points: list[tuple[float, float] | None] = []
+    for i in range(count):
+        mask = (labels == i).astype(np.uint8)
+        if not mask.any():
+            points.append(None)
+            continue
+        dist = cv2.distanceTransform(np.pad(mask, 1), cv2.DIST_L2, 5)[1:-1, 1:-1]
+        y, x = np.unravel_index(int(dist.argmax()), dist.shape)
+        points.append(((x + 0.5) / w, (y + 0.5) / h))
+    return points

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .projects_folder import projects_folder
 from .recent_projects import Recent, recent_projects, remove_recent
 
 CARD = QSize(220, 160)
@@ -69,6 +70,7 @@ class StartScreen(QWidget):
     newRequested = Signal()
     openRequested = Signal()
     recentChosen = Signal(str)
+    folderChangeRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -102,6 +104,16 @@ class StartScreen(QWidget):
         left.addWidget(self.new_button)
         left.addWidget(self.open_button)
         left.addStretch(1)
+        self.folder_label = QLabel()
+        self.folder_label.setObjectName("hint")
+        self.folder_label.setWordWrap(True)
+        self.folder_label.setMaximumWidth(300)
+        self.folder_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.folder_button = QPushButton("Change Folder…")
+        self.folder_button.setToolTip("Where new projects are saved (they autosave from the start)")
+        self.folder_button.clicked.connect(self.folderChangeRequested.emit)
+        left.addWidget(self.folder_label)
+        left.addWidget(self.folder_button, alignment=Qt.AlignLeft)
 
         recent_title = QLabel("Recent Projects")
         f = recent_title.font()
@@ -120,7 +132,7 @@ class StartScreen(QWidget):
         self.recent_list.itemClicked.connect(lambda item: self.recentChosen.emit(item.data(PATH_ROLE)))
         self.recent_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.recent_list.customContextMenuRequested.connect(self._context_menu)
-        self.empty_label = QLabel("No recent projects yet. Projects show up here once they are saved.")
+        self.empty_label = QLabel("No recent projects yet. New projects show up here right away.")
         self.empty_label.setObjectName("hint")
 
         right = QVBoxLayout()
@@ -137,6 +149,7 @@ class StartScreen(QWidget):
         self.refresh()
 
     def refresh(self) -> None:
+        self.folder_label.setText(f"New projects are saved in:\n{projects_folder()}")
         self.recent_list.clear()
         recents = recent_projects()
         for r in recents:

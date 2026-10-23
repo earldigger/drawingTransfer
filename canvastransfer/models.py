@@ -221,6 +221,29 @@ DEFAULT_HIGHLIGHT_TOLERANCE = 12.0  # CIELAB distance; ~2.3 is a just-noticeable
 
 
 @dataclass
+class SimplifySettings:
+    """Viewing the selected layer reduced to a few flat colors or values."""
+
+    enabled: bool = False
+    values: bool = False  # gray values instead of colors
+    colors: int = 8  # how many colors in color mode
+    value_steps: int = 5  # how many values in value mode
+    smoothing: int = 2  # 0..6
+
+    def key(self) -> tuple[int, int, bool]:
+        return (self.value_steps if self.values else self.colors, self.smoothing, self.values)
+
+    def to_dict(self) -> dict:
+        return {"enabled": self.enabled, "values": self.values, "colors": self.colors,
+                "value_steps": self.value_steps, "smoothing": self.smoothing}
+
+    @staticmethod
+    def from_dict(data: dict) -> "SimplifySettings":
+        known = {k: v for k, v in data.items() if k in SimplifySettings.__dataclass_fields__}
+        return SimplifySettings(**known)
+
+
+@dataclass
 class Project:
     name: str
     canvas_width: float
@@ -235,6 +258,7 @@ class Project:
     split_position: float = 0.5  # 0..1, used by CompareMode.SPLIT
     swatches: list[Swatch] = field(default_factory=list)
     highlight_tolerance: float = DEFAULT_HIGHLIGHT_TOLERANCE
+    simplify: SimplifySettings = field(default_factory=SimplifySettings)
 
     def add_layer(self, layer: Layer) -> None:
         self.layers.append(layer)
@@ -278,6 +302,7 @@ class Project:
             "split_position": self.split_position,
             "swatches": [s.to_dict() for s in self.swatches],
             "highlight_tolerance": self.highlight_tolerance,
+            "simplify": self.simplify.to_dict(),
         }
 
     @staticmethod
@@ -296,4 +321,5 @@ class Project:
             split_position=data.get("split_position", 0.5),
             swatches=[Swatch.from_dict(s) for s in data.get("swatches", [])],
             highlight_tolerance=data.get("highlight_tolerance", DEFAULT_HIGHLIGHT_TOLERANCE),
+            simplify=SimplifySettings.from_dict(data.get("simplify", {})),
         )

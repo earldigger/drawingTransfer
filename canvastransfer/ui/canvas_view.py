@@ -33,6 +33,7 @@ class Marker:
     v: float
     rgb: tuple[int, int, int]
     selected: bool = False
+    ring: tuple[int, int, int] | None = None  # highlight color while the swatch is highlighted
 
 
 @dataclass
@@ -363,7 +364,8 @@ class CanvasView(QGraphicsView):
             center = self._marker_point(m)
             if center is None:
                 continue
-            ring = QPen(ACCENT if m.selected else Qt.white, 3 if m.selected else 2)
+            ring_color = QColor(*m.ring) if m.ring else (ACCENT if m.selected else Qt.white)
+            ring = QPen(ring_color, 4 if m.selected else (3 if m.ring else 2))
             ring.setCosmetic(True)
             painter.setPen(ring)
             painter.setBrush(QBrush(QColor(*m.rgb)))
