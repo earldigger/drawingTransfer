@@ -422,15 +422,18 @@ S("color-simplify", "Color — Simplify", `
 
 // ---------- Color — Swatches sheet, Paints & mixes ----------
 const SW = [["#4A3426", 1], ["#D9A58A", 2], ["#B97E66", 3], ["#3F5A6E", 4], ["#9AA3AB", 5]];
-const mixRow = (a, b, name, ratio, de) => `<div class="vrow" style="min-height:52px;border-bottom:1px solid #2A2A2D;gap:10px">
-  <div style="display:flex;width:48px;height:32px;border-radius:7px;overflow:hidden;flex:none"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
-  <div class="col" style="flex:1;min-width:0;line-height:1.25"><span style="font-size:14px">${name}</span><span style="color:var(--sub);font-size:12px">${ratio}</span></div>
-  <span style="font-size:13px;color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de}</span></div>`;
+const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
+// a mix: big swatch | predicted mix chip, the paints stacked one per line, then amounts and ΔE
+const mixRow = (a, b, names, ratio, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
+  <div style="display:flex;width:76px;height:76px;border-radius:10px;overflow:hidden;flex:none"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
+  <div class="col" style="flex:1;min-width:0;gap:3px">
+    ${names.map(n => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}</div>`).join("")}
+    <div class="vrow" style="gap:14px;margin-top:3px;font-size:15px"><span style="color:var(--sub)">${ratio}</span><b style="color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"};font-weight:600">ΔE ${de}</b></div>
+  </div></div>`;
 S("color-mixes", "Color — Paints & mixes", `
   ${chrome()}${nav("Color")}
   ${canvas(WF.x, WF.y, WF.w, WF.h, art("art-paint"))}
-  <div class="abs" style="left:${WF.x + 300 * .754 - 13}px;top:${WF.y + 190 * .754 - 13}px;width:26px;height:26px;border-radius:13px;background:#B97E66;border:3px solid var(--accent);display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff">3</div>
-  <div class="sheet" style="top:330px;padding:0 16px">
+    <div class="sheet" style="top:150px;padding:0 16px">
     <div class="grab"></div>
     <div class="vrow" style="gap:8px;margin-top:12px">
       ${SW.map(([c, n]) => `<div style="position:relative;width:44px;height:44px;border-radius:9px;background:${c};${n === 3 ? "outline:3px solid var(--accent);outline-offset:2px" : ""}"><span style="position:absolute;left:4px;top:2px;font-size:10px;font-weight:700;color:${n === 2 || n === 5 ? "#222" : "#fff"}">${n}</span></div>`).join("")}
@@ -442,22 +445,22 @@ S("color-mixes", "Color — Paints & mixes", `
       <div class="vrow" style="height:40px;border-bottom:1px solid #2A2A2D"><span style="flex:1;color:var(--sub)">Lighten with</span><span>Titanium white ›</span></div>
     </div>
     <div class="lbl" style="margin-top:12px">One paint</div>
-    ${mixRow("#B97E66", "#B47C62", "Yellow ochre + white", "1 : 0.6", "4.8")}
+    ${mixRow("#B97E66", "#B47C62", ["Yellow ochre", "Titanium white"], "1 : 0.6", "4.8")}
     <div class="lbl" style="margin-top:12px">Two-paint mixes</div>
-    ${mixRow("#B97E66", "#B97F67", "Yellow ochre + Vermilion + white", "3 : 1 : 1.5", "0.7")}
-    ${mixRow("#B97E66", "#BA7D68", "Vermilion + Ivory black + white", "2 : 0.3 : 2", "1.2")}
+    ${mixRow("#B97E66", "#B97F67", ["Yellow ochre", "Vermilion", "Titanium white"], "3 : 1 : 1.5", "0.7")}
+    ${mixRow("#B97E66", "#BA7D68", ["Vermilion", "Ivory black", "Titanium white"], "2 : 0.3 : 2", "1.2")}
     <div class="vrow" style="height:44px;justify-content:center;color:var(--accent-hi);gap:6px">${ic("book", "sm blue")}Paint library</div>
   </div>
-  ${mark(27, 352, 344)}${mark(28, 200, 400)}${mark(29, 96, 506)}${mark(30, 160, 664)}
+  ${mark(27, 280, 160)}${mark(28, 352, 278)}${mark(29, 96, 326)}${mark(30, 262, 438)}
 `, `
   <h3><span class="n">27</span>Swatches sheet</h3>
-  <p><b>Swatches</b> in the Color toolbar opens this sheet. The top row is every swatch in the project; tap one to select it (its marker on the canvas is ringed). New swatches come from Pick.</p>
+  <p><b>Swatches</b> in the Color toolbar opens this sheet. The top row is every swatch in the project; tap one to select it (its marker on the canvas is ringed when the sheet is dragged down). New swatches come from Pick.</p>
   <h3><span class="n">28</span>Details | Paints &amp; mixes</h3>
   <p>The same two tabs as the iPad panel, stacked. Details shows hex, L*a*b*, Munsell, value, warm / cool and the tint, shade, tone and complement strips.</p>
   <h3><span class="n">29</span>Mix from · Lighten with</h3>
   <p>All your paints in a medium, one of your palettes, or a classic palette (Zorn here); a white or water as the lightener.</p>
   <h3><span class="n">30</span>Mixes</h3>
-  <p>Closest single paints, then two-paint mixes, each with ΔE (under 2 in blue: hard to tell apart) and amounts as a guide. Drag the sheet up for more rows and the Paint library link.</p>
+  <p>Sized to read at arm’s length: a 76 pt chip (your swatch | the predicted mix), each paint on its own line with its color dot, then the amounts in the same order and ΔE (blue under 2: hard to tell apart). Amounts are a guide. The sheet opens tall for this tab; scroll for more mixes and the Paint library link, or drag it down to see the canvas.</p>
 `);
 
 // ---------- Paint library ----------

@@ -199,7 +199,7 @@ canvas is the sketchbook page.
 | Transfer — Full screen | Canvas as wide as the phone; replaces the separate “Quick look”. |
 | Compare — Split | A / B chosen from the labels on the canvas; modes in one row. |
 | Color — Simplify | Value check for sketchbook shading; Swatches sheet holds Details and Paints & mixes. |
-| Color — Paints & mixes | Swatches sheet: every swatch in a row, Details \| Paints & mixes, Mix from, Lighten with, mixes with ΔE and amounts. |
+| Color — Paints & mixes | Swatches sheet (opens tall): every swatch in a row, Details \| Paints & mixes, Mix from, Lighten with. Each mix: a 76 pt swatch \| mix chip, the paints stacked one per line with color dots, then amounts and ΔE. |
 | Paint library | iOS list with search, Paints \| Palettes, medium chips. |
 | Edit paint | Grouped form, same fields as iPad. |
 
