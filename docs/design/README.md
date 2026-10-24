@@ -52,7 +52,7 @@ something else, these win.
 | **Swatch** | A color picked from a layer, numbered. | sample, chip |
 | **Paint** | A tube in your paint library (name, brand, pigments, color, …). | color |
 | **Palette** | A named set of paints (yours, or a classic one like Zorn). | — |
-| **Mix** | One or two paints plus a lightener, predicted to match a swatch. Amounts are a guide, not a recipe. | recipe |
+| **Mix** | One or two paints plus a lightener, predicted to match a swatch. Each paint's share is a percentage (adding up to 100); a guide, not a recipe. | recipe |
 
 Watch for: *canvas* now means the real canvas; the area of the screen it is
 shown in is just “the view”.
@@ -170,7 +170,7 @@ screen at 1180 × 820 with numbered notes beside it, in workflow order.
 | Compare — Split | Overlay / Blink reference / Blink A/B / Split in one control; A, B, swap; draggable vertical line; *New photo* → Camera with Canvas chosen. |
 | Compare — Blink A/B | Label shows which layer is up; speed 0.1–5 s; tap the canvas to pause. In full screen, **tap = pause / resume blink** (only while Compare is on). |
 | Color — Pick, Highlight, Details | Tools: Pick, Simplify, Highlight, Grid. Loupe while picking. Swatch chips along the bottom with highlight range. One right-hand panel, tabs **Details \| Paints & mixes**, collapsible; the swatch bar shows all swatches. |
-| Color — Simplify, Paints & mixes | Colors / Values / Value scale, steps, smoothing, value strip under the canvas. Mixes from a palette: 64 pt chip (yours \| mix), one line per paint led by its amount, then ΔE (under 2 in blue). Amounts are a guide. |
+| Color — Simplify, Paints & mixes | Colors / Values / Value scale, steps, smoothing, value strip under the canvas. Mixes from a palette: 64 pt chip (yours \| mix, halves touching), one line per paint led by its % of the mix, then ΔE and how close (very close / close / noticeably different / far off; blue under 2). Percentages are a guide. |
 | Paint library | Full-screen sheet: Paints \| Palettes, medium list, table, detail with hex; Import saved page, Add paint. Full-featured on every device. |
 | Edit paint | Medium (move between oil, watercolor…), name, brand, series, pigments, color as hex or L*a*b*, opacity, lightfastness, drying, source; favorite, use in mixes, stand-in. |
 | Share | Canvas view (full res, no UI), Swatch sheet (PDF), Project file; then the iOS share sheet. |
@@ -178,7 +178,7 @@ screen at 1180 × 820 with numbered notes beside it, in workflow order.
 
 Decided from the first review: older canvas photos are never hidden or
 changed automatically; Split is vertical only; the Color panel collapses and
-the swatch bar shows all swatches; mix ratios stay, as a guide; the paint
+the swatch bar shows all swatches; mix amounts stay, as percentages and a guide; the paint
 library is full-featured on every device, with hex in the detail; the
 Gallery groups by time; the canvas-size chips stay as they are.
 
@@ -199,7 +199,7 @@ canvas is the sketchbook page.
 | Transfer — Full screen | Canvas as wide as the phone; replaces the separate “Quick look”. |
 | Compare — Split | A / B chosen from the labels on the canvas; modes in one row. |
 | Color — Simplify | Value check for sketchbook shading; Swatches sheet holds Details and Paints & mixes. |
-| Color — Paints & mixes | Swatches sheet (opens tall): every swatch in a row, Details \| Paints & mixes, Mix from, Lighten with. Each mix: a 76 pt chip (yours \| mix, split by a dark line), one line per paint led by its amount, then ΔE. |
+| Color — Paints & mixes | Swatches sheet (opens tall): every swatch in a row, Details \| Paints & mixes, Mix from, Lighten with. Each mix: a 76 pt chip (yours \| mix, halves touching so the shift shows), one line per paint led by its %, then ΔE and how close. |
 | Paint library | iOS list with search, Paints \| Palettes, medium chips. |
 | Edit paint | Grouped form, same fields as iPad. |
 
