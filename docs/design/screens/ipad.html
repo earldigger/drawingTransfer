@@ -75,6 +75,7 @@ section.screen > h2 { margin: 0 0 12px; font-size: 20px; }
 .mark { position: absolute; width: 24px; height: 24px; border-radius: 12px; background: var(--mark); color: #fff; font-weight: 700; font-size: 12px; display: grid; place-items: center; z-index: 50; }
 .lbl { font-size: 11px; font-weight: 600; letter-spacing: .6px; color: var(--sub); text-transform: uppercase; }
 .slider { position: relative; height: 28px; flex: 1; }
+.col > .slider { flex: none; }
 .slider::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px;
   background: linear-gradient(90deg, var(--accent) var(--v), #4A4A4E var(--v)); }
 .slider::after { content: ""; position: absolute; top: 3px; left: calc(var(--v) - 11px); width: 22px; height: 22px; border-radius: 11px; background: #fff; border: 2px solid var(--accent); box-sizing: border-box; }
@@ -168,6 +169,18 @@ table.lib tr.sel td { background: rgba(52,99,168,.25); }
       <ellipse cx="225" cy="240" rx="13" ry="6" fill="#1B1B1B"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#1B1B1B"/>
       <ellipse cx="258" cy="335" rx="22" ry="7" fill="#777777"/>
     </symbol>
+    <symbol id="scene" viewBox="0 0 1180 820">
+      <rect width="1180" height="820" fill="#5E564E"/><rect y="560" width="1180" height="260" fill="#4A433C"/><rect x="590" y="700" width="18" height="120" fill="#3A332C"/>
+      <polygon points="330,150 860,120 900,700 300,690" fill="#EEEAE2"/>
+      <g transform="matrix(1.06,-0.06,-0.048,0.864,330,150)"><use href="#art-lines" width="500" height="625"/></g>
+      <ellipse cx="760" cy="260" rx="90" ry="50" fill="#fff" opacity=".35"/>
+    </symbol>
+    <symbol id="i-exitfull" viewBox="0 0 24 24"><path d="M20 4l-6 6M14 5v5h5M4 20l6-6M10 19v-5H5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="art-toned" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#C9B79C"/><path d="M0 0h500v625H0z" fill="#B9A587" opacity=".35" transform="skewX(-8)"/>
+      <ellipse cx="330" cy="420" rx="160" ry="120" fill="#BFA98A" opacity=".5"/>
+    </symbol>
     <symbol id="art-paint-early" viewBox="0 0 500 625" preserveAspectRatio="none">
       <rect width="500" height="625" fill="#A9B0B5"/><rect y="430" width="500" height="195" fill="#C0B8AB"/>
       <ellipse cx="250" cy="245" rx="105" ry="140" fill="#6B5040"/>
@@ -179,7 +192,7 @@ table.lib tr.sel td { background: rgba(52,99,168,.25); }
 
 <header class="doc">
   <h1>Canvas Transfer — iPad screens</h1>
-  <p>Wireframes for the screens after Transfer and Camera (those two are in the Figma file, with older names — the names table in <code>docs/design/README.md</code> wins). iPad landscape, 1180 × 820 pt, drawn to scale. Numbered markers refer to the notes beside each screen. Layout and behaviour, not final visuals.</p>
+  <p>Every iPad screen, in workflow order. This page replaces the Figma file; names follow the table in <code>docs/design/README.md</code>. iPad landscape, 1180 × 820 pt, drawn to scale. Numbered markers refer to the notes beside each screen. Layout and behaviour, not final visuals.</p>
   <nav class="toc" id="toc"></nav>
 </header>
 
@@ -225,7 +238,7 @@ const S = (id, title, html, notes) => screens.push({ id, title, html, notes });
 // ---------- 1 · Camera — layer added ----------
 S("camera-added", "Camera — Layer added", `
   ${topBar()}
-  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-paint") + art("art-lines", 'style="opacity:.6;transform:translate(14px,-10px) scale(.94);transform-origin:center"'))}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-paint") + art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply;transform:translate(14px,-10px) scale(.94);transform-origin:center"'))}
   <div class="abs" style="left:${TF.x + 82}px;top:${TF.y + 40}px;width:330px;height:580px;border:1.5px solid var(--accent)">
     ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 7px);top:calc(${b}% - 7px);width:14px;height:14px;background:#fff;border:2px solid var(--accent);border-radius:3px"></i>`).join("")}
   </div>
@@ -240,7 +253,7 @@ S("camera-added", "Camera — Layer added", `
   ${mark(1, 300, 72)}${mark(2, 1062, 118)}
 `, `
   <h3><span class="n">1</span>Straight into Transform</h3>
-  <p>After <b>Add layer</b> on the Adjust corners screen, a new reference lands selected, at Normal 60 %, fitted inside the canvas, with Transform already on — placing it is always the next step (workflow step 4). It often ends up much smaller than the canvas, e.g. a face in one corner. A toast confirms it, with Undo.</p>
+  <p>After <b>Add layer</b> on the Adjust corners screen, a new reference lands selected, at Multiply 60 %, fitted inside the canvas, with Transform already on — placing it is always the next step (workflow step 4). It often ends up much smaller than the canvas, e.g. a face in one corner. A toast confirms it, with Undo.</p>
   <h3><span class="n">2</span>New layer on top</h3>
   <p>References go on top so they stay over the canvas photos. Named by type and date (“Reference · Oct 24”); rename in the expanded layer bar.</p>
   <h3>Canvas photo instead</h3>
@@ -611,8 +624,8 @@ S("settings", "Settings", `
       <div class="lbl" style="padding:16px 16px 4px">Defaults</div>
       <div class="list">
         <div>Units<span class="sp"></span><div class="seg small"><span class="on">in</span><span>cm</span></div></div>
-        <div>New reference layer<span class="sp"></span><span class="v">Normal · 60 %</span>${ic("chev","sm")}</div>
-        <div>Auto levels on photos<span class="sp"></span><span class="v" style="margin-right:8px">References only</span>${ic("chev","sm")}</div>
+        <div>New reference layer<span class="sp"></span><span class="v">Multiply · 60 %</span>${ic("chev","sm")}</div>
+        <div>Auto levels on photos<span class="sp"></span><span class="v" style="margin-right:8px">References only (never canvas photos)</span>${ic("chev","sm")}</div>
         <div>Grid<span class="sp"></span><span class="v">4 × 5 · white · thin</span>${ic("chev","sm")}</div>
         <div>Blink speed<span class="sp"></span><span class="v">0.6 s</span>${ic("chev","sm")}</div>
       </div>
@@ -626,12 +639,189 @@ S("settings", "Settings", `
   <p>Where things are stored (iCloud Drive by default, decision A), and the defaults that came up while designing: units, the look of a new reference layer, auto levels, grid, blink speed. A gestures cheat sheet, since several actions have no button.</p>
 `);
 
+// ---------- Transfer workspace (first drawn in Figma) ----------
+const handles = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid var(--accent)">
+  ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 7px);top:calc(${b}% - 7px);width:14px;height:14px;background:#fff;border:2px solid var(--accent);border-radius:3px"></i>`).join("")}</div>`;
+const transformBar = () => `<div class="abs panel ctx">
+    <div class="seg"><span class="on">Proportional</span><span>Free</span><span>Skew</span><span>Distort</span></div><div class="div"></div>
+    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="div"></div>
+    <div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>`;
+// the reference placed small, in the upper left of the canvas (workflow step 4)
+const REF = { x: TF.x + 40, y: TF.y + 40, w: 250, h: 312 };
+const placedRef = `<div class="abs" style="left:${REF.x - TF.x}px;top:${REF.y - TF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply"')}</div>`;
+const transferCanvas = () => canvas(TF.x, TF.y, TF.w, TF.h, art("art-toned") + placedRef);
+
+S("transfer-transform", "Transfer — Transform", `
+  ${topBar()}
+  ${transferCanvas()}
+  ${handles(REF.x, REF.y, REF.w, REF.h)}
+  ${toolStrip(TRANSFER_TOOLS, "transform")}
+  ${layerBar(LAYERS, 0)}
+  ${transformBar()}
+  ${mark(1, 730, 14)}${mark(2, 74, 68)}${mark(3, 816, 90)}${mark(4, 1076, 68)}${mark(5, 160, 772)}
+`, `
+  <h3><span class="n">1</span>Top bar</h3>
+  <p>Gallery, project name, the <b>Transfer | Color</b> switch, undo, redo, Full screen, Share. Two-finger tap = undo, three-finger tap = redo (Procreate), so the buttons are a backup.</p>
+  <h3><span class="n">2</span>Tool strip</h3>
+  <p>Camera, Transform, Perspective, Grid, Compare. 44 pt targets; the active tool is filled blue.</p>
+  <h3><span class="n">3</span>The view</h3>
+  <p>By default the canvas is sized to the space between the strips, the top bar and the context bar, so nothing covers it — and it keeps that size whether or not a bar is showing (no jumping). Pinch to zoom and rotate, two-finger drag to pan, quick pinch to fit. Here the canvas photo is the toned, still-empty canvas (workflow steps 1–2) and the reference has been scaled down into the upper left: a reference does not have to fill the canvas.</p>
+  <h3><span class="n">4</span>Layer bar</h3>
+  <p>Collapsed to a thin icon bar: thumbnails only, the selected one ringed in blue. ‹ expands it. Tap a layer to select it; tap it again for Look.</p>
+  <h3><span class="n">5</span>Context bar</h3>
+  <p>Only while a tool is active. Transform: Proportional / Free / Skew / Distort, Flip H / V, Fit, Cancel, <b>Done</b>. Handles work with Pencil or finger.</p>
+`);
+
+const cslider = (v) => `<div class="slider" style="--v:${v}%;flex:1"><i class="abs" style="top:11px;height:6px;left:${Math.min(v, 50)}%;width:${Math.abs(v - 50)}%;background:var(--accent);border-radius:3px"></i></div>`;
+const hsRow = (label, v, val) => `<div class="vrow"><span style="width:72px">${label}</span><div style="flex:1;display:flex">${cslider(v)}</div><span style="width:34px;text-align:right;color:var(--sub)">${val}</span></div>`;
+const hr = `<div style="height:1px;background:var(--stroke)"></div>`;
+S("transfer-look", "Transfer — Look", `
+  ${topBar()}
+  ${transferCanvas()}
+  ${toolStrip(TRANSFER_TOOLS, null)}
+  ${layerBar(LAYERS, 0)}
+  <div class="abs panel col" style="left:772px;top:64px;width:320px;padding:16px;gap:11px;background:#232325;z-index:10">
+    <div class="vrow"><b style="font-size:15px;flex:1">Opacity</b><b style="font-size:15px">60%</b><span style="color:var(--sub);margin-left:14px">Reset</span></div>
+    <div class="slider" style="--v:60%"></div>
+    <div class="seg fill small"><span>Normal</span><span class="on">Multiply</span><span>Screen</span><span>Lin. Light</span></div>
+    ${hr}<span class="lbl">Levels</span>
+    <svg width="288" height="56" viewBox="0 0 288 56"><rect width="288" height="56" rx="6" fill="#2E2E31"/><path d="M0 56 L0 52 C30 50 40 18 70 26 S110 9 140 23 S190 44 220 35 S260 47 288 50 L288 56Z" fill="#6A6A6E"/><path d="M24 0v56M150 0v56M262 0v56" stroke="#7FA8EC" stroke-width="1.5" stroke-dasharray="3 3"/></svg>
+    <div class="vrow">${[["Black","12"],["Gamma","1.20"],["White","236"]].map(([l,v]) => `<div class="col" style="flex:1;gap:4px"><span style="color:var(--sub);font-size:11px">${l}</span><div class="field" style="padding:6px 10px">${v}</div></div>`).join("")}</div>
+    ${hr}<span class="lbl">Hue / Saturation</span>
+    ${hsRow("Hue", 50, "0")}${hsRow("Saturation", 20, "−60")}${hsRow("Lightness", 50, "0")}
+    <div class="vrow"><span style="flex:1">Colorize</span><div class="switch"></div></div>
+    ${hr}
+    <div class="vrow"><span style="flex:1">Invert</span><div class="switch"></div></div>
+    <div class="vrow"><span style="flex:1">Perspective</span><span style="color:var(--sub)">Edit corners ›</span></div>
+  </div>
+  <div class="abs" style="left:1092px;top:134px;width:0;height:0;border:10px solid transparent;border-left-color:#232325;z-index:11"></div>
+  ${mark(6, 742, 70)}
+`, `
+  <h3><span class="n">6</span>Look</h3>
+  <p>Tap the selected layer again. No title — the pointer shows which layer it belongs to. <b>Opacity</b> first and largest (the most-used control), then blend mode (Normal / Multiply / Screen / Linear Light), Levels (histogram with black / gray / white points, plus number boxes), Hue / Saturation / Lightness, Colorize, Invert, Perspective → Edit corners. Live on the canvas; tap outside to close. Reset clears this layer only.</p>
+  <h3>Defaults</h3>
+  <p>A new reference — photo or drawing — starts at <b>Multiply 60 %</b>: white paper disappears and the lines sit on the canvas photo. A canvas photo starts at <b>Normal 100 %</b>.</p>
+  <h3>Not drawn</h3>
+  <p>Colorize, when on, shows its own hue and saturation sliders.</p>
+`);
+
+const card = (color, name, sum, sel, eye = true) => `<div class="col" style="width:142px;padding:8px;gap:4px;border-radius:10px;${sel ? "background:#2C2C30;border:2px solid var(--accent);padding:6px" : ""}">
+  <div style="height:72px;border-radius:6px;background:${color}"></div>
+  <div class="vrow" style="gap:4px"><b style="flex:1;font-size:12px">${name}</b><span style="opacity:${eye ? 1 : .35}">${ic("eye","sm")}</span></div>
+  <span style="color:var(--sub);font-size:11px">${sum}</span></div>`;
+S("transfer-layers", "Transfer — Layer bar expanded", `
+  ${topBar()}
+  ${transferCanvas()}
+  ${toolStrip(TRANSFER_TOOLS, null)}
+  <div class="abs panel col" style="right:12px;top:64px;padding:6px;gap:6px">
+    <div class="vrow" style="padding-left:8px"><span style="flex:1;color:var(--sub);font-weight:600">Layers</span><div class="iconbtn" style="width:36px;height:36px">${ic("chev")}</div></div>
+    ${card("#F4F2EE", "Reference", "Multiply · 60%", true)}
+    ${card("#B7977E", "Canvas · Oct 22", "Normal · 100%", false)}
+    ${card("#A9A196", "Canvas · Oct 15", "Normal · 100%", false, false)}
+    <div class="btn fill" style="height:44px">${ic("plus")}Layer</div>
+  </div>
+  ${mark(7, 990, 70)}
+`, `
+  <h3><span class="n">7</span>Layer bar, expanded</h3>
+  <p>Thumbnail, name, eye (show / hide), and a one-line summary of blend mode and opacity. Tap › or swipe right to collapse back to the icon bar. It overlaps the edge of the view slightly — it is for setting layers up, not for working. ＋ Layer goes to Camera or Photos.</p>
+  <p>Order: references on top, canvas photos below, newest canvas photo first. Older canvas photos keep whatever you set; here Oct 15 has been hidden by hand.</p>
+`);
+
+S("transfer-full", "Transfer — Full screen", `
+  <div class="abs" style="inset:0;background:#161617"></div>
+  ${canvas(262, 0, 656, 820, art("art-toned") + `<div class="abs" style="left:51px;top:51px;width:320px;height:400px">${art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply"')}</div>`)}
+  <div class="abs" style="left:16px;top:16px;width:40px;height:40px;border-radius:20px;background:rgba(0,0,0,.35);opacity:.6;display:grid;place-items:center">${ic("exitfull")}</div>
+  ${mark(8, 64, 24)}
+`, `
+  <h3><span class="n">8</span>Full screen</h3>
+  <p>All UI hidden; the canvas fills the screen (height in landscape, width in portrait). For working at the easel once the layers are set. Gestures still zoom and pan. Leave with the faint button (it fades after a few seconds and comes back on a tap) or a four-finger tap (Procreate).</p>
+  <p>If Compare is on, it keeps running here, and a tap pauses / resumes the blink.</p>
+  <h3>Portrait iPad</h3>
+  <p>Same layout, rotated: the layer bar collapses and full screen hides everything, so nothing needs redesigning.</p>
+`);
+
+// ---------- Camera (first drawn in Figma) ----------
+const Q = [[330,150],[860,120],[900,700],[300,690]];
+const qpts = (k = 1, dx = 0, dy = 0) => Q.map(([x, y]) => `${dx + x * k},${dy + y * k}`).join(" ");
+S("camera-capture", "Camera — Capture", `
+  <svg class="abs" style="inset:0" width="1180" height="820" viewBox="0 0 1180 820"><use href="#scene"/>
+    <polygon points="${qpts()}" fill="#3463A8" fill-opacity=".12" stroke="#5B8FE0" stroke-width="3" stroke-linejoin="round"/>
+    ${Q.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="#5B8FE0"/>`).join("")}</svg>
+  <div class="pill" style="left:16px;top:16px">Cancel</div>
+  <div class="pill" style="left:535px;transform:translateX(-50%);top:16px;color:var(--sub);font-size:13px">Adding to Portrait of Ana</div>
+  <div class="pill" style="left:595px;transform:translateX(-50%);top:72px;height:32px;background:var(--accent);color:#fff;font-size:13px">Rectangle found · hold steady</div>
+  <div class="pill" style="left:680px;top:325px;height:32px;background:rgba(0,0,0,.6);color:#F2D27A;font-size:13px">Glare on the paper — tilt slightly</div>
+  <div class="abs" style="right:0;top:0;width:110px;height:820px;background:rgba(0,0,0,.55)">
+    <svg class="abs" style="left:15px;top:370px" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="37" fill="none" stroke="#fff" stroke-width="4"/><circle cx="40" cy="40" r="31" fill="#fff"/></svg>
+    <div class="abs" style="left:31px;top:712px;width:48px;height:48px;border-radius:8px;background:#8F8577;border:1.5px solid #fff"></div>
+    <div class="abs" style="left:0;width:110px;top:764px;text-align:center;font-size:11px">Photos</div>
+  </div>
+  <div class="abs seg" style="left:535px;transform:translateX(-50%);bottom:16px;border-radius:21px;padding:3px;background:rgba(34,34,36,.9)">
+    <span style="border-radius:18px;padding:0 20px">Canvas</span><span class="on" style="border-radius:18px;padding:0 20px">Reference</span></div>
+  ${mark(9, 405, 778)}${mark(10, 430, 76)}${mark(11, 1040, 398)}${mark(12, 1040, 724)}
+`, `
+  <h3>Entry</h3>
+  <p>Camera in the tool strip, ＋ in the layer bar, or <b>Create</b> on New project. Full screen over the workspace.</p>
+  <h3><span class="n">9</span>Canvas | Reference</h3>
+  <p>Chosen before the shot because it decides what happens next. <b>Canvas</b> → corrected to the canvas proportions, fills the canvas exactly, Normal 100 %. <b>Reference</b> → corrected, Multiply 60 %, then placed with Transform. Default: Canvas if the project has no canvas photo yet, then Reference if it has no reference yet, otherwise Canvas.</p>
+  <h3><span class="n">10</span>Live detection</h3>
+  <p>The rectangle is outlined as soon as it is found. Warnings sit on the image where the problem is: glare, too dark, angle too steep.</p>
+  <h3><span class="n">11</span>Shutter</h3>
+  <p>Right edge in landscape (iOS convention), 80 pt; Pencil or finger. No auto capture.</p>
+  <h3><span class="n">12</span>Photos</h3>
+  <p>Pick an existing photo instead; it goes to the same corner step.</p>
+`);
+
+const K = 0.72, PX = 8, PY = 141;
+S("camera-corners", "Camera — Adjust corners", `
+  <div class="abs" style="inset:0;background:#161617"></div>
+  <div class="topbar" style="padding:0 16px"><span style="font-size:15px">Retake</span><div class="sp"></div><span style="font-size:15px;color:var(--sub)">Cancel</span>
+    <b class="abs" style="left:50%;transform:translateX(-50%);font-size:15px">Adjust corners</b></div>
+  <svg class="abs" style="left:${PX}px;top:${PY}px" width="${1180 * K}" height="${820 * K}" viewBox="0 0 1180 820"><use href="#scene"/>
+    <path fill-rule="evenodd" d="M0 0H1180V820H0Z M${Q.map(p => p.join(" ")).join(" L")}Z" fill="#000" fill-opacity=".5"/>
+    <polygon points="${qpts()}" fill="none" stroke="#5B8FE0" stroke-width="3"/></svg>
+  ${Q.map(([x, y], i) => `<div class="abs" style="left:${PX + x * K - 15}px;top:${PY + y * K - 15}px;width:30px;height:30px;border-radius:15px;border:3px solid var(--accent);background:rgba(255,255,255,${i === 0 ? 1 : .25})"></div>`).join("")}
+  <div class="abs" style="left:${PX + Q[0][0] * K - 26}px;top:${PY + Q[0][1] * K - 176}px;width:132px;height:132px;border-radius:66px;overflow:hidden;border:3px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.5)">
+    <svg width="132" height="132" viewBox="0 0 132 132"><rect width="132" height="132" fill="#5E564E"/><polygon points="66,66 160,58 168,170 60,170" fill="#EEEAE2"/><path d="M66 6v120M6 66h120" stroke="#5B8FE0" stroke-width="1.5"/><circle cx="66" cy="66" r="9" fill="none" stroke="#5B8FE0" stroke-width="2"/></svg></div>
+  <div class="abs panel col" style="left:868px;top:64px;width:300px;height:744px;padding:16px;gap:12px;background:var(--panel-solid)">
+    <div style="height:200px;border-radius:8px;background:var(--ctl);display:grid;place-items:center"><div style="width:160px;height:200px;position:relative">${art("art-paper", 'style="position:absolute;inset:0;width:100%;height:100%"')}</div></div>
+    <span style="color:var(--sub);font-size:12px">3024 × 3780 px · ratio 4 : 5</span>
+    <span class="lbl">Use as</span>
+    <div class="seg fill" style="border-radius:20px;padding:3px"><span style="border-radius:17px;height:34px">Canvas</span><span class="on" style="border-radius:17px;height:34px">Reference</span></div>
+    <span class="lbl">Adjust</span>
+    <div class="vrow" style="height:36px"><span style="flex:1;font-size:14px">Auto levels</span><div class="switch on"></div></div>
+    <div class="vrow" style="height:36px"><span style="flex:1;font-size:14px">Rotate 90°</span><span style="font-size:18px">↻</span></div>
+    <div class="vrow" style="height:36px"><span style="flex:1;font-size:14px">Reset to detected</span><span style="font-size:18px;color:var(--sub)">↺</span></div>
+    <div style="flex:1"></div>
+    <div class="btn primary" style="height:52px;border-radius:12px;font-size:16px">Add layer</div>
+  </div>
+  ${mark(13, PX + Q[0][0] * K - 44, PY + Q[0][1] * K + 16)}${mark(14, PX + Q[0][0] * K + 112, PY + Q[0][1] * K - 168)}${mark(15, 838, 84)}${mark(16, 838, 420)}${mark(17, 838, 768)}
+`, `
+  <h3><span class="n">13</span>Corners</h3>
+  <p>The detected corners come in already placed; drag any of the four with Pencil or finger (30 pt handles, 44 pt hit area). Outside the four corners is dimmed. If nothing was detected, the corners start 10 % in from the photo's edges. The corners are the crop — there is no separate crop step.</p>
+  <h3><span class="n">14</span>Loupe</h3>
+  <p>While a corner is dragged, a magnified view with a crosshair sits above it, offset so your finger never hides it.</p>
+  <h3><span class="n">15</span>Preview</h3>
+  <p>The corrected image (no title), updated live as corners move, with pixel size and ratio. For Canvas the ratio is forced to the canvas (16 × 20).</p>
+  <h3><span class="n">16</span>Use as · Adjust</h3>
+  <p>Canvas / Reference can still be switched here. <b>Auto levels</b>: on for references (paper to white, lines to dark), off for canvas photos so the painting's values stay true. Rotate 90° for sideways shots. Reset puts the corners back where they were detected.</p>
+  <h3><span class="n">17</span>Add layer</h3>
+  <p>Adds the corrected photo as a new layer and returns to the workspace (next screen). Corners stay editable later: Look → Perspective → Edit corners.</p>
+`);
+
 // ---------- render ----------
+// workflow order; markers are numbered per screen, in the order the notes mention them
+const ORDER = ["gallery", "new-project", "camera-capture", "camera-corners", "camera-added", "transfer-transform", "transfer-look",
+  "transfer-layers", "transfer-full", "compare-split", "compare-blink", "color-pick", "color-simplify", "paint-library", "edit-paint", "share", "settings"];
+screens.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
 const main = document.getElementById("screens"), toc = document.getElementById("toc");
 screens.forEach((s, i) => {
   toc.insertAdjacentHTML("beforeend", `<a href="#${s.id}">${i + 1} · ${s.title}</a>`);
   main.insertAdjacentHTML("beforeend", `<section class="screen" id="${s.id}"><h2>${i + 1} · ${s.title}</h2>
     <div class="row"><div class="stage"><div class="ipad">${s.html}</div></div><div class="notes">${s.notes}</div></div></section>`);
+  const sec = main.lastElementChild, map = {};
+  sec.querySelectorAll(".notes .n").forEach(n => { map[n.textContent] ??= String(Object.keys(map).length + 1); n.textContent = map[n.textContent]; });
+  sec.querySelectorAll(".ipad .mark").forEach(m => { m.textContent = map[m.textContent] ?? m.textContent; });
 });
 function fit() {
   const w = Math.min(document.documentElement.clientWidth, 1700) - 32;

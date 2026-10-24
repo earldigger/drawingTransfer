@@ -4,8 +4,11 @@ Design work for the iPhone / iPad / Mac app. The desktop Python prototype
 in this repo is the working spec of what the app does; this folder records
 how it should look and be organised.
 
-Figma file: [Canvas Transfer – iPad design](https://www.figma.com/design/AKfGx0W7u726iwbbJ7EGSL)
-(page *1 · Screen map*).
+**All iPad screens are in [`screens/ipad.html`](screens/ipad.html)**, in
+workflow order, each with numbered notes — open it in any browser. The
+earlier Figma file ([Canvas Transfer – iPad design](https://www.figma.com/design/AKfGx0W7u726iwbbJ7EGSL))
+is no longer needed: its screens were rebuilt in the HTML with the current
+names and decisions.
 
 ## Who and where
 
@@ -19,7 +22,7 @@ Figma file: [Canvas Transfer – iPad design](https://www.figma.com/design/AKfGx
 
 1. **Add a canvas photo**: photograph the destination canvas.
 2. **Adjust its perspective**: four corners, so it fills the canvas exactly.
-3. **Add a reference** (a photo or a drawing) on top, at 60 % opacity.
+3. **Add a reference** (a photo or a drawing) on top, at Multiply 60 %.
 4. **Fit the reference** with Transform where it belongs. It doesn't always
    fill the canvas; it might be a small face in one corner.
 
@@ -29,15 +32,15 @@ closest-to-hand controls.
 
 ## Names
 
-The words the app uses on screen. Where an older Figma frame or note says
+The words the app uses on screen. Where an older note says
 something else, these win.
 
 | Name | Means | Not called |
 |---|---|---|
 | **Project** | One painting: its canvas size, layers, swatches. A `.ctproj` file. | document, file |
 | **Canvas** | The real canvas you paint on, and its size in the project (16 × 20 in). | — |
-| **Canvas photo** | A layer: a photo of your canvas, perspective-corrected to fill the canvas exactly. Opacity stays 100 % unless you change it. A project collects several over time (“Canvas · Oct 22”). | canvas progress, painting photo |
-| **Reference** | A layer: the photo or drawing you transfer from. Added at 60 % opacity and placed with Transform, at any size. | drawing, source, overlay |
+| **Canvas photo** | A layer: a photo of your canvas, perspective-corrected to fill the canvas exactly. Starts at Normal 100 % and is never changed automatically; no auto levels. A project collects several over time (“Canvas · Oct 22”). | canvas progress, painting photo |
+| **Reference** | A layer: the photo or drawing you transfer from. Starts at Multiply 60 % (white paper disappears), with auto levels; placed with Transform, at any size. | drawing, source, overlay |
 | **Layer** | A canvas photo or a reference. Listed in the layer bar. | — |
 | **Layer bar** | The strip of layer thumbnails on the right; collapses to icons. | layer strip, layers panel |
 | **Look** | The popover for one layer: opacity, blend mode, levels, hue / saturation, colorize, invert, perspective. No title; it points at its layer. | Look · Drawing, adjustments |
@@ -87,7 +90,7 @@ shown in is just “the view”.
 
 **Mac:** Gallery · Workspace (dockable panels, shortcuts, menus) · Add images (drag from a browser or Finder, paste, import) · Paint library & palettes (table view; saved-page import lives here).
 
-## Workspace · Transfer (iPad, landscape 1180 × 820 pt) — wireframe plan
+## Workspace · Transfer (iPad, landscape 1180 × 820 pt)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -120,89 +123,58 @@ shown in is just “the view”.
 - **Chrome**: panels in neutral grays; blue for active and primary controls
   (decision J).
 
-### Wireframes (done)
+### Screens
 
-Figma page *2 · iPad screens*, column *Workspace · Transfer*, has four iPad frames, each with numbered
-notes beside it:
-
-1. **Transform** — tool strip with Transform active, canvas fitted clear of the
-   UI with transform handles on the reference, collapsed layer bar, context bar
-   (Proportional / Free / Skew / Distort, Flip H / V, Fit, Cancel, **Done**).
-2. **Look popover** — opened from the collapsed layer bar: Opacity (largest),
-   blend mode, Levels (histogram + Black / Gamma / White), Hue / Saturation /
-   Lightness, Colorize, Invert, Perspective → Edit corners.
-3. **Layers expanded** — the layer bar with names and summaries.
-4. **Full screen** — UI hidden, canvas fills the height, faint exit button.
-
-Reusable components on that page (section *Components*): `icon/*` (19 line icons), **Tool button**
-(Default / Active, icon swap), **Layer card** (Size Expanded / Collapsed ×
-Selected; Name and Summary text properties).
+In `screens/ipad.html`: *Transfer — Transform*, *Look*, *Layer bar
+expanded*, *Full screen*. The Transform and Look screens show the canvas
+photo of a toned, still-empty canvas with a small reference placed in one
+corner (workflow steps 1–4).
 
 Open questions:
 
-1. The Look popover is tall (~615 pt) and covers the right edge of the canvas.
-   Acceptable for quick changes; could be made draggable if it gets in the way.
+1. The Look popover is tall (~560 pt) and covers the right edge of the
+   canvas. Fine for quick changes; could be made draggable.
 2. Colorize needs its own hue / saturation sliders when on — not drawn yet.
-3. ~~Tap in full screen~~ — decided: pauses / resumes Blink while Compare is
-   on; does nothing otherwise.
 
-## Camera (iPad) — wireframe plan
+## Camera (iPad)
 
-Figma page *2 · iPad screens*, column *Camera* (the Starter plan allows only
-three pages, so screens share one page in columns).
+1. **Capture** — full-screen live view. The detected rectangle is outlined
+   live; warnings (glare, too dark, angle too steep) sit on the image where
+   the problem is. Right edge: 80 pt shutter, Photos. Bottom: **Canvas |
+   Reference**, chosen before the shot. Default: Canvas if the project has no
+   canvas photo yet, then Reference if it has no reference yet, otherwise
+   Canvas. No auto capture.
+2. **Adjust corners** — the four corners are the crop; loupe while
+   dragging; preview (no title); Use as; Auto levels (on for references,
+   off for canvas photos); Rotate 90°; Reset to detected; **Add layer**.
+3. **Layer added** — a reference lands on top at Multiply 60 % with
+   Transform on. A canvas photo fills the canvas at Normal 100 % under the
+   references; older canvas photos are not changed. Offers Compare.
 
-1. **Capture** (drawn) — full-screen live view. The detected rectangle is
-   outlined live; status and warnings (glare, too dark, angle too steep) sit on
-   the image where the problem is. Right-edge column: Auto switch (shoot once
-   the rectangle is steady ~1 s), 80 pt shutter, Photos library. Bottom:
-   **Canvas | Reference**, chosen before the shot because it decides what
-   happens next. Default: Canvas if the project has no canvas photo yet, then
-   Reference if it has no reference yet, otherwise Canvas.
-2. **Adjust corners** (drawn) — frozen photo with the detected quad; outside
-   is dimmed. 30 pt corner handles (44 pt hit area), Pencil or finger; a loupe
-   with a crosshair sits above the corner being dragged. Side panel: live
-   corrected preview (no title) with pixel size and ratio, Use as (Canvas /
-   Reference), Auto levels (on for references), Rotate 90°, Reset to detected,
-   **Add layer** (blue). Retake / Cancel in the top bar. The four corners are
-   the crop; no separate crop step. No rectangle found → corners start inset
-   10 %.
-3. **Layer added** — drawn in HTML (see below). A new reference lands on
-   top, selected, at Normal 60 %, fitted inside the canvas, with Transform
-   already active; toast "Reference added — place it with Transform · Undo".
-   A canvas photo fills the canvas exactly and lands at Normal 100 % just
-   under the references. Older canvas photos are **not** hidden or changed.
-   It offers "Compare with Oct 22".
+## All iPad screens
 
-Open questions:
+[`screens/ipad.html`](screens/ipad.html): one self-contained page, each
+screen at 1180 × 820 with numbered notes beside it, in workflow order.
 
-1. Is Auto capture worth having? It helps only if the iPad is held still or
-   on a stand aimed at the easel.
-2. Auto levels for canvas photos: off by default (proposed)? Brightening the
-   painting helps line comparison but misstates its values.
-
-The Figma frames still show the old names (*Drawing / Canvas progress*,
-*Look · Drawing*, *Result*); the names table above wins, and the HTML
-screens use the new ones.
-
-## Remaining iPad screens — HTML wireframes
-
-Figma's Starter plan ran out of MCP calls, so the rest are in
-[`screens/ipad.html`](screens/ipad.html): one self-contained page (open it in
-any browser), each screen at 1180 × 820 with numbered notes beside it.
-
-| # | Screen | Key points |
-|---|---|---|
-| 1 | Camera — Layer added | Reference → Normal 60 %, Transform on; canvas photo → fills canvas, offers Compare. |
-| 2 | Compare — Split | Overlay / Blink reference / Blink A/B / Split in one control; A, B, swap; draggable vertical line; *New photo* → Camera with Canvas chosen. |
-| 3 | Compare — Blink A/B | Label shows which layer is up; speed 0.1–5 s; tap the canvas to pause. In full screen, **tap = pause / resume blink** (only while Compare is on). |
-| 4 | Color — Pick, Highlight, Details | Tools: Pick, Simplify, Highlight, Grid. Loupe while picking. Swatch chips along the bottom with highlight range. One right-hand panel, tabs **Details \| Paints & mixes**, collapsible; the swatch bar shows all swatches. |
-| 5 | Color — Simplify, Paints & mixes | Colors / Values / Value scale, steps, smoothing, value strip under the canvas. Mixes from a palette with ΔE (under 2 in blue) and ratios as a guide. |
-| 6 | Paint library | Full-screen sheet: Paints \| Palettes, medium list, table, detail with hex; Import saved page, Add paint. Full-featured on every device. |
-| 7 | Edit paint | Medium (move between oil, watercolor…), name, brand, series, pigments, color as hex or L*a*b*, opacity, lightfastness, drying, source; favorite, use in mixes, stand-in. |
-| 8 | Gallery | Thumbnails at real proportions, grouped by time; New project, Open from Files, Settings. |
-| 9 | New project | Name, size chips (8×10 – 36×48, Custom), in \| cm, orientation, to-scale preview; saved at once; Create opens Camera with Canvas chosen. |
-| 10 | Share | Canvas view (full res, no UI), Swatch sheet (PDF), Project file; then the iOS share sheet. |
-| 11 | Settings | Storage locations; defaults (units, new reference look, auto levels, grid, blink speed); gestures cheat sheet. |
+| Screen | Key points |
+|---|---|
+| Gallery | Thumbnails at real proportions, grouped by month; New project, Open from Files, Settings. |
+| New project | Name, size chips (8×10 – 36×48, Custom), in \| cm, orientation, preview; Create opens Camera with Canvas chosen. |
+| Camera — Capture | Canvas \| Reference; live detection and warnings; shutter, Photos. |
+| Camera — Adjust corners | Corners = crop, loupe, preview, Use as, Auto levels (references only), Add layer. |
+| Camera — Layer added | Reference → Multiply 60 %, Transform on; canvas photo → Normal 100 %, offers Compare. |
+| Transfer — Transform | Top bar, tool strip, view fitted clear of the UI, collapsed layer bar, Transform context bar. |
+| Transfer — Look | Opacity first, blend, levels, hue / saturation, colorize, invert, perspective. No title. |
+| Transfer — Layer bar expanded | Thumbnail, name, eye, blend · opacity summary; ＋ Layer. |
+| Transfer — Full screen | Canvas only; faint exit button or four-finger tap. |
+| Compare — Split | Overlay / Blink reference / Blink A/B / Split in one control; A, B, swap; draggable vertical line; *New photo* → Camera with Canvas chosen. |
+| Compare — Blink A/B | Label shows which layer is up; speed 0.1–5 s; tap the canvas to pause. In full screen, **tap = pause / resume blink** (only while Compare is on). |
+| Color — Pick, Highlight, Details | Tools: Pick, Simplify, Highlight, Grid. Loupe while picking. Swatch chips along the bottom with highlight range. One right-hand panel, tabs **Details \| Paints & mixes**, collapsible; the swatch bar shows all swatches. |
+| Color — Simplify, Paints & mixes | Colors / Values / Value scale, steps, smoothing, value strip under the canvas. Mixes from a palette with ΔE (under 2 in blue) and ratios as a guide. |
+| Paint library | Full-screen sheet: Paints \| Palettes, medium list, table, detail with hex; Import saved page, Add paint. Full-featured on every device. |
+| Edit paint | Medium (move between oil, watercolor…), name, brand, series, pigments, color as hex or L*a*b*, opacity, lightfastness, drying, source; favorite, use in mixes, stand-in. |
+| Share | Canvas view (full res, no UI), Swatch sheet (PDF), Project file; then the iOS share sheet. |
+| Settings | Storage locations; defaults (units, new reference look, auto levels, grid, blink speed); gestures cheat sheet. |
 
 Decided from the first review: older canvas photos are never hidden or
 changed automatically; Split is vertical only; the Color panel collapses and
