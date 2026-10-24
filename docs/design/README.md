@@ -91,7 +91,7 @@ These get the biggest, closest-to-hand controls.
 
 ### Wireframes (done)
 
-Figma page *2 · Workspace · Transfer* has four iPad frames, each with numbered
+Figma page *2 · iPad screens*, column *Workspace · Transfer*, has four iPad frames, each with numbered
 notes beside it:
 
 1. **Transform** — tool strip with Transform active, canvas fitted clear of the
@@ -103,7 +103,7 @@ notes beside it:
 3. **Layers expanded** — the layer bar with names and summaries.
 4. **Full screen** — UI hidden, canvas fills the height, faint exit button.
 
-Reusable components on that page: `icon/*` (19 line icons), **Tool button**
+Reusable components on that page (section *Components*): `icon/*` (19 line icons), **Tool button**
 (Default / Active, icon swap), **Layer card** (Size Expanded / Collapsed ×
 Selected; Name and Summary text properties).
 
@@ -115,4 +115,41 @@ Open questions:
 3. Should a tap in full screen do anything (e.g. blink the drawing layer)? Off
    by default to avoid accidental changes.
 
-Next: Camera, Compare, Color workspace and Gallery.
+## Camera (iPad) — wireframe plan
+
+Figma page *2 · iPad screens*, column *Camera* (the Starter plan allows only
+three pages, so screens share one page in columns).
+
+1. **Capture** (drawn) — full-screen live view. The detected rectangle is
+   outlined live; status and warnings (glare, too dark, angle too steep) sit on
+   the image where the problem is. Right-edge column: Auto switch (shoot once
+   the rectangle is steady ~1 s), 80 pt shutter, Photos library. Bottom:
+   **Drawing | Canvas progress**, chosen before the shot because it decides what
+   happens next. Default: Drawing if the project has none yet, otherwise
+   Canvas progress.
+2. **Adjust corners** (drawn) — frozen photo with the detected quad; outside
+   is dimmed. 30 pt corner handles (44 pt hit area), Pencil or finger; a loupe
+   with a crosshair sits above the corner being dragged. Side panel: live
+   corrected preview with pixel size and ratio, Use as (Drawing / Canvas
+   progress), Auto levels (on for drawings), Rotate 90°, Reset to detected,
+   **Add layer** (blue). Retake / Cancel in the top bar. The four corners are
+   the crop; no separate crop step. No rectangle found → corners start inset
+   10 %.
+3. **Layer added** (*not drawn yet*: the Figma Starter plan's MCP call limit
+   was reached) — back in the workspace. A new drawing lands selected, at
+   Multiply 60 %, fitted to the canvas, with Transform already active; toast
+   "Drawing added — place it with Transform · Undo". A canvas progress photo
+   fills the canvas exactly, lands at Normal 100 % under the drawing, hides
+   the previous canvas photo, and offers "Compare with Oct 22?".
+
+Open questions:
+
+1. Is Auto capture worth having? It helps only if the iPad is held still or
+   on a stand aimed at the easel.
+2. Auto levels for canvas progress: off by default? Brightening the painting
+   helps line comparison but misstates its values.
+3. Hide the older canvas photo automatically when a new one arrives?
+4. Default look for a new drawing: is Multiply 60 % what you usually set
+   first?
+
+Next: draw *Layer added*, then Compare, Color workspace and Gallery.
