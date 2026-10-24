@@ -135,12 +135,11 @@ three pages, so screens share one page in columns).
    **Add layer** (blue). Retake / Cancel in the top bar. The four corners are
    the crop; no separate crop step. No rectangle found → corners start inset
    10 %.
-3. **Layer added** (*not drawn yet*: the Figma Starter plan's MCP call limit
-   was reached) — back in the workspace. A new drawing lands selected, at
-   Multiply 60 %, fitted to the canvas, with Transform already active; toast
-   "Drawing added — place it with Transform · Undo". A canvas progress photo
-   fills the canvas exactly, lands at Normal 100 % under the drawing, hides
-   the previous canvas photo, and offers "Compare with Oct 22?".
+3. **Layer added** — drawn in HTML (see below). A new drawing lands
+   selected, at Multiply 60 %, fitted to the canvas, with Transform already
+   active; toast "Drawing added — place it with Transform · Undo". A canvas
+   progress photo fills the canvas exactly, lands at Normal 100 % under the
+   drawing, hides the previous canvas photo, and offers "Compare with Oct 22".
 
 Open questions:
 
@@ -152,4 +151,34 @@ Open questions:
 4. Default look for a new drawing: is Multiply 60 % what you usually set
    first?
 
-Next: draw *Layer added*, then Compare, Color workspace and Gallery.
+## Remaining iPad screens — HTML wireframes
+
+Figma's Starter plan ran out of MCP calls, so the rest are in
+[`screens/ipad.html`](screens/ipad.html): one self-contained page (open it in
+any browser), each screen at 1180 × 820 with numbered notes beside it.
+
+| # | Screen | Key points |
+|---|---|---|
+| 1 | Camera — Layer added | Drawing → Transform on; canvas photo → fills canvas, offers Compare. |
+| 2 | Compare — Split | Overlay / Blink drawing / Blink A/B / Split in one control; A, B, swap; draggable line; *New photo* → Camera with Canvas progress chosen. |
+| 3 | Compare — Blink A/B | Label shows which layer is up; speed 0.1–5 s; tap the canvas to pause. In full screen, **tap = pause / resume blink** (only while Compare is on). |
+| 4 | Color — Pick, Highlight, Details | Tools: Pick, Simplify, Highlight, Grid. Loupe while picking. Swatch chips along the bottom with highlight range. One right-hand panel, tabs **Details \| Paints & mixes**, always shown in Color, so the Color canvas fits to its left. |
+| 5 | Color — Simplify, Paints & mixes | Colors / Values / Value scale, steps, smoothing, value strip under the canvas. Mixes from a palette with ΔE; under 2 in blue. |
+| 6 | Paint library | Full-screen sheet: Paints \| Palettes, medium list, table, detail; Import saved page, Add paint. |
+| 7 | Gallery | Thumbnails at real proportions; New project, Open from Files, Settings. |
+| 8 | New project | Name, size chips (8×10 – 36×48, Custom), in \| cm, orientation, to-scale preview; saved at once. |
+| 9 | Share | Canvas view (full res, no UI), Swatch sheet (PDF), Project file; then the iOS share sheet. |
+| 10 | Settings | Storage locations; defaults (units, new drawing look, auto levels, grid, blink speed); gestures cheat sheet. |
+
+Open questions from these screens:
+
+1. Show only the selected layer's swatches, or all of them?
+2. Mix ratios (3 : 1 : 1.5): show them, or paint names only, given Mixbox
+   treats every paint as equally strong?
+3. Paint library on iPad: full editing, or mostly read-only with editing on
+   the Mac?
+4. Which canvas sizes do you actually use? Trim the chips to those.
+5. Should the 302 pt Color panel collapse like the layer bar?
+
+Not yet designed: iPhone (Gallery, Capture, Sketchbook transfer, Quick look)
+and Mac (Workspace with docked panels, Add images, Paint library table).
