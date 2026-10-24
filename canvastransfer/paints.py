@@ -346,7 +346,7 @@ class PaintLibrary:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self._stamp is not None and self.path.exists() and self.changed_on_disk():
-            # someone else (another computer, via Dropbox) changed the file since we read it:
+            # someone else (another device, via iCloud Drive or Dropbox) changed the file since we read it:
             # keep their version next to ours rather than silently overwriting it
             stamp = time.strftime("%Y%m%d-%H%M%S")
             shutil.copy2(self.path, self.path.with_name(f"{self.path.stem}.other-{stamp}.json"))
@@ -365,7 +365,7 @@ class PaintLibrary:
 
     def changed_on_disk(self) -> bool:
         """True when the file was changed by someone else since this library
-        last read or wrote it (e.g. Dropbox syncing an edit from another Mac)."""
+        last read or wrote it (e.g. iCloud Drive syncing an edit from another device)."""
         return self.path is not None and self._disk_stamp() != self._stamp
 
     def move_to(self, path: Path) -> None:

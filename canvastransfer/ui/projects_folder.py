@@ -1,7 +1,7 @@
 """The folder new projects are saved in as soon as they are created, so they
 autosave from the start (as iPhone and iPad apps do). By default
-Dropbox/Canvas Transfer/Projects, next to the paint library; without
-Dropbox, Documents/Canvas Transfer Projects. Changeable; the choice is
+iCloud Drive/Canvas Transfer/Projects (Dropbox if iCloud Drive is off;
+Documents/Canvas Transfer Projects without either). Changeable; the choice is
 remembered in a pointer file in the app's data folder."""
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog
 
-from .library_location import DROPBOX_SUBFOLDER, data_dir, dropbox_folder
+from .library_location import APP_SUBFOLDER, cloud_folder, data_dir, tidy_cloud_choice
 
 POINTER_FILE = "projects_location.json"
 PROJECTS_SUBFOLDER = "Projects"
@@ -23,9 +23,9 @@ PROJECT_SUFFIX = ".ctproj"
 def default_projects_folder() -> Path:
     if os.environ.get("CANVASTRANSFER_DATA_DIR"):  # tests: stay inside their own folder
         return data_dir() / PROJECTS_SUBFOLDER
-    dropbox = dropbox_folder()
-    if dropbox is not None:
-        return dropbox / DROPBOX_SUBFOLDER / PROJECTS_SUBFOLDER
+    cloud = cloud_folder()
+    if cloud is not None:
+        return cloud / APP_SUBFOLDER / PROJECTS_SUBFOLDER
     return Path.home() / "Documents" / "Canvas Transfer Projects"
 
 
@@ -64,12 +64,6 @@ def new_project_path(name: str, folder: Path | None = None) -> Path:
 
 def choose_projects_folder(parent) -> Path | None:
     current = projects_folder()
-    start = current if current.is_dir() else (dropbox_folder() or Path.home())
-    folder = QFileDialog.getExistingDirectory(parent, "Folder for new projects (e.g. in Dropbox)", str(start))
-    if not folder:
-        return None
-    folder = Path(folder)
-    dropbox = dropbox_folder()
-    if dropbox and folder.resolve() == dropbox.resolve():
-        folder = folder / DROPBOX_SUBFOLDER / PROJECTS_SUBFOLDER  # keep the Dropbox top level tidy
-    return folder
+    start = current if current.is_dir() else (cloud_folder() or Path.home())
+    folder = QFileDialog.getExistingDirectory(parent, "Folder for new projects (e.g. in iCloud Drive)", str(start))
+    return tidy_cloud_choice(Path(folder), PROJECTS_SUBFOLDER) if folder else None

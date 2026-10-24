@@ -1,6 +1,7 @@
 """The recently opened or saved projects, newest first, kept in the app's
 data folder. Projects that can't be found right now (an unplugged drive,
-Dropbox offline) stay in the list but are not shown until they are back."""
+a cloud folder not downloaded yet) stay in the list but are not shown
+until they are back."""
 
 from __future__ import annotations
 

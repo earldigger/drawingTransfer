@@ -129,7 +129,7 @@ class PaintLibraryDialog(QDialog):
         self.location_label.setStyleSheet("color: gray;")
         self.location_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.location_button = QPushButton("Change Location…")
-        self.location_button.setToolTip("Keep the library file in another folder, such as Dropbox")
+        self.location_button.setToolTip("Keep the library file in another folder, such as iCloud Drive")
         self.location_button.clicked.connect(self.change_location)
         location = QHBoxLayout()
         location.addWidget(self.location_label, 1)

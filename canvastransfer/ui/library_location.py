@@ -1,6 +1,6 @@
 """Where the paint library file lives. By default in the app's data folder;
-you can move it to any folder, such as Dropbox, so it is backed up and can
-be shared between computers. The chosen location is remembered in a small
+you can move it to any folder, such as iCloud Drive, so it is backed up and
+can be shared between devices. The chosen location is remembered in a small
 pointer file in the app's data folder."""
 
 from __future__ import annotations
@@ -18,7 +18,8 @@ from ..paints import PaintLibrary
 
 LIBRARY_FILE = "paints.json"
 POINTER_FILE = "library_location.json"
-DROPBOX_SUBFOLDER = "Canvas Transfer"
+APP_SUBFOLDER = "Canvas Transfer"  # the app's own folder inside iCloud Drive or Dropbox
+DROPBOX_SUBFOLDER = APP_SUBFOLDER
 
 
 def data_dir() -> Path:
@@ -55,6 +56,18 @@ def dropbox_folder() -> Path | None:
     return next((c for c in candidates if c.is_dir()), None)
 
 
+def icloud_folder() -> Path | None:
+    """iCloud Drive on a Mac, if it is turned on."""
+    folder = Path.home() / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
+    return folder if folder.is_dir() else None
+
+
+def cloud_folder() -> Path | None:
+    """Where synced files go: iCloud Drive (which the iPhone and iPad apps
+    will use too), else Dropbox."""
+    return icloud_folder() or dropbox_folder()
+
+
 def ask_existing(parent, there: int, here: int) -> str | None:
     """'use', 'replace' or None (cancel) when the chosen folder already has a library."""
     box = QMessageBox(parent)
@@ -69,16 +82,20 @@ def ask_existing(parent, there: int, here: int) -> str | None:
     return {use: "use", replace: "replace"}.get(box.clickedButton())
 
 
-def choose_folder(parent) -> Path | None:
-    dropbox = dropbox_folder()
-    start = dropbox / DROPBOX_SUBFOLDER if dropbox and (dropbox / DROPBOX_SUBFOLDER).is_dir() else (dropbox or Path.home())
-    folder = QFileDialog.getExistingDirectory(parent, "Folder for your paint library (e.g. in Dropbox)", str(start))
-    if not folder:
-        return None
-    folder = Path(folder)
-    if dropbox and folder.resolve() == dropbox.resolve():
-        folder = folder / DROPBOX_SUBFOLDER  # keep the Dropbox top level tidy
+def tidy_cloud_choice(folder: Path, *subfolders: str) -> Path:
+    """Choosing the top of iCloud Drive or Dropbox means the app's own
+    folder inside it, to keep the top level tidy."""
+    for top in (icloud_folder(), dropbox_folder()):
+        if top is not None and folder.resolve() == top.resolve():
+            return folder.joinpath(APP_SUBFOLDER, *subfolders)
     return folder
+
+
+def choose_folder(parent) -> Path | None:
+    cloud = cloud_folder()
+    start = cloud / APP_SUBFOLDER if cloud and (cloud / APP_SUBFOLDER).is_dir() else (cloud or Path.home())
+    folder = QFileDialog.getExistingDirectory(parent, "Folder for your paint library (e.g. in iCloud Drive)", str(start))
+    return tidy_cloud_choice(Path(folder)) if folder else None
 
 
 def move_library(library: PaintLibrary, folder: Path, parent=None) -> bool:

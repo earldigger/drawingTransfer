@@ -913,7 +913,7 @@ class MainWindow(QMainWindow):
             self.reload_library_if_changed()
 
     def reload_library_if_changed(self) -> bool:
-        """Pick up changes Dropbox synced in from another computer. Checked
+        """Pick up changes synced in from another device (iCloud Drive, Dropbox). Checked
         whenever the app comes to the front."""
         library = self.paint_library
         if not library.changed_on_disk():

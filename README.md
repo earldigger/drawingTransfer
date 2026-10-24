@@ -20,8 +20,9 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   thumbnail (`thumbnail.png` in the project) is refreshed on save, on
   close, and at most every 10 s while autosaving
 - New projects are saved straight away in the projects folder, so they
-  autosave from the start: `Dropbox/Canvas Transfer/Projects` (or
-  `Documents/Canvas Transfer Projects` without Dropbox). Change it with
+  autosave from the start: `iCloud Drive/Canvas Transfer/Projects`
+  (Dropbox if iCloud Drive is off; `Documents/Canvas Transfer Projects`
+  without either). Change it with
   File > Projects Folder… or on the start screen. Save As still saves a
   copy anywhere; a project that couldn't be saved asks before closing
 - Project creation with canvas width/height/units (in/cm)
@@ -105,7 +106,7 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   `paints.json` shared by all projects. By default it is in the app's data
   folder (on a Mac, `~/Library/Application Support/Canvas Transfer`);
   **Change Location…** (or Color > Paint Library Location…) moves it to a
-  folder such as Dropbox. If that folder already has a library you choose
+  folder such as iCloud Drive. If that folder already has a library you choose
   to use it or replace it (after a backup copy). The app reloads the file
   when it comes to the front and the file was changed elsewhere, and if it
   must save over such a change it first keeps a `paints.other-<time>.json`
@@ -276,6 +277,7 @@ recomputed for display and cached.
     and Open buttons, recent projects as cards showing the latest canvas
     photo. More work; recents and file access must be kept by the app
     (security-scoped bookmarks).
-- The paint library in Dropbox: an iOS app can't use a folder path the way
-  the desktop prototype does. It would pick the file once through the Files
-  app (Dropbox shows up there) and keep a security-scoped bookmark to it.
+- Projects and the paint library live in iCloud Drive (decided). An iOS app
+  uses its iCloud container rather than a folder path the way the desktop
+  prototype does.
+- Design decisions, screen map and wireframe plans: [docs/design](docs/design/README.md).

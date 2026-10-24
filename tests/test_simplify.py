@@ -263,26 +263,45 @@ def test_change_projects_folder(window, tmp_path, monkeypatch):
     assert str(target) in w.start_screen.folder_label.text()
 
 
-def test_dropbox_top_level_gets_subfolders(qapp, tmp_path, monkeypatch):
+@pytest.mark.parametrize("service", ["iCloud Drive", "Dropbox"])
+def test_cloud_top_level_gets_subfolders(qapp, tmp_path, monkeypatch, service):
     from PySide6.QtWidgets import QFileDialog
 
+    from canvastransfer.ui import library_location as loc
     from canvastransfer.ui import projects_folder as pf
 
-    dropbox = tmp_path / "Dropbox"
-    dropbox.mkdir()
-    monkeypatch.setattr(pf, "dropbox_folder", lambda: dropbox)
-    monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: str(dropbox)))
-    assert pf.choose_projects_folder(None) == dropbox / "Canvas Transfer" / "Projects"
+    top = tmp_path / service
+    top.mkdir()
+    monkeypatch.setattr(loc, "icloud_folder", lambda: top if service == "iCloud Drive" else None)
+    monkeypatch.setattr(loc, "dropbox_folder", lambda: top if service == "Dropbox" else None)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: str(top)))
+    assert pf.choose_projects_folder(None) == top / "Canvas Transfer" / "Projects"
+    assert loc.choose_folder(None) == top / "Canvas Transfer"
 
 
-def test_default_folder_is_in_dropbox(monkeypatch, tmp_path):
+def test_default_folder_prefers_icloud_then_dropbox(monkeypatch, tmp_path):
+    from canvastransfer.ui import library_location as loc
     from canvastransfer.ui import projects_folder as pf
 
     monkeypatch.delenv("CANVASTRANSFER_DATA_DIR")
-    monkeypatch.setattr(pf, "dropbox_folder", lambda: tmp_path / "Dropbox")
-    assert pf.default_projects_folder() == tmp_path / "Dropbox" / "Canvas Transfer" / "Projects"
-    monkeypatch.setattr(pf, "dropbox_folder", lambda: None)
+    icloud, dropbox = tmp_path / "iCloud", tmp_path / "Dropbox"
+    monkeypatch.setattr(loc, "icloud_folder", lambda: icloud)
+    monkeypatch.setattr(loc, "dropbox_folder", lambda: dropbox)
+    assert pf.default_projects_folder() == icloud / "Canvas Transfer" / "Projects"
+    monkeypatch.setattr(loc, "icloud_folder", lambda: None)
+    assert pf.default_projects_folder() == dropbox / "Canvas Transfer" / "Projects"
+    monkeypatch.setattr(loc, "dropbox_folder", lambda: None)
     assert pf.default_projects_folder().name == "Canvas Transfer Projects"
+
+
+def test_icloud_drive_location(monkeypatch, tmp_path):
+    from canvastransfer.ui import library_location as loc
+
+    monkeypatch.setattr(loc.Path, "home", staticmethod(lambda: tmp_path))
+    assert loc.icloud_folder() is None
+    drive = tmp_path / "Library" / "Mobile Documents" / "com~apple~CloudDocs"
+    drive.mkdir(parents=True)
+    assert loc.icloud_folder() == drive
 
 
 def test_safe_names():
