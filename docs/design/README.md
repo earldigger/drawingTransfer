@@ -199,12 +199,13 @@ canvas is the sketchbook page.
 | Transfer — Full screen | Canvas as wide as the phone; replaces the separate “Quick look”. |
 | Compare — Split | A / B chosen from the labels on the canvas; modes in one row. |
 | Color — Simplify | Value check for sketchbook shading; Swatches sheet holds Details and Paints & mixes. |
+| Color — Paints & mixes | Swatches sheet: every swatch in a row, Details \| Paints & mixes, Mix from, Lighten with, mixes with ΔE and amounts. |
 | Paint library | iOS list with search, Paints \| Palettes, medium chips. |
 | Edit paint | Grouped form, same fields as iPad. |
 
 Not drawn for iPhone (same content as iPad, in a sheet or list): Look's
-Levels and Hue / Saturation pages, Compare — Blink, Color — Pick and the
-Swatches sheet, Share, Settings.
+Levels and Hue / Saturation pages, Compare — Blink, Color — Pick, Share,
+Settings.
 
 Not yet designed: Mac (Workspace with docked panels, Add images, Paint
 library table).
