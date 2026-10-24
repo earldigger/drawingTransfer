@@ -179,7 +179,7 @@ table.lib tr.sel td { background: rgba(52,99,168,.25); }
 
 <header class="doc">
   <h1>Canvas Transfer — iPad screens</h1>
-  <p>Wireframes for the screens after Transfer and Camera (those two are in the Figma file). iPad landscape, 1180 × 820 pt, drawn to scale. Numbered markers refer to the notes beside each screen. Layout and behaviour, not final visuals.</p>
+  <p>Wireframes for the screens after Transfer and Camera (those two are in the Figma file, with older names — the names table in <code>docs/design/README.md</code> wins). iPad landscape, 1180 × 820 pt, drawn to scale. Numbered markers refer to the notes beside each screen. Layout and behaviour, not final visuals.</p>
   <nav class="toc" id="toc"></nav>
 </header>
 
@@ -208,7 +208,7 @@ function layerBar(layers, sel) {
     ${layers.map((c, i) => `<div class="lthumb ${i === sel ? "on" : ""}"><div style="background:${c}"></div></div>`).join("")}
     <div class="addbtn">${ic("plus")}</div></div>`;
 }
-const LAYERS = ["#F4F2EE", "#B7977E", "#A9A196"]; // drawing, canvas Oct 22, canvas Oct 15
+const LAYERS = ["#F4F2EE", "#B7977E", "#A9A196"]; // reference, canvas Oct 22, canvas Oct 15
 function canvas(x, y, w, h, inner) {
   return `<div class="canvas" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${inner}</div>`;
 }
@@ -225,13 +225,13 @@ const S = (id, title, html, notes) => screens.push({ id, title, html, notes });
 // ---------- 1 · Camera — layer added ----------
 S("camera-added", "Camera — Layer added", `
   ${topBar()}
-  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-paint") + art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply;transform:translate(14px,-10px) scale(.94);transform-origin:center"'))}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-paint") + art("art-lines", 'style="opacity:.6;transform:translate(14px,-10px) scale(.94);transform-origin:center"'))}
   <div class="abs" style="left:${TF.x + 82}px;top:${TF.y + 40}px;width:330px;height:580px;border:1.5px solid var(--accent)">
     ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 7px);top:calc(${b}% - 7px);width:14px;height:14px;background:#fff;border:2px solid var(--accent);border-radius:3px"></i>`).join("")}
   </div>
   ${toolStrip(TRANSFER_TOOLS, "transform")}
   ${layerBar(["#F4F2EE", "#E9E4DA", "#B7977E", "#A9A196"], 0)}
-  <div class="pill" style="left:50%;transform:translateX(-50%);top:64px">Drawing added — place it with Transform <b style="color:var(--accent-hi)">Undo</b></div>
+  <div class="pill" style="left:50%;transform:translateX(-50%);top:64px">Reference added — place it with Transform <b style="color:var(--accent-hi)">Undo</b></div>
   <div class="abs panel ctx">
     <div class="seg"><span class="on">Proportional</span><span>Free</span><span>Skew</span><span>Distort</span></div><div class="div"></div>
     <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="div"></div>
@@ -240,13 +240,13 @@ S("camera-added", "Camera — Layer added", `
   ${mark(1, 300, 72)}${mark(2, 1062, 118)}
 `, `
   <h3><span class="n">1</span>Straight into Transform</h3>
-  <p>After <b>Add layer</b> on the Adjust corners screen, the new drawing lands selected, at Multiply 60 %, fitted to the canvas, with Transform already on — placing it is always the next step. A toast confirms it, with Undo.</p>
+  <p>After <b>Add layer</b> on the Adjust corners screen, a new reference lands selected, at Normal 60 %, fitted inside the canvas, with Transform already on — placing it is always the next step (workflow step 4). It often ends up much smaller than the canvas, e.g. a face in one corner. A toast confirms it, with Undo.</p>
   <h3><span class="n">2</span>New layer on top</h3>
-  <p>A drawing goes on top so it stays over the canvas photos. Named by type and date (“Drawing · Oct 24”); rename in the expanded layer bar.</p>
-  <h3>Canvas progress instead</h3>
-  <p>No Transform: the corrected photo already fills the canvas exactly. It lands at Normal 100 % just under the drawing, the previous canvas photo is hidden, and the toast reads “Canvas photo added · <b>Compare with Oct 22</b>”, which opens Compare with A = new, B = previous.</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>Hide the older canvas photo automatically when a new one arrives?</li><li>Multiply 60 % as the default look for a new drawing — or what do you set first?</li></ul>
+  <p>References go on top so they stay over the canvas photos. Named by type and date (“Reference · Oct 24”); rename in the expanded layer bar.</p>
+  <h3>Canvas photo instead</h3>
+  <p>No Transform: the corrected photo already fills the canvas exactly. It lands at Normal 100 % just under the references. Older canvas photos are left exactly as they were — never hidden, opacity unchanged. The toast reads “Canvas photo added · <b>Compare with Oct 22</b>”, which opens Compare with A = new, B = previous.</p>
+  <h3>First photo of a project</h3>
+  <p>Create (New project) opens Camera with <b>Canvas</b> chosen: workflow step 1.</p>
 `);
 
 // ---------- 2 · Compare — split ----------
@@ -257,13 +257,13 @@ S("compare-split", "Compare — Split", `
     <div class="abs" style="inset:0;clip-path:inset(0 0 0 58%)">${art("art-paint")}</div>
     <div class="abs" style="left:58%;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.5)"></div>
     <div class="abs" style="left:58%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:18px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:grid;place-items:center;color:#333;font-size:16px">⇆</div>
-    <div class="abs pill" style="left:10px;top:10px;height:28px;font-size:12px;padding:0 10px">A · Drawing</div>
+    <div class="abs pill" style="left:10px;top:10px;height:28px;font-size:12px;padding:0 10px">A · Reference</div>
     <div class="abs pill" style="right:10px;top:10px;height:28px;font-size:12px;padding:0 10px">B · Canvas · Oct 22</div>`)}
   ${toolStrip(TRANSFER_TOOLS, "compare")}
   ${layerBar(LAYERS, 1)}
   <div class="abs panel ctx">
-    <div class="seg"><span>Overlay</span><span>Blink drawing</span><span>Blink A / B</span><span class="on">Split</span></div><div class="div"></div>
-    <div class="btn fill"><span style="color:var(--sub)">A</span> Drawing ${ic("down","sm")}</div>
+    <div class="seg"><span>Overlay</span><span>Blink reference</span><span>Blink A / B</span><span class="on">Split</span></div><div class="div"></div>
+    <div class="btn fill"><span style="color:var(--sub)">A</span> Reference ${ic("down","sm")}</div>
     <div class="btn fill"><span style="color:var(--sub)">B</span> Canvas · Oct 22 ${ic("down","sm")}</div>
     <div class="btn" title="Swap A and B">⇄</div><div class="div"></div>
     <div class="btn primary">${ic("camera")}New photo</div>
@@ -271,15 +271,13 @@ S("compare-split", "Compare — Split", `
   ${mark(3, 122, 772)}${mark(4, 780, 380)}${mark(5, 1036, 772)}
 `, `
   <h3><span class="n">3</span>Mode</h3>
-  <p>The four modes from the prototype, one tap each: <b>Overlay</b> (the normal stack), <b>Blink drawing</b> (only A toggles on and off, everything else stays), <b>Blink A / B</b> (alternate two layers), <b>Split</b>.</p>
+  <p>The four modes from the prototype, one tap each: <b>Overlay</b> (the normal stack), <b>Blink reference</b> (only A, usually the reference, toggles on and off; everything else stays), <b>Blink A / B</b> (alternate two layers), <b>Split</b>.</p>
   <h3><span class="n">4</span>Split line</h3>
-  <p>Drag the line (or its handle) with Pencil or finger; A on the left, B on the right, each labelled. Defaults to the middle. The canvas does not move while dragging.</p>
+  <p>A vertical line only. Drag it (or its handle) with Pencil or finger; A on the left, B on the right, each labelled. Defaults to the middle. The view does not move while dragging.</p>
   <h3>A and B</h3>
-  <p>Default: A = the drawing, B = the newest canvas photo. ⇄ swaps them.</p>
+  <p>Default: A = the reference, B = the newest canvas photo. ⇄ swaps them.</p>
   <h3><span class="n">5</span>New photo</h3>
-  <p>One tap to Camera with <i>Canvas progress</i> already chosen; the result comes back as the new B.</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>A vertical line only, or also horizontal (top / bottom) for wide canvases?</li></ul>
+  <p>One tap to Camera with <i>Canvas</i> already chosen; the result comes back as the new B.</p>
 `);
 
 // ---------- 3 · Compare — blink ----------
@@ -289,7 +287,7 @@ S("compare-blink", "Compare — Blink A / B", `
   ${toolStrip(TRANSFER_TOOLS, "compare")}
   ${layerBar(LAYERS, 2)}
   <div class="abs panel ctx">
-    <div class="seg"><span>Overlay</span><span>Blink drawing</span><span class="on">Blink A / B</span><span>Split</span></div><div class="div"></div>
+    <div class="seg"><span>Overlay</span><span>Blink reference</span><span class="on">Blink A / B</span><span>Split</span></div><div class="div"></div>
     <div class="btn fill"><span style="color:var(--sub)">A</span> Oct 22 ${ic("down","sm")}</div>
     <div class="btn fill"><span style="color:var(--sub)">B</span> Oct 15 ${ic("down","sm")}</div><div class="div"></div>
     <div class="btn">${ic("pause")}</div>
@@ -305,9 +303,9 @@ S("compare-blink", "Compare — Blink A / B", `
   <h3><span class="n">7</span>Speed</h3>
   <p>0.1 – 5 s, default 0.6 s (the prototype's range).</p>
   <h3>Comparing two canvas photos</h3>
-  <p>Here A and B are both canvas photos — how the painting changed in a week. Works the same with the drawing as A.</p>
+  <p>Here A and B are both canvas photos — how the painting changed in a week. Works the same with the reference as A.</p>
   <h3>Full screen</h3>
-  <p>Compare keeps running in full screen, so you can blink the drawing over the painting at the easel with no UI showing. This answers the earlier “what does a tap do in full screen” question: <b>tap = pause / resume the blink</b>, only while Compare is on.</p>
+  <p>Compare keeps running in full screen, so you can blink the reference over the painting at the easel with no UI showing. This answers the earlier “what does a tap do in full screen” question: <b>tap = pause / resume the blink</b>, only while Compare is on.</p>
 `);
 
 // ---------- 4 · Color — Pick, Highlight, Details ----------
@@ -336,7 +334,7 @@ S("color-pick", "Color — Pick, Highlight, Swatch details", `
   ${toolStrip(COLOR_TOOLS, "pick")}
   ${layerBar(LAYERS, 1)}
   <div class="abs panel col" style="left:790px;top:64px;width:302px;padding:14px;gap:12px">
-    <div class="seg fill small"><span class="on">Details</span><span>Paints &amp; mixes</span></div>
+    <div class="vrow"><div class="seg fill small" style="flex:1"><span class="on">Details</span><span>Paints &amp; mixes</span></div><div class="iconbtn" style="width:32px;height:32px">${ic("chev")}</div></div>
     <div class="vrow" style="gap:12px"><div style="width:64px;height:64px;border-radius:10px;background:#D9A58A"></div>
       <div class="col" style="flex:1"><b style="font-size:17px">#D9A58A</b><span style="color:var(--sub)">RGB 217 165 138</span><span style="color:var(--sub)">Swatch 2 · Face, light</span></div>
       <div class="btn fill" style="height:32px;padding:0 10px;font-size:12px">Copy</div></div>
@@ -359,14 +357,12 @@ S("color-pick", "Color — Pick, Highlight, Swatch details", `
   <h3><span class="n">9</span>Pick</h3>
   <p>Touch the selected layer with Pencil or finger: a loupe shows the color under the point (left half) against the area average (right half) and the sample square. Lift to add a numbered swatch there. Tapping a marker selects its swatch. Sample size (point → large) lives in a small context bar while Pick is on — not drawn here.</p>
   <h3><span class="n">10</span>Details | Paints &amp; mixes</h3>
-  <p>One floating panel, two tabs, always shown in Color. Because it is always there, the Color workspace fits the canvas to its left — no jumping when it opens.</p>
+  <p>One floating panel, two tabs. › collapses it to a thin bar on the right (like the layer bar); the canvas stays where it is, so nothing jumps. The Color workspace fits the canvas to the left of the open panel.</p>
   <p>Details: hex (Copy), RGB, L*a*b*, Munsell, value on a 10-step scale, warm / cool, and pigment-mixed tints, shades, tones and complement strips.</p>
   <h3><span class="n">11</span>Swatch bar</h3>
-  <p>Swatches as large chips along the bottom. Tap = select; the magenta dot means its highlight is on (long-press or Highlight tool to toggle). Highlight range (ΔE) sits beside them because it only matters when a highlight is on.</p>
+  <p>All the project's swatches, from every layer, as large chips along the bottom. Tap = select (and its layer); the magenta dot means its highlight is on (long-press or Highlight tool to toggle). Highlight range (ΔE) sits beside them because it only matters when a highlight is on.</p>
   <h3><span class="n">12</span>Highlight</h3>
   <p>Areas similar to a swatch are tinted with that swatch's highlight color — here everywhere the face light is within ΔE 12.</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>Is the 302 pt panel worth its space, or should it collapse like the layer bar?</li><li>Swatches belong to a layer in the prototype. Show only the selected layer's swatches, or all?</li></ul>
 `);
 
 // ---------- 5 · Color — Simplify, Paints & mixes ----------
@@ -380,7 +376,7 @@ S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
   ${toolStrip(COLOR_TOOLS, "simplify")}
   ${layerBar(LAYERS, 1)}
   <div class="abs panel col" style="left:790px;top:64px;width:302px;padding:14px;gap:10px">
-    <div class="seg fill small"><span>Details</span><span class="on">Paints &amp; mixes</span></div>
+    <div class="vrow"><div class="seg fill small" style="flex:1"><span>Details</span><span class="on">Paints &amp; mixes</span></div><div class="iconbtn" style="width:32px;height:32px">${ic("chev")}</div></div>
     <div class="vrow"><div style="width:48px;height:32px;border-radius:6px;background:#B97E66"></div><div class="col"><b>Swatch 3 · Face, shadow</b><span style="color:var(--sub)">#B97E66 · 5YR 6/6</span></div></div>
     <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Mix from</span><span class="field" style="padding:6px 10px">Zorn palette (oil) ${"▾"}</span></div>
     <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Lighten with</span><span class="field" style="padding:6px 10px">Titanium white ${"▾"}</span></div>
@@ -390,7 +386,7 @@ S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
     ${mixRow("#B97E66", "#B97F67", "Yellow ochre + Vermilion + white", "0.7", "3 : 1 : 1.5")}
     ${mixRow("#B97E66", "#BA7D68", "Vermilion + Ivory black + white", "1.2", "2 : 0.3 : 2")}
     ${mixRow("#B97E66", "#B6806A", "Yellow ochre + Ivory black + white", "2.9", "4 : 0.5 : 1")}
-    <div style="color:var(--sub);font-size:11px;line-height:1.35">Left: swatch. Right: predicted mix (Mixbox). Trust the paints named more than the amounts.</div>
+    <div style="color:var(--sub);font-size:11px;line-height:1.35">Left: swatch. Right: predicted mix (Mixbox). Amounts are a guide: strong paints need less, earths more.</div>
     <div class="btn fill" style="margin-top:2px">${ic("book")}Paint library</div>
   </div>
   <div class="abs panel ctx" style="left:${80 + (CF.w + 186) / 2}px">
@@ -405,11 +401,9 @@ S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
   <h3><span class="n">13</span>Simplify</h3>
   <p>Shows the selected layer as a few flat colors or values, to see the big shapes. <b>Colors</b> · <b>Values</b> (fitted to this image) · <b>Value scale</b> (equal steps, L* 10 – 90, the same for every image). Steps 2 – 24, Smooth 0 – 6. The strip under the canvas shows each value as wide as the area it covers. <i>Add as swatches</i> makes one swatch per flat color.</p>
   <h3><span class="n">14</span>Paints &amp; mixes</h3>
-  <p>For the selected swatch: the closest single paints and two-paint mixes from the chosen <i>Mix from</i> group — all your oils, one of your palettes, or a classic palette (Zorn here) — lightened with a white or water. ΔE under 2 is shown in blue: hard to tell apart.</p>
+  <p>For the selected swatch: the closest single paints and two-paint mixes from the chosen <i>Mix from</i> group — all your oils, one of your palettes, or a classic palette (Zorn here) — lightened with a white or water. ΔE under 2 is shown in blue: hard to tell apart. Amounts (3 : 1 : 1.5) are shown as a guide — the model treats every paint as equally strong, so strong paints like phthalos need less than it says.</p>
   <h3><span class="n">15</span>Paint library</h3>
   <p>Opens the full-screen library sheet.</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>Ratios (3 : 1 : 1.5) are shown because they help, but the prototype warns Mixbox treats every paint as equally strong. Show them, or names only?</li></ul>
 `);
 
 // ---------- 6 · Paint library ----------
@@ -448,6 +442,7 @@ S("paint-library", "Paint library", `
         <div style="height:90px;border-radius:10px;background:#B5432F"></div>
         <b style="font-size:16px">Vermilion (hue)</b><span style="color:var(--sub)">Michael Harding · Series 2</span>
         <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Pigments</span><span>PR255, PY65</span></div>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Hex</span><span>#B5432F</span></div>
         <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">L*a*b*</span><span>48.2  52.0  38.1</span></div>
         <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Opacity</span><span>Opaque</span></div>
         <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Drying</span><span>Medium</span></div>
@@ -464,11 +459,60 @@ S("paint-library", "Paint library", `
   <h3><span class="n">17</span>Adding paints</h3>
   <p><b>Import saved page</b>: pick an artistpigments.org page saved to Files; the paint and its measured color come in, and your edits are kept on re-import (prototype behaviour). <b>Add paint</b>: by hand (name, brand, pigments, L*a*b* or hex).</p>
   <h3><span class="n">18</span>Detail</h3>
-  <p>Selected paint with its color, data and source link; Edit, Revert to site data.</p>
+  <p>Selected paint with its color (hex and L*a*b*), data and source link. <b>Edit</b> opens Edit paint (next screen); Revert to site data undoes your changes to imported fields.</p>
   <h3>Palettes tab (not drawn)</h3>
   <p>Your palettes and classic ones (Zorn, etc.), with roles filled from your paints and gaps marked. New palette, Duplicate as my palette.</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>Most of this is desk work. Keep it full-featured on iPad, or make the Mac the place to edit and the iPad mostly read-only?</li></ul>
+  <h3>Every device</h3>
+  <p>Full-featured on iPad, iPhone and Mac (one shared library in iCloud Drive).</p>
+`);
+
+// ---------- 6b · Edit paint ----------
+const formRow = (label, control, note = "") => `<div class="vrow" style="min-height:48px;border-bottom:1px solid #2A2A2D;gap:12px">
+  <span style="width:110px;color:var(--sub);flex:none">${label}</span><div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${control}</div>${note}</div>`;
+const edited = `<span title="Changed by you" style="color:#E8C35A;font-size:11px;white-space:nowrap">● edited</span>`;
+S("edit-paint", "Edit paint", `
+  ${topBar("Color")}
+  <div class="dim"></div>
+  <div class="sheet" style="left:40px;top:40px;right:40px;bottom:0;border-radius:16px 16px 0 0;z-index:25;opacity:.35"></div>
+  <div class="sheet" style="left:190px;top:56px;width:800px;bottom:0;border-radius:16px 16px 0 0">
+    <div class="hd"><span class="btn quiet" style="padding:0;height:auto">Cancel</span><span class="sp" style="text-align:center">Edit paint</span><span class="btn primary" style="height:36px">Save</span></div>
+    <div style="display:flex;gap:24px;padding:16px 24px">
+      <div class="col" style="flex:1;min-width:0">
+        ${formRow("Medium", `<div class="seg small"><span class="on">Oil</span><span>Watercolor</span><span>Acrylic</span><span>Gouache</span><span>Other…</span></div>`)}
+        ${formRow("Name", `<div class="field" style="flex:1">Vermilion (hue)</div>`)}
+        ${formRow("Brand", `<div class="field" style="flex:1">Michael Harding</div><div class="field" style="width:96px;color:var(--sub);white-space:nowrap">Series 2</div>`)}
+        ${formRow("Pigments", `<span class="btn fill" style="height:32px;padding:0 10px">PR255 ✕</span><span class="btn fill" style="height:32px;padding:0 10px">PY65 ✕</span><span class="btn" style="height:32px;padding:0 6px;color:var(--accent-hi)">＋ Add</span>`)}
+        ${formRow("Opacity", `<div class="seg small"><span>Transparent</span><span>Semi-transp.</span><span>Semi-opaque</span><span class="on">Opaque</span></div>`)}
+        ${formRow("Lightfastness", `<div class="field" style="padding:7px 12px">ASTM I ▾</div>`)}
+        ${formRow("Drying", `<div class="field" style="flex:1">medium, 3–4 days</div>`, edited)}
+        ${formRow("Source", `<div class="field" style="flex:1;color:var(--accent-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">artistpigments.org/…/michael-harding-vermilion</div>`)}
+        ${formRow("", `<span style="color:var(--sub);font-size:12px">Measured on a color chart · imported Oct 3 · 1 field edited by you</span><span style="flex:1"></span><span class="btn quiet" style="height:30px;padding:0">Revert to site</span>`)}
+      </div>
+      <div class="col" style="width:250px;gap:12px">
+        <div style="height:140px;border-radius:12px;background:#B5432F"></div>
+        <div class="col" style="gap:6px"><span class="lbl">Hex</span><div class="field">#B5432F</div></div>
+        <div class="col" style="gap:6px"><span class="lbl">L*a*b* (D50)</span><div class="vrow"><div class="field" style="flex:1">48.2</div><div class="field" style="flex:1">52.0</div><div class="field" style="flex:1">38.1</div></div></div>
+        <div style="color:var(--sub);font-size:12px;line-height:1.35">Type either one; the other follows. L*a*b* from artistpigments.org is the measured color and more exact than hex. Or paste the site's color text.</div>
+        <div class="vrow" style="height:44px;border-top:1px solid #2A2A2D"><span style="flex:1">Favorite</span><div class="switch on"></div></div>
+        <div class="vrow" style="height:44px;border-top:1px solid #2A2A2D"><span style="flex:1">Use in mixes</span><div class="switch on"></div></div>
+        <div class="vrow" style="height:44px;border-top:1px solid #2A2A2D"><span style="flex:1">Stand-in</span><span style="color:var(--sub)">Automatic ▾</span></div>
+        <div class="btn" style="color:#FF6B6B;justify-content:flex-start;padding:0">Delete paint</div>
+      </div>
+    </div>
+  </div>
+  ${mark(24, 160, 140)}${mark(25, 1000, 260)}${mark(26, 160, 548)}
+`, `
+  <h3><span class="n">24</span>Medium</h3>
+  <p>Oil, Watercolor, Acrylic, Gouache, or Other… (your own group). Changing it moves the paint to that list in the library; its mixes then use that medium's whites and water.</p>
+  <h3>Fields</h3>
+  <p>Name, brand, series, pigments (as chips: PR255, PY65 — typed or picked from a list), opacity, lightfastness (ASTM I–III, or the maker's stars), drying (your own words: “fast”, “3–4 days”), source link.</p>
+  <h3><span class="n">25</span>Color</h3>
+  <p>Hex or L*a*b* — type either and the other is calculated; or paste the color text from the paint's artistpigments.org page. The swatch above updates as you type.</p>
+  <p>Favorite (filter in the library and mixes), Use in mixes (off = kept in the library but never suggested), Stand-in (the paint whose color is used for mixing when this one's is unknown or outside what a screen can show).</p>
+  <h3><span class="n">26</span>Your edits are kept</h3>
+  <p>For an imported paint, fields you change are marked ● edited and survive a re-import; Revert to site puts back the site's values. A paint added by hand has no source line.</p>
+  <h3>Add paint</h3>
+  <p>The same sheet, empty, titled “New paint”.</p>
 `);
 
 // ---------- 7 · Gallery ----------
@@ -489,20 +533,22 @@ S("gallery", "Gallery", `
     <div class="btn fill">${ic("folder")}Open from Files</div>
     <div class="btn primary">${ic("plus")}New project</div>
   </div>
-  <div class="abs" style="left:32px;right:32px;top:104px;display:grid;grid-template-columns:repeat(4,1fr);gap:28px 24px">
-    ${projects.map((p, i) => `<div class="col" style="gap:8px">
-      <div style="height:200px;border-radius:12px;background:#2A2A2D;display:grid;place-items:center;${i === 0 ? "outline:3px solid var(--accent);outline-offset:3px" : ""}">
+  ${[["October", projects.slice(0, 3), 96], ["September", projects.slice(3, 5), 386], ["August", projects.slice(5), 676]].map(([g, list, top]) => `
+  <div class="abs" style="left:32px;top:${top}px;font-size:17px;font-weight:600">${g}</div>
+  <div class="abs" style="left:32px;right:32px;top:${top + 34}px;display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    ${list.map(p => `<div class="col" style="gap:8px">
+      <div style="height:200px;border-radius:12px;background:#2A2A2D;display:grid;place-items:center;${p[0] === "Portrait of Ana" ? "outline:3px solid var(--accent);outline-offset:3px" : ""}">
         <div style="height:${p[4] >= 1 ? 200 / p[4] * 0.85 : 176}px;width:${p[4] >= 1 ? 220 : 176 * p[4]}px;max-width:236px;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.4)">${art(p[3], 'style="position:absolute;inset:0;width:100%;height:100%"')}</div></div>
       <div><b style="font-size:15px">${p[0]}</b><div style="color:var(--sub)">${p[1]} · ${p[2]}</div></div></div>`).join("")}
-  </div>
-  ${mark(19, 608, 40)}${mark(20, 20, 210)}
+  </div>`).join("")}
+  ${mark(19, 608, 40)}${mark(20, 4, 96)}
 `, `
   <h3><span class="n">19</span>Start screen</h3>
   <p>Recent projects, newest first, as thumbnails of the composited canvas at its real proportions. <b>New project</b> (blue), <b>Open from Files</b> (a .ctproj from anywhere), Settings. Where projects live is shown, not chosen, here.</p>
-  <h3><span class="n">20</span>Cards</h3>
+  <h3><span class="n">20</span>Grouped by time</h3>
+  <p>Projects grouped by the month they were last edited, newest first. Scroll for older ones.</p>
+  <h3>Cards</h3>
   <p>Tap opens the project. Long-press: Rename, Duplicate, Share project, Delete. Same screen on iPhone (2 columns) and Mac (window).</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>Group by year or folder once there are dozens, or is a plain list with search enough?</li></ul>
 `);
 
 // ---------- 8 · New project ----------
@@ -527,9 +573,7 @@ S("new-project", "New project", `
   ${mark(21, 260, 200)}
 `, `
   <h3><span class="n">21</span>Three choices</h3>
-  <p>Name, size and orientation; everything else is set later. Common stretched-canvas sizes as one-tap chips, plus Custom (two number boxes). in | cm. A to-scale preview shows the shape. <b>Create</b> saves immediately and opens the workspace with Camera ready for the first drawing photo.</p>
-  <h3 class="q">Open questions</h3>
-  <ul><li>Which sizes do you actually use? The list could be trimmed to yours, with the rest under Custom.</li></ul>
+  <p>Name, size and orientation; everything else is set later. Common stretched-canvas sizes as one-tap chips, plus Custom (two number boxes). in | cm. A to-scale preview shows the shape. <b>Create</b> saves immediately and opens Camera with <b>Canvas</b> chosen, for workflow step 1.</p>
 `);
 
 // ---------- 9 · Share ----------
@@ -567,8 +611,8 @@ S("settings", "Settings", `
       <div class="lbl" style="padding:16px 16px 4px">Defaults</div>
       <div class="list">
         <div>Units<span class="sp"></span><div class="seg small"><span class="on">in</span><span>cm</span></div></div>
-        <div>New drawing layer<span class="sp"></span><span class="v">Multiply · 60 %</span>${ic("chev","sm")}</div>
-        <div>Auto levels on photos<span class="sp"></span><span class="v" style="margin-right:8px">Drawings only</span>${ic("chev","sm")}</div>
+        <div>New reference layer<span class="sp"></span><span class="v">Normal · 60 %</span>${ic("chev","sm")}</div>
+        <div>Auto levels on photos<span class="sp"></span><span class="v" style="margin-right:8px">References only</span>${ic("chev","sm")}</div>
         <div>Grid<span class="sp"></span><span class="v">4 × 5 · white · thin</span>${ic("chev","sm")}</div>
         <div>Blink speed<span class="sp"></span><span class="v">0.6 s</span>${ic("chev","sm")}</div>
       </div>
@@ -579,7 +623,7 @@ S("settings", "Settings", `
   ${mark(23, 210, 120)}
 `, `
   <h3><span class="n">23</span>Settings</h3>
-  <p>Where things are stored (iCloud Drive by default, decision A), and the defaults that came up while designing: units, the look of a new drawing layer, auto levels, grid, blink speed. A gestures cheat sheet, since several actions have no button.</p>
+  <p>Where things are stored (iCloud Drive by default, decision A), and the defaults that came up while designing: units, the look of a new reference layer, auto levels, grid, blink speed. A gestures cheat sheet, since several actions have no button.</p>
 `);
 
 // ---------- render ----------
