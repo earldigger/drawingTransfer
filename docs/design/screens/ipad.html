@@ -380,10 +380,15 @@ S("color-pick", "Color — Pick, Highlight, Swatch details", `
 `);
 
 // ---------- 5 · Color — Simplify, Paints & mixes ----------
-const mixRow = (a, b, name, de, small = "") => `<div class="vrow" style="min-height:48px;padding:4px 0;border-bottom:1px solid #2A2A2D">
-  <div style="display:flex;width:44px;height:28px;border-radius:6px;overflow:hidden;flex:none"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
-  <div class="col" style="flex:1;min-width:0;line-height:1.25"><span style="font-size:12px">${name}</span>${small ? `<span style="color:var(--sub);font-size:11px">${small}</span>` : ""}</div>
-  <span style="color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de}</span></div>`;
+const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
+// a mix: chip = your swatch | the predicted mix (split by a dark line), then one line per paint led by its amount, then ΔE
+const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
+  <div class="col" style="gap:3px;flex:none"><div style="display:flex;gap:2px;width:64px;height:64px;border-radius:10px;overflow:hidden;background:#111"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
+    <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
+  <div class="col" style="flex:1;min-width:0;gap:3px">
+    ${paints.map(([amt, n]) => `<div class="vrow" style="gap:8px;font-size:14px;line-height:1.25"><b style="width:28px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}</div>`).join("")}
+    <b style="margin-top:3px;font-size:13px;font-weight:600;color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de}</b>
+  </div></div>`;
 S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
   ${topBar("Color")}
   ${canvas(CF.x, CF.y, CF.w, CF.h, art("art-values"))}
@@ -395,12 +400,11 @@ S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
     <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Mix from</span><span class="field" style="padding:6px 10px">Zorn palette (oil) ${"▾"}</span></div>
     <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Lighten with</span><span class="field" style="padding:6px 10px">Titanium white ${"▾"}</span></div>
     <div class="lbl" style="margin-top:4px">One paint</div>
-    ${mixRow("#B97E66", "#B47C62", "Yellow ochre + white", "4.8", "1 : 0.6")}
+    ${mixRow("#B97E66", "#B27959", [["1", "Yellow ochre"], ["0.6", "Titanium white"]], "4.8")}
     <div class="lbl" style="margin-top:4px">Two-paint mixes</div>
-    ${mixRow("#B97E66", "#B97F67", "Yellow ochre + Vermilion + white", "0.7", "3 : 1 : 1.5")}
-    ${mixRow("#B97E66", "#BA7D68", "Vermilion + Ivory black + white", "1.2", "2 : 0.3 : 2")}
-    ${mixRow("#B97E66", "#B6806A", "Yellow ochre + Ivory black + white", "2.9", "4 : 0.5 : 1")}
-    <div style="color:var(--sub);font-size:11px;line-height:1.35">Left: swatch. Right: predicted mix (Mixbox). Amounts are a guide: strong paints need less, earths more.</div>
+    ${mixRow("#B97E66", "#BA7F66", [["3", "Yellow ochre"], ["1", "Vermilion"], ["1.5", "Titanium white"]], "0.7")}
+    ${mixRow("#B97E66", "#B77B65", [["2", "Vermilion"], ["0.3", "Ivory black"], ["2", "Titanium white"]], "1.2")}
+    <div style="color:var(--sub);font-size:11px;line-height:1.35">Amounts are a guide: strong paints need less, earths more. Scroll for more mixes.</div>
     <div class="btn fill" style="margin-top:2px">${ic("book")}Paint library</div>
   </div>
   <div class="abs panel ctx" style="left:${80 + (CF.w + 186) / 2}px">
@@ -415,7 +419,7 @@ S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
   <h3><span class="n">13</span>Simplify</h3>
   <p>Shows the selected layer as a few flat colors or values, to see the big shapes. <b>Colors</b> · <b>Values</b> (fitted to this image) · <b>Value scale</b> (equal steps, L* 10 – 90, the same for every image). Steps 2 – 24, Smooth 0 – 6. The strip under the canvas shows each value as wide as the area it covers. <i>Add as swatches</i> makes one swatch per flat color.</p>
   <h3><span class="n">14</span>Paints &amp; mixes</h3>
-  <p>For the selected swatch: the closest single paints and two-paint mixes from the chosen <i>Mix from</i> group — all your oils, one of your palettes, or a classic palette (Zorn here) — lightened with a white or water. ΔE under 2 is shown in blue: hard to tell apart. Amounts (3 : 1 : 1.5) are shown as a guide — the model treats every paint as equally strong, so strong paints like phthalos need less than it says.</p>
+  <p>For the selected swatch: the closest single paints and two-paint mixes from the chosen <i>Mix from</i> group — all your oils, one of your palettes, or a classic palette (Zorn here) — lightened with a white or water. Each mix: a 64 pt chip (your swatch | the predicted mix, split by a dark line so both halves show even when the match is close), one line per paint led by its amount, then ΔE — under 2 is shown in blue: hard to tell apart. Amounts (3 : 1 : 1.5) are shown as a guide — the model treats every paint as equally strong, so strong paints like phthalos need less than it says.</p>
   <h3><span class="n">15</span>Paint library</h3>
   <p>Opens the full-screen library sheet.</p>
 `);

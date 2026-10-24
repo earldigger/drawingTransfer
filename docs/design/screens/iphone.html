@@ -423,12 +423,13 @@ S("color-simplify", "Color — Simplify", `
 // ---------- Color — Swatches sheet, Paints & mixes ----------
 const SW = [["#4A3426", 1], ["#D9A58A", 2], ["#B97E66", 3], ["#3F5A6E", 4], ["#9AA3AB", 5]];
 const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
-// a mix: big swatch | predicted mix chip, the paints stacked one per line, then amounts and ΔE
-const mixRow = (a, b, names, ratio, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
-  <div style="display:flex;width:76px;height:76px;border-radius:10px;overflow:hidden;flex:none"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
+// a mix: chip = your swatch | the predicted mix (split by a dark line), then one line per paint led by its amount, then ΔE
+const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
+  <div class="col" style="gap:3px;flex:none"><div style="display:flex;gap:2px;width:76px;height:76px;border-radius:10px;overflow:hidden;background:#111"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
+    <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
   <div class="col" style="flex:1;min-width:0;gap:3px">
-    ${names.map(n => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}</div>`).join("")}
-    <div class="vrow" style="gap:14px;margin-top:3px;font-size:15px"><span style="color:var(--sub)">${ratio}</span><b style="color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"};font-weight:600">ΔE ${de}</b></div>
+    ${paints.map(([amt, n]) => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><b style="width:30px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}</div>`).join("")}
+    <b style="margin-top:3px;font-size:15px;font-weight:600;color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de}</b>
   </div></div>`;
 S("color-mixes", "Color — Paints & mixes", `
   ${chrome()}${nav("Color")}
@@ -445,13 +446,13 @@ S("color-mixes", "Color — Paints & mixes", `
       <div class="vrow" style="height:40px;border-bottom:1px solid #2A2A2D"><span style="flex:1;color:var(--sub)">Lighten with</span><span>Titanium white ›</span></div>
     </div>
     <div class="lbl" style="margin-top:12px">One paint</div>
-    ${mixRow("#B97E66", "#B47C62", ["Yellow ochre", "Titanium white"], "1 : 0.6", "4.8")}
+    ${mixRow("#B97E66", "#B27959", [["1", "Yellow ochre"], ["0.6", "Titanium white"]], "4.8")}
     <div class="lbl" style="margin-top:12px">Two-paint mixes</div>
-    ${mixRow("#B97E66", "#B97F67", ["Yellow ochre", "Vermilion", "Titanium white"], "3 : 1 : 1.5", "0.7")}
-    ${mixRow("#B97E66", "#BA7D68", ["Vermilion", "Ivory black", "Titanium white"], "2 : 0.3 : 2", "1.2")}
+    ${mixRow("#B97E66", "#BA7F66", [["3", "Yellow ochre"], ["1", "Vermilion"], ["1.5", "Titanium white"]], "0.7")}
+    ${mixRow("#B97E66", "#B77B65", [["2", "Vermilion"], ["0.3", "Ivory black"], ["2", "Titanium white"]], "1.2")}
     <div class="vrow" style="height:44px;justify-content:center;color:var(--accent-hi);gap:6px">${ic("book", "sm blue")}Paint library</div>
   </div>
-  ${mark(27, 280, 160)}${mark(28, 352, 278)}${mark(29, 96, 326)}${mark(30, 262, 438)}
+  ${mark(27, 280, 160)}${mark(28, 352, 278)}${mark(29, 96, 326)}${mark(30, 352, 438)}
 `, `
   <h3><span class="n">27</span>Swatches sheet</h3>
   <p><b>Swatches</b> in the Color toolbar opens this sheet. The top row is every swatch in the project; tap one to select it (its marker on the canvas is ringed when the sheet is dragged down). New swatches come from Pick.</p>
@@ -460,7 +461,7 @@ S("color-mixes", "Color — Paints & mixes", `
   <h3><span class="n">29</span>Mix from · Lighten with</h3>
   <p>All your paints in a medium, one of your palettes, or a classic palette (Zorn here); a white or water as the lightener.</p>
   <h3><span class="n">30</span>Mixes</h3>
-  <p>Sized to read at arm’s length: a 76 pt chip (your swatch | the predicted mix), each paint on its own line with its color dot, then the amounts in the same order and ΔE (blue under 2: hard to tell apart). Amounts are a guide. The sheet opens tall for this tab; scroll for more mixes and the Paint library link, or drag it down to see the canvas.</p>
+  <p>Sized to read at arm’s length: a 76 pt chip (your swatch | the predicted mix), each paint on its own line led by its amount, then ΔE (blue under 2: hard to tell apart). The chip is split by a dark line so you can see the two halves even when the match is close. Amounts are a guide. The sheet opens tall for this tab; scroll for more mixes and the Paint library link, or drag it down to see the canvas.</p>
 `);
 
 // ---------- Paint library ----------
