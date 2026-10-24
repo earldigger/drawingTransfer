@@ -182,7 +182,7 @@ section.screen > h2 { margin: 0 0 10px; font-size: 17px; }
   </defs>
 </svg>
 <header class="doc">
-  <p class="switch-dev" style="margin:0 0 6px;font-size:14px"><a href="ipad.html" style="color:inherit">iPad</a> · <b>iPhone</b></p>
+  <p class="switch-dev" style="margin:0 0 6px;font-size:14px"><a href="ipad.html" style="color:inherit">iPad</a> · <b>iPhone</b> · <a href="mac.html" style="color:inherit">Mac</a></p>
   <h1>Canvas Transfer — iPhone screens</h1>
   <p>The same projects and workflow as the iPad (see <code>ipad.html</code>), on a phone held upright: 393 × 852 pt, drawn to scale. Taking photos for a project and sketchbook transfer at a cafe come first; the color tools are there but rarely used. Numbered markers refer to the notes under each screen.</p>
   <nav class="toc" id="toc"></nav>
@@ -425,7 +425,7 @@ const SW = [["#4A3426", 1], ["#D9A58A", 2], ["#B97E66", 3], ["#3F5A6E", 4], ["#9
 const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
 // a mix: chip = your swatch | the predicted mix, touching so the shift shows; one line per paint led by its share; ΔE and how close
 const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
-  <div class="col" style="gap:3px;flex:none"><div style="display:flex;width:76px;height:76px;border-radius:10px;overflow:hidden"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
+  <div class="col" style="gap:3px;flex:none"><div style="width:76px;height:76px;border-radius:10px;background:linear-gradient(90deg, ${a} 50%, ${b} 50%)"></div>
     <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
   <div class="col" style="flex:1;min-width:0;gap:3px">
     ${paints.map(([amt, n, warn]) => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><b style="width:44px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}${warn ? `<span style="color:#F2C14E" title="Color uncertain">⚠</span>` : ""}</div>`).join("")}

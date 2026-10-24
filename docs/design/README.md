@@ -4,8 +4,8 @@ Design work for the iPhone / iPad / Mac app. The desktop Python prototype
 in this repo is the working spec of what the app does; this folder records
 how it should look and be organised.
 
-**All iPad screens are in [`screens/ipad.html`](screens/ipad.html)**, in
-workflow order, each with numbered notes — open it in any browser. The
+**All screens are in [`screens/`](screens/)** — [`ipad.html`](screens/ipad.html), [`iphone.html`](screens/iphone.html), [`mac.html`](screens/mac.html) — in
+workflow order, each with numbered notes; open them in any browser. The
 earlier Figma file ([Canvas Transfer – iPad design](https://www.figma.com/design/AKfGx0W7u726iwbbJ7EGSL))
 is no longer needed: its screens were rebuilt in the HTML with the current
 names and decisions.
@@ -207,5 +207,18 @@ Not drawn for iPhone (same content as iPad, in a sheet or list): Look's
 Levels and Hue / Saturation pages, Compare — Blink, Color — Pick, Share,
 Settings.
 
-Not yet designed: Mac (Workspace with docked panels, Add images, Paint
-library table).
+## Mac screens
+
+[`screens/mac.html`](screens/mac.html): the same projects in a Mac window
+(1280 × 800 plus the menu bar). Panels are docked, every action is in a menu,
+the common ones have keys.
+
+| Screen | Key points |
+|---|---|
+| Gallery | Window with search, Open… ⌘O, New Project ⌘N; grouped by month; projects open in their own windows. |
+| Transfer workspace | Docked tool column (key on each tool: T, P, G, C) with **Add** instead of Camera; docked inspector with Layers on top and the selected layer's Look always open below; context bar with ↩ Done / esc Cancel. |
+| Menus & keys | File, Edit, Layer, View, Window. Number keys set opacity (1 = 10 % … 0 = 100 %); ⌥⇧N / M / S / J blend modes; ⇥ hides panels; F full screen. |
+| Add images | Drag from Safari, Finder or Photos: drop on **Reference** (Multiply 60 %, Transform, no corner step) or **Canvas photo** (Adjust corners). ⌘V pastes a reference; Take Photo with iPhone (Continuity Camera). |
+| Color workspace | Swatches docked in the inspector, Details \| Paints & mixes as on the other devices; Pick shows the color under the pointer live. |
+| Paint library | Own window ⇧⌘L: sidebar (media, your palettes, classic palettes), sortable table, inspector that is the editor (no separate Edit sheet). |
+| Settings | ⌘, — General, Storage, Defaults (shown), Keys. |

@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas Transfer Mac Screens</title>
+<style>
+
+:root {
+  --page: #ECEBE8; --page-text: #1C1C1E; --note-bg: #F7F6F4; --note-text: #333; --note-sub: #666;
+  --surround: #3A3A3C; --panel: rgba(34,34,36,.95); --panel-solid: #222224; --stroke: #38383B;
+  --ctl: #2E2E31; --seg: #4A4A4E; --text: #EDEDED; --sub: #9A9A9E; --accent: #3463A8; --accent-hi: #7FA8EC;
+  --mark: #96643C; --s: 1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --page: #161617; --page-text: #EDEDED; --note-bg: #232325; --note-text: #CFCFD2; --note-sub: #9A9A9E; }
+}
+:root[data-theme="dark"] { --page: #161617; --page-text: #EDEDED; --note-bg: #232325; --note-text: #CFCFD2; --note-sub: #9A9A9E; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif; }
+header.doc { padding: 32px 16px 8px; max-width: 1700px; margin: 0 auto; }
+header.doc h1 { margin: 0 0 4px; font-size: 28px; }
+header.doc p { margin: 0 0 12px; color: var(--note-sub); max-width: 760px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+nav.toc a { color: inherit; }
+section.screen { max-width: 1700px; margin: 0 auto; padding: 28px 16px; }
+section.screen > h2 { margin: 0 0 12px; font-size: 20px; }
+.row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.stage { width: calc(1180px * var(--s)); height: calc(820px * var(--s)); flex: none; }
+.notes { flex: 1 1 360px; max-width: 460px; background: var(--note-bg); border-radius: 12px; padding: 20px 22px; color: var(--note-text); font-size: 14px; }
+.notes h3 { margin: 14px 0 2px; font-size: 14px; color: var(--page-text); }
+.notes h3:first-child { margin-top: 0; }
+.notes h3.q { color: #B07A4C; }
+.notes p, .notes ul { margin: 0 0 6px; }
+.notes ul { padding-left: 18px; }
+.n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 10px; background: var(--mark); color: #fff; font-size: 11px; font-weight: 700; margin-right: 6px; vertical-align: 1px; }
+
+/* ---------- iPad frame ---------- */
+.ipad { position: relative; width: 1180px; height: 820px; overflow: hidden; background: var(--surround); color: var(--text);
+  transform: scale(var(--s)); transform-origin: 0 0; border-radius: 18px; font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.abs { position: absolute; }
+.panel { background: var(--panel); border: 1px solid var(--stroke); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+.ic { width: 24px; height: 24px; stroke: #E6E6E6; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ic.sm { width: 18px; height: 18px; }
+.topbar { position: absolute; left: 0; top: 0; width: 100%; height: 52px; background: var(--panel-solid); border-bottom: 1px solid var(--stroke);
+  display: flex; align-items: center; gap: 4px; padding: 0 12px 0 8px; z-index: 5; }
+.topbar .back { display: flex; align-items: center; gap: 2px; font-size: 15px; padding: 10px 10px 10px 4px; }
+.topbar .title { font-size: 15px; font-weight: 600; }
+.topbar .sp { flex: 1; }
+.iconbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 9px; flex: none; }
+.ws { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); }
+.seg { display: flex; gap: 2px; padding: 2px; background: var(--ctl); border-radius: 9px; }
+.seg > span { min-width: 0; padding: 0 12px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--sub); font-size: 13px; white-space: nowrap; }
+.seg > span.on { background: var(--accent); color: #fff; font-weight: 600; }
+.seg.fill > span { flex: 1; }
+.seg.small > span { height: 30px; font-size: 12px; padding: 0 8px; }
+.tools { left: 12px; top: 64px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+.tool { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; }
+.tool.on { background: var(--accent); }
+.layers { right: 12px; top: 64px; padding: 6px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.lthumb { width: 48px; height: 48px; border-radius: 10px; padding: 4px; }
+.lthumb > div { width: 40px; height: 40px; border-radius: 6px; }
+.lthumb.on { border: 2px solid var(--accent); padding: 2px; background: #2C2C30; }
+.lthumb.on > div { width: 40px; height: 40px; }
+.addbtn { width: 44px; height: 44px; border-radius: 10px; background: var(--ctl); display: grid; place-items: center; }
+.canvas { position: absolute; box-shadow: 0 6px 24px rgba(0,0,0,.4); overflow: hidden; }
+.canvas > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ctx { bottom: 12px; left: 50%; transform: translateX(-50%); padding: 8px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.div { width: 1px; height: 28px; background: var(--stroke); flex: none; }
+.btn { height: 44px; padding: 0 16px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
+.btn.quiet { color: var(--sub); }
+.btn.fill { background: var(--ctl); }
+.mark { position: absolute; width: 24px; height: 24px; border-radius: 12px; background: var(--mark); color: #fff; font-weight: 700; font-size: 12px; display: grid; place-items: center; z-index: 50; }
+.lbl { font-size: 11px; font-weight: 600; letter-spacing: .6px; color: var(--sub); text-transform: uppercase; }
+.slider { position: relative; height: 28px; flex: 1; }
+.col > .slider { flex: none; }
+.slider::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent) var(--v), #4A4A4E var(--v)); }
+.slider::after { content: ""; position: absolute; top: 3px; left: calc(var(--v) - 11px); width: 22px; height: 22px; border-radius: 11px; background: #fff; border: 2px solid var(--accent); box-sizing: border-box; }
+.switch { width: 44px; height: 26px; border-radius: 13px; background: #4A4A4E; position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 22px; height: 22px; border-radius: 11px; background: #fff; }
+.switch.on { background: var(--accent); }
+.switch.on::after { left: 20px; }
+.field { background: var(--ctl); border-radius: 8px; padding: 9px 12px; font-size: 14px; }
+.pill { position: absolute; padding: 0 16px; height: 40px; border-radius: 20px; display: flex; align-items: center; gap: 10px; background: rgba(34,34,36,.95); font-size: 14px; white-space: nowrap; }
+.chip { width: 28px; height: 28px; border-radius: 6px; flex: none; }
+.vrow { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; }
+.dim { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 20; }
+.sheet { position: absolute; z-index: 30; background: #1C1C1E; border-radius: 16px; border: 1px solid var(--stroke); box-shadow: 0 12px 48px rgba(0,0,0,.5); }
+.sheet .hd { height: 56px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--stroke); font-size: 16px; font-weight: 600; gap: 12px; }
+.sheet .hd .sp { flex: 1; }
+.strip { display: flex; height: 22px; border-radius: 5px; overflow: hidden; }
+.strip > i { flex: 1; }
+table.lib { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.lib th { text-align: left; color: var(--sub); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--stroke); white-space: nowrap; }
+table.lib td { padding: 7px 10px; border-bottom: 1px solid #2A2A2D; white-space: nowrap; }
+table.lib tr.sel td { background: rgba(52,99,168,.25); }
+.star { color: #E8C35A; }
+.list > div { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 52px; border-bottom: 1px solid #2A2A2D; font-size: 15px; }
+.list > div .sp { flex: 1; }
+.list > div .v { color: var(--sub); }
+
+/* ---------- Mac additions ---------- */
+.mac { position: relative; width: 1280px; height: 828px; overflow: hidden; color: var(--text); font-size: 13px;
+  transform: scale(var(--s)); transform-origin: 0 0; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.3);
+  background: linear-gradient(160deg, #4B5A6B, #2E3742 60%, #3A2F3A);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; }
+.stage.m { width: calc(1280px * var(--s)); height: calc(828px * var(--s)); }
+.menubar { position: absolute; left: 0; right: 0; top: 0; height: 28px; background: rgba(28,28,30,.85); display: flex; align-items: center; gap: 18px; padding: 0 16px; font-size: 13px; z-index: 40; }
+.menubar b { font-weight: 700; }
+.menubar .open { background: var(--accent); border-radius: 5px; padding: 2px 8px; margin: 0 -8px; }
+.menu { position: absolute; top: 26px; z-index: 50; min-width: 300px; padding: 5px; background: rgba(40,40,43,.97); border: 1px solid #4A4A4E; border-radius: 9px; box-shadow: 0 12px 32px rgba(0,0,0,.5); font-size: 13px; }
+.menu > div { display: flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 5px; gap: 10px; }
+.menu > div .k { margin-left: auto; color: var(--sub); font-variant-numeric: tabular-nums; }
+.menu > div.hl { background: var(--accent); }
+.menu > div.hl .k { color: #fff; }
+.menu > hr { border: 0; border-top: 1px solid #4A4A4E; margin: 5px 8px; }
+.win { position: absolute; left: 0; top: 28px; width: 1280px; height: 800px; background: #1E1E20; overflow: hidden; }
+.tbar { position: absolute; left: 0; right: 0; top: 0; height: 52px; background: #2A2A2C; border-bottom: 1px solid #111; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 90px; z-index: 8; }
+.lights { position: absolute; left: 20px; top: 20px; display: flex; gap: 8px; }
+.lights i { width: 12px; height: 12px; border-radius: 6px; }
+.tbtn { height: 30px; min-width: 32px; padding: 0 8px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; color: var(--text); }
+.tbtn.box { background: #3A3A3D; }
+.col-tools { position: absolute; left: 0; top: 52px; bottom: 0; width: 52px; background: #232325; border-right: 1px solid #111; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 10px; z-index: 6; }
+.mtool { position: relative; width: 38px; height: 38px; border-radius: 8px; display: grid; place-items: center; }
+.mtool.on { background: var(--accent); }
+.mtool .key { position: absolute; right: 2px; bottom: 0; font-size: 9px; color: var(--sub); }
+.mtool.on .key { color: #dbe6ff; }
+.insp { position: absolute; right: 0; top: 52px; bottom: 0; width: 300px; background: #232325; border-left: 1px solid #111; overflow: hidden; z-index: 6; }
+.insp .sec { padding: 12px 14px; border-bottom: 1px solid #111; display: flex; flex-direction: column; gap: 10px; }
+.insp .hd { display: flex; align-items: center; font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .5px; }
+.lrow { display: flex; align-items: center; gap: 10px; padding: 5px 6px; border-radius: 7px; }
+.lrow.sel { background: rgba(52,99,168,.35); }
+.mfield { background: #1A1A1C; border: 1px solid #3A3A3D; border-radius: 5px; padding: 3px 7px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.popup { background: #3A3A3D; border-radius: 5px; padding: 3px 8px; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; }
+.check { width: 14px; height: 14px; border-radius: 3px; border: 1px solid #666; background: #1A1A1C; display: inline-block; }
+.check.on { background: var(--accent); border-color: var(--accent); }
+.slider.m { height: 20px; }
+.slider.m::before { top: 8px; height: 4px; }
+.slider.m::after { top: 2px; width: 16px; height: 16px; left: calc(var(--v) - 8px); border-width: 1px; border-color: #999; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-transform" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/><rect x="3.5" y="3.5" width="4" height="4" fill="#E6E6E6"/><rect x="16.5" y="3.5" width="4" height="4" fill="#E6E6E6"/><rect x="3.5" y="16.5" width="4" height="4" fill="#E6E6E6"/><rect x="16.5" y="16.5" width="4" height="4" fill="#E6E6E6"/></symbol>
+    <symbol id="i-perspective" viewBox="0 0 24 24"><path d="M8 5h8l4 14H4z"/><path d="M12 5v14M6 12h12"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9.33h16M4 14.66h16M9.33 4v16M14.66 4v16"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="#E6E6E6"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a5.5 5.5 0 0 1 0 11h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 5 5 5-5 5"/><path d="M21 10H10a5.5 5.5 0 0 0 0 11h3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H5v11h14V10h-2"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-flipH" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 7 4 17h5zM15 7l5 10h-5z"/></symbol>
+    <symbol id="i-flipV" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 9 17 4v5zM7 15l10 5v-5z"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+    <symbol id="i-pick" viewBox="0 0 24 24"><path d="M14 4l6 6-2 2-6-6z"/><path d="M13 7 5 15l-1 5 5-1 8-8"/></symbol>
+    <symbol id="i-simplify" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h8V4M12 20v-8h8"/></symbol>
+    <symbol id="i-highlight" viewBox="0 0 24 24"><path d="M9 15 4 20h5l2-2"/><path d="m9 15 3 3 8-8-3-3z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z"/></symbol>
+
+    <!-- artwork, 500 x 625 (16 x 20) -->
+    <symbol id="art-paint" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#9AA3AB"/><rect y="430" width="500" height="195" fill="#B7AE9F"/>
+      <path d="M150 230c-10-110 50-170 105-170s120 50 105 175c-10 60-20 120-30 150H180c-15-40-28-90-30-155z" fill="#4A3426"/>
+      <path d="M215 350h75v85h-75z" fill="#C48E74"/>
+      <ellipse cx="255" cy="250" rx="92" ry="125" fill="#D9A58A"/>
+      <path d="M300 140c45 45 55 130 30 190-15 30-40 45-60 42 40-50 50-160 30-232z" fill="#B97E66"/>
+      <path d="M60 625c20-150 100-200 195-200s170 50 190 200z" fill="#3F5A6E"/>
+      <ellipse cx="225" cy="240" rx="13" ry="6" fill="#3B2A1E"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#3B2A1E"/>
+      <ellipse cx="258" cy="335" rx="22" ry="7" fill="#A85A55"/>
+    </symbol>
+    <symbol id="art-lines" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <g fill="none" stroke="#2E2018" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M163 250c0-95 42-160 92-160s92 65 92 160c0 80-38 125-92 125s-92-45-92-125z"/>
+        <path d="M210 240c10-7 22-7 32 0M275 240c10-7 22-7 32 0"/><path d="M257 255c-5 30-10 48-1 56 8 5 17 1 21-3"/>
+        <path d="M236 335c14 8 30 8 44 0"/><path d="M150 230c-10-110 50-170 105-170s120 50 105 175"/>
+        <path d="M215 375c-3 30-8 45-25 55-65 15-115 50-125 195M290 375c3 30 8 45 25 55 65 15 115 50 125 195"/>
+      </g>
+    </symbol>
+    <symbol id="art-paper" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#F4F2EE"/><use href="#art-lines"/>
+    </symbol>
+    <symbol id="art-values" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#ABABAB"/><rect y="430" width="500" height="195" fill="#ABABAB"/>
+      <path d="M150 230c-10-110 50-170 105-170s120 50 105 175c-10 60-20 120-30 150H180c-15-40-28-90-30-155z" fill="#1B1B1B"/>
+      <path d="M215 350h75v85h-75z" fill="#777777"/>
+      <ellipse cx="255" cy="250" rx="92" ry="125" fill="#ABABAB"/>
+      <path d="M300 140c45 45 55 130 30 190-15 30-40 45-60 42 40-50 50-160 30-232z" fill="#777777"/>
+      <path d="M60 625c20-150 100-200 195-200s170 50 190 200z" fill="#474747"/>
+      <path d="M215 205c20-30 60-35 80-10" fill="none" stroke="#E2E2E2" stroke-width="18" stroke-linecap="round"/>
+      <ellipse cx="225" cy="240" rx="13" ry="6" fill="#1B1B1B"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#1B1B1B"/>
+      <ellipse cx="258" cy="335" rx="22" ry="7" fill="#777777"/>
+    </symbol>
+    <symbol id="scene" viewBox="0 0 1180 820">
+      <rect width="1180" height="820" fill="#5E564E"/><rect y="560" width="1180" height="260" fill="#4A433C"/><rect x="590" y="700" width="18" height="120" fill="#3A332C"/>
+      <polygon points="330,150 860,120 900,700 300,690" fill="#EEEAE2"/>
+      <g transform="matrix(1.06,-0.06,-0.048,0.864,330,150)"><use href="#art-lines" width="500" height="625"/></g>
+      <ellipse cx="760" cy="260" rx="90" ry="50" fill="#fff" opacity=".35"/>
+    </symbol>
+    <symbol id="i-exitfull" viewBox="0 0 24 24"><path d="M20 4l-6 6M14 5v5h5M4 20l6-6M10 19v-5H5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="art-toned" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#C9B79C"/><path d="M0 0h500v625H0z" fill="#B9A587" opacity=".35" transform="skewX(-8)"/>
+      <ellipse cx="330" cy="420" rx="160" ry="120" fill="#BFA98A" opacity=".5"/>
+    </symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+    <symbol id="art-paint-early" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#A9B0B5"/><rect y="430" width="500" height="195" fill="#C0B8AB"/>
+      <ellipse cx="250" cy="245" rx="105" ry="140" fill="#6B5040"/>
+      <ellipse cx="258" cy="255" rx="85" ry="115" fill="#D3A68E"/>
+      <path d="M70 625c20-150 100-195 190-195s165 50 185 195z" fill="#556B7C"/>
+    </symbol>
+  </defs>
+</svg>
+<header class="doc">
+  <p style="margin:0 0 6px;font-size:14px"><a href="ipad.html" style="color:inherit">iPad</a> · <a href="iphone.html" style="color:inherit">iPhone</a> · <b>Mac</b></p>
+  <h1>Canvas Transfer — Mac screens</h1>
+  <p>The same projects and workflow in a Mac window (drawn at 1280 × 800 plus the menu bar). The Mac's job: full resolution, finding images on the web and adding them, and the paint library at a desk. Panels are docked instead of floating, every action is in a menu, and the common ones have keys. Numbered markers refer to the notes beside each screen.</p>
+  <nav class="toc" id="toc"></nav>
+</header>
+<main id="screens"></main>
+
+<script>
+const ic = (id, cls = "") => `<svg class="ic ${cls}"><use href="#i-${id}"/></svg>`;
+const mark = (n, x, y) => `<div class="mark" style="left:${x}px;top:${y}px">${n}</div>`;
+const art = (id, extra = "") => `<svg viewBox="0 0 500 625" preserveAspectRatio="none" ${extra}><use href="#${id}"/></svg>`;
+const canvas = (x, y, w, h, inner) => `<div class="canvas" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${inner}</div>`;
+const lights = `<div class="lights"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i></div>`;
+
+const MENUS = ["File", "Edit", "Layer", "View", "Window", "Help"];
+function menubar(open = null, menu = "") {
+  return `<div class="menubar"><span style="font-size:15px"></span><b>Canvas Transfer</b>${MENUS.map(m => `<span class="${m === open ? "open" : ""}">${m}</span>`).join("")}
+    <span style="margin-left:auto;color:#ddd">Fri 24 Oct  9:41</span></div>${menu}`;
+}
+// window y offset is 28 (menu bar); everything inside .win is relative to the window
+function workspace({ ws = "Transfer", tool = null, inspector = "", body = "", ctx = "" } = {}) {
+  const tools = ws === "Transfer" ? [["plus", "Add", "⌘⇧I"], ["transform", "Transform", "T"], ["perspective", "Perspective", "P"], ["grid", "Grid", "G"], ["compare", "Compare", "C"]]
+                                  : [["pick", "Pick", "I"], ["simplify", "Simplify", "S"], ["highlight", "Highlight", "H"], ["grid", "Grid", "G"]];
+  return `<div class="win">
+    <div class="tbar">${lights}
+      <div class="col" style="line-height:1.2"><b style="font-size:13px">Portrait of Ana</b><span style="font-size:11px;color:var(--sub)">16 × 20 in · iCloud Drive</span></div>
+      <div class="seg abs" style="left:50%;transform:translateX(-50%)"><span class="${ws === "Transfer" ? "on" : ""}" style="height:26px;width:90px">Transfer</span><span class="${ws === "Color" ? "on" : ""}" style="height:26px;width:90px">Color</span></div>
+      <div style="flex:1"></div>
+      <span class="tbtn">${ic("full", "sm")}</span><span class="tbtn">${ic("share", "sm")}</span><span class="tbtn box" title="Inspector">${ic("layers", "sm")}</span>
+    </div>
+    <div class="col-tools">${tools.map(([id, l, k]) => `<div class="mtool ${id === tool ? "on" : ""}" title="${l} (${k})">${ic(id, "sm")}<span class="key">${k.length === 1 ? k : ""}</span></div>`).join("")}</div>
+    ${body}
+    <div class="insp">${inspector}</div>
+    ${ctx}
+  </div>`;
+}
+// canvas fit inside the window: between the tool column (52) and the inspector (980), toolbar (52) and the context-bar band (bottom 72)
+const MF = { x: 260, y: 70, w: 512, h: 640 };
+const REF = { x: 44, y: 44, w: 230, h: 288 };
+const placedRef = `<div class="abs" style="left:${REF.x}px;top:${REF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-lines", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
+const transferCanvas = () => canvas(MF.x, MF.y, MF.w, MF.h, art("art-toned") + placedRef);
+const handles = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid var(--accent)">
+  ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 5px);top:calc(${b}% - 5px);width:10px;height:10px;background:#fff;border:1.5px solid var(--accent);border-radius:2px"></i>`).join("")}</div>`;
+const ctxBar = (inner) => `<div class="abs panel" style="left:${52 + 928 / 2}px;transform:translateX(-50%);bottom:12px;padding:6px;display:flex;align-items:center;gap:6px;white-space:nowrap;z-index:7">${inner}</div>`;
+const transformCtx = ctxBar(`<div class="seg"><span class="on" style="height:28px">Proportional</span><span style="height:28px">Free</span><span style="height:28px">Skew</span><span style="height:28px">Distort</span></div>
+  <span class="tbtn">${ic("flipH", "sm")}Flip H</span><span class="tbtn">${ic("flipV", "sm")}Flip V</span><span class="tbtn">${ic("fit", "sm")}Fit</span>
+  <span class="tbtn" style="color:var(--sub)">Cancel <span style="font-size:11px">esc</span></span><span class="tbtn" style="background:var(--accent);font-weight:600;padding:0 14px">Done <span style="font-size:11px;opacity:.8">↩</span></span>`);
+
+const layersSec = (sel = 0) => `<div class="sec"><div class="hd"><span style="flex:1">Layers</span><span class="tbtn" style="height:22px;min-width:22px;padding:0">${ic("plus", "sm")}</span><span class="tbtn" style="height:22px;min-width:22px;padding:0;font-size:16px">−</span></div>
+  ${[["#F4F2EE", "Reference", "Multiply · 60%", true], ["#C9B79C", "Canvas · Oct 22", "Normal · 100%", true], ["#B9A587", "Canvas · Oct 15", "Normal · 100%", false]].map(([c, n, sm, eye], i) =>
+    `<div class="lrow ${i === sel ? "sel" : ""}"><div style="width:44px;height:44px;border-radius:5px;background:${c};flex:none"></div><div class="col" style="flex:1"><b style="font-size:13px">${n}</b><span style="font-size:11px;color:var(--sub)">${sm}</span></div><span style="opacity:${eye ? 1 : .3}">${ic("eye", "sm")}</span></div>`).join("")}</div>`;
+const hs = (l, v, val) => `<div class="vrow"><span style="width:70px">${l}</span><div class="slider m" style="--v:${v}%"></div><span class="mfield" style="width:40px;text-align:right">${val}</span></div>`;
+const lookSec = `<div class="sec" style="border:0"><div class="hd">Look</div>
+  <div class="vrow"><b style="width:70px">Opacity</b><div class="slider m" style="--v:60%"></div><span class="mfield" style="width:48px;text-align:right;white-space:nowrap">60 %</span></div>
+  <div class="vrow"><span style="width:70px">Blend</span><span class="popup">Multiply <span style="color:var(--sub)">⌃</span></span></div>
+  <div class="vrow" style="margin-top:4px"><span style="flex:1;color:var(--sub);font-size:11px;font-weight:700;letter-spacing:.5px">LEVELS</span><span style="color:var(--sub);font-size:11px">Auto</span></div>
+  <svg width="270" height="50" viewBox="0 0 270 50"><rect width="270" height="50" rx="4" fill="#1A1A1C"/><path d="M0 50 L0 46 C28 44 38 16 66 23 S103 8 131 20 S178 39 206 31 S244 42 270 44 L270 50Z" fill="#5A5A5E"/><path d="M22 0v50M140 0v50M246 0v50" stroke="#7FA8EC" stroke-width="1.2" stroke-dasharray="3 3"/></svg>
+  <div class="vrow">${[["Black", "12"], ["Gamma", "1.20"], ["White", "236"]].map(([l, v]) => `<span style="color:var(--sub);font-size:11px">${l}</span><span class="mfield" style="width:44px">${v}</span>`).join("")}</div>
+  <div style="color:var(--sub);font-size:11px;font-weight:700;letter-spacing:.5px;margin-top:4px">HUE / SATURATION</div>
+  ${hs("Hue", 50, "0")}${hs("Saturation", 20, "−60")}${hs("Lightness", 50, "0")}
+  <div class="vrow" style="gap:16px"><label class="vrow" style="gap:6px"><i class="check"></i>Colorize</label><label class="vrow" style="gap:6px"><i class="check"></i>Invert</label></div>
+  <div class="vrow"><span style="flex:1">Perspective</span><span class="tbtn box" style="height:24px">Edit Corners…</span></div>
+</div>`;
+
+const screens = [];
+const S = (id, title, html, notes) => screens.push({ id, title, html, notes });
+
+// ---------- Gallery ----------
+const projects = [["Portrait of Ana", "16 × 20 in · Today", "art-toned", .8], ["Sketchbook, Lisbon", "8 × 10 in · Oct 21", "art-paper", .8], ["Harbor at dusk", "24 × 18 in · Oct 20", "art-paint-early", 1.333],
+  ["Still life, pears", "12 × 16 in · Oct 12", "art-paint", .75], ["Self portrait", "11 × 14 in · Sep 30", "art-values", .786], ["Market street", "36 × 24 in · Sep 2", "art-paint-early", 1.5]];
+const card = (p, sel) => `<div class="col" style="gap:6px"><div style="height:190px;border-radius:10px;background:#2A2A2D;display:grid;place-items:center;${sel ? "outline:3px solid var(--accent);outline-offset:2px" : ""}">
+  <div style="position:relative;${p[3] >= 1 ? `width:190px;height:${Math.round(190 / p[3])}px` : `height:160px;width:${Math.round(160 * p[3])}px`};box-shadow:0 2px 8px rgba(0,0,0,.4)">${art(p[2], 'style="position:absolute;inset:0;width:100%;height:100%"')}</div></div>
+  <div><b>${p[0]}</b><div style="color:var(--sub);font-size:12px">${p[1]}</div></div></div>`;
+S("gallery", "Gallery", `
+  ${menubar()}
+  <div class="win">
+    <div class="tbar">${lights}<b style="font-size:14px">Canvas Transfer</b><div style="flex:1"></div>
+      <div class="mfield vrow" style="width:220px;padding:5px 8px;color:var(--sub);font-size:13px">${ic("search", "sm")}Search projects</div>
+      <span class="tbtn box">${ic("folder", "sm")}Open…</span><span class="tbtn" style="background:var(--accent);font-weight:600">${ic("plus", "sm")}New Project</span></div>
+    <div class="abs" style="left:28px;right:28px;top:72px">
+      <div style="font-size:17px;font-weight:600;margin-bottom:12px">October</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:20px">${projects.slice(0, 4).map((p, i) => card(p, i === 0)).join("")}</div>
+      <div style="font-size:17px;font-weight:600;margin:24px 0 12px">September</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:20px">${projects.slice(4).map(p => card(p)).join("")}</div>
+    </div>
+  </div>
+  ${mark(1, 640, 46)}${mark(2, 4, 104)}
+`, `
+  <h3><span class="n">1</span>Same Gallery, in a window</h3>
+  <p>Grouped by month, five columns (more as the window widens). <b>New Project</b> ⌘N, <b>Open…</b> ⌘O for a .ctproj anywhere, search by name. Double-click opens a project in its own window — two projects can be open side by side.</p>
+  <h3><span class="n">2</span>Cards</h3>
+  <p>Right-click: Open, Rename, Duplicate, Show in Finder, Share, Move to Trash.</p>
+`);
+
+// ---------- Transfer workspace ----------
+S("transfer", "Transfer workspace", `
+  ${menubar()}
+  ${workspace({ tool: "transform", body: `${transferCanvas()}${handles(MF.x + REF.x, MF.y + REF.y, REF.w, REF.h)}`, inspector: layersSec(0) + lookSec, ctx: transformCtx })}
+  ${mark(3, 744, 46)}${mark(4, 56, 104)}${mark(5, 744, 112)}${mark(6, 952, 94)}${mark(7, 952, 300)}${mark(8, 150, 772)}
+`, `
+  <h3><span class="n">3</span>Toolbar</h3>
+  <p>Project name and size, the <b>Transfer | Color</b> switch, Full screen (canvas only, F), Share, and the inspector toggle. Undo / redo are ⌘Z / ⇧⌘Z (Edit menu).</p>
+  <h3><span class="n">4</span>Tool column, docked</h3>
+  <p>Add image, Transform (T), Perspective (P), Grid (G), Compare (C); the key is printed on each tool. On the Mac, <b>Add</b> replaces Camera: it opens a file, pastes, or takes a photo with your iPhone (Continuity Camera).</p>
+  <h3><span class="n">5</span>The view</h3>
+  <p>Fitted between the docked panels, at full resolution. Trackpad pinch to zoom, two-finger scroll to pan, ⌘0 to fit. Handles are smaller than on iPad (pointer, not finger).</p>
+  <h3><span class="n">6</span>Layers</h3>
+  <p>A docked list instead of the iPad's collapsing bar: thumbnail, name, blend · opacity, eye. Drag to reorder; ＋ / − add and delete.</p>
+  <h3><span class="n">7</span>Look, always open</h3>
+  <p>The Mac has room, so the selected layer's Look sits under the layers: no popover, nothing to open. Same controls as iPad, as Mac controls — slider plus number box, blend as a pop-up menu, checkboxes. The section is labelled only “Look”, like any inspector section.</p>
+  <h3><span class="n">8</span>Context bar</h3>
+  <p>As on iPad, while a tool is on. <b>↩</b> Done, <b>esc</b> Cancel (as in the prototype). Hide all panels with ⇥ Tab.</p>
+`);
+
+// ---------- Menus ----------
+const layerMenu = `<div class="menu" style="left:300px">
+  <div>New Reference from File…<span class="k">⌥⌘R</span></div><div>New Canvas Photo from File…<span class="k">⌥⌘C</span></div>
+  <div>Paste as Reference<span class="k">⌘V</span></div><div>Take Photo with iPhone…<span class="k"></span></div><hr>
+  <div class="hl">Opacity<span class="k">1 – 9, 0 = 100%  ▸</span></div><div>Blend Mode<span class="k">▸</span></div><div>Show / Hide<span class="k">⌘,</span></div><hr>
+  <div>Move Up<span class="k">⌘]</span></div><div>Move Down<span class="k">⌘[</span></div><div>Edit Corners…<span class="k">⌥⌘P</span></div><div>Reset Look<span class="k"></span></div><hr>
+  <div>Delete Layer<span class="k">⌫</span></div></div>
+  <div class="menu" style="left:603px;top:106px;min-width:210px">
+  <div>10%<span class="k">1</span></div><div>30%<span class="k">3</span></div><div>50%<span class="k">5</span></div><div class="hl">60%<span class="k">6</span></div><div>80%<span class="k">8</span></div><div>100%<span class="k">0</span></div></div>`;
+S("menus", "Menus & keys", `
+  ${menubar("Layer", layerMenu)}
+  ${workspace({ body: transferCanvas(), inspector: layersSec(0) + lookSec })}
+  ${mark(9, 270, 2)}${mark(10, 780, 106)}
+`, `
+  <h3><span class="n">9</span>Everything is in a menu</h3>
+  <p><b>File</b>: New Project ⌘N, Open… ⌘O, Add Image… ⇧⌘I, Take Photo with iPhone, Share ▸, Export Canvas View… ⌘E. <b>Edit</b>: Undo ⌘Z, Redo ⇧⌘Z, Paste as Reference ⌘V. <b>Layer</b> (shown). <b>View</b>: Transfer ⌃1, Color ⌃2, Fit ⌘0, Actual Size ⌘1, Zoom ⌘+ / ⌘−, Hide Panels ⇥, Full Screen Canvas F. <b>Window</b>: Paint Library ⇧⌘L.</p>
+  <h3><span class="n">10</span>Opacity from the keyboard</h3>
+  <p>Number keys set the selected layer's opacity (1 = 10 % … 0 = 100 %), the Photoshop convention — the fastest way to try 40 % vs 60 % while looking at the canvas.</p>
+  <h3>Single keys</h3>
+  <p>T Transform, P Perspective, G Grid, C Compare, I Pick, S Simplify, H Highlight, F Full screen, B blink pause / resume, ↩ Done, esc Cancel. Blend modes: ⌥⇧N Normal, ⌥⇧M Multiply, ⌥⇧S Screen, ⌥⇧J Linear Light.</p>
+`);
+
+// ---------- Add images ----------
+const dropZone = (x, y, w, h, title, sub, on) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border-radius:14px;border:2px dashed ${on ? "var(--accent-hi)" : "#777"};background:${on ? "rgba(52,99,168,.35)" : "rgba(20,20,22,.55)"};display:flex;justify-content:center;align-items:flex-start;padding-top:48px;text-align:center;z-index:9">
+  <div><b style="font-size:18px">${title}</b><div style="color:${on ? "#dbe6ff" : "var(--sub)"};margin-top:4px">${sub}</div></div></div>`;
+S("add-images", "Add images", `
+  ${menubar()}
+  ${workspace({ tool: "plus", body: `${transferCanvas()}
+    <div class="abs" style="left:52px;top:52px;width:928px;height:748px;background:rgba(0,0,0,.35);z-index:8"></div>
+    ${dropZone(140, 150, 360, 420, "Reference", "Multiply 60 %, then Transform", true)}
+    ${dropZone(530, 150, 360, 420, "Canvas photo", "Adjust corners, then fills the canvas", false)}
+    <div class="abs" style="left:300px;top:380px;width:120px;height:150px;transform:rotate(-4deg);box-shadow:0 10px 30px rgba(0,0,0,.6);z-index:10;opacity:.92">${art("art-paint", 'style="position:absolute;inset:0;width:100%;height:100%"')}</div>
+    <div class="abs" style="left:404px;top:516px;width:22px;height:22px;border-radius:11px;background:#28C840;color:#fff;font-weight:700;display:grid;place-items:center;z-index:11">+</div>
+    <div class="abs" style="left:430px;top:526px;z-index:11;font-size:26px">↖</div>`, inspector: layersSec(0) + lookSec })}
+  ${mark(11, 112, 182)}${mark(12, 900, 182)}
+`, `
+  <h3><span class="n">11</span>Drop on the window</h3>
+  <p>Drag an image from Safari, Finder or Photos onto the window: two targets appear. <b>Reference</b> → added on top at Multiply 60 %, Transform on. Web images are already flat, so there is no corner step; Look → Perspective → Edit Corners if one needs it.</p>
+  <h3><span class="n">12</span>Canvas photo</h3>
+  <p>Opens Adjust corners (same as iPad, in a sheet), then fills the canvas at Normal 100 %.</p>
+  <h3>Other ways in</h3>
+  <p>⌘V pastes an image as a reference. File → Add Image… ⇧⌘I opens a file. Take Photo with iPhone uses Continuity Camera: the iPhone camera opens, the photo lands here and goes to Adjust corners. Photos added on iPad or iPhone appear through iCloud.</p>
+`);
+
+// ---------- Color workspace ----------
+const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
+const close = de => de < 2 ? "very close" : de < 5 ? "close" : de < 10 ? "noticeably different" : "far off";
+const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid #1A1A1C">
+  <div class="col" style="gap:2px;flex:none"><div style="width:60px;height:60px;border-radius:8px;background:linear-gradient(90deg, ${a} 50%, ${b} 50%)"></div>
+    <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
+  <div class="col" style="flex:1;min-width:0;gap:2px">
+    ${paints.map(([amt, n, w]) => `<div class="vrow" style="gap:7px;font-size:13px"><b style="width:34px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:10px;height:10px;border-radius:5px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}${w ? `<span style="color:#F2C14E">⚠</span>` : ""}</div>`).join("")}
+    <b style="font-size:12px;font-weight:600;margin-top:2px;color:${de < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de} · ${close(de)}</b></div></div>`;
+const SW = [["#4A3426", 1, 352, 285], ["#D9A58A", 2, 408, 326], ["#B97E66", 3, 496, 346], ["#3F5A6E", 4, 327, 653], ["#9AA3AB", 5, 603, 182]];
+S("color", "Color workspace", `
+  ${menubar()}
+  ${workspace({ ws: "Color", tool: "pick", body: `${canvas(MF.x, MF.y, MF.w, MF.h, art("art-paint"))}
+    ${SW.map(([c, n, x, y]) => `<div class="abs" style="left:${MF.x + (x - 173) - 12}px;top:${MF.y + (y - 80) - 12}px;width:24px;height:24px;border-radius:12px;background:${c};border:${n === 3 ? "3px solid var(--accent)" : "2px solid #fff"};display:grid;place-items:center;font-size:10px;font-weight:700;color:${n === 2 || n === 5 ? "#222" : "#fff"};z-index:3">${n}</div>`).join("")}`,
+    inspector: `<div class="sec"><div class="hd"><span style="flex:1">Swatches</span><span style="text-transform:none;font-weight:400">Pick (I) to add</span></div>
+      <div class="vrow" style="gap:6px">${SW.map(([c, n]) => `<div style="position:relative;width:44px;height:44px;border-radius:7px;background:${c};${n === 3 ? "outline:2px solid var(--accent);outline-offset:2px" : ""}"><span style="position:absolute;left:4px;top:2px;font-size:10px;font-weight:700;color:${n === 2 || n === 5 ? "#222" : "#fff"}">${n}</span></div>`).join("")}</div>
+      <div class="vrow"><span style="color:var(--sub);flex:1">Highlight range</span><div class="slider m" style="--v:30%;flex:none;width:110px"></div><span class="mfield">ΔE 12</span></div></div>
+      <div class="sec" style="border:0;gap:6px"><div class="seg fill small"><span>Details</span><span class="on">Paints &amp; mixes</span></div>
+      <div class="vrow" style="margin-top:4px"><div style="width:40px;height:26px;border-radius:5px;background:#B97E66"></div><div class="col"><b>Swatch 3 · Face, shadow</b><span style="color:var(--sub);font-size:11px">#B97E66 · 5YR 6/6</span></div></div>
+      <div class="vrow"><span style="width:84px;color:var(--sub)">Mix from</span><span class="popup">Zorn palette (oil) ⌃</span></div>
+      <div class="vrow"><span style="width:84px;color:var(--sub)">Lighten with</span><span class="popup">Titanium white ⌃</span></div>
+      <div class="lbl" style="margin-top:6px">One paint</div>
+      ${mixRow("#B97E66", "#B27959", [["62%", "Yellow ochre"], ["38%", "Titanium white"]], 4.8)}
+      <div class="lbl" style="margin-top:6px">Two-paint mixes</div>
+      ${mixRow("#B97E66", "#BA7F66", [["55%", "Yellow ochre"], ["18%", "Vermilion"], ["27%", "Titanium white"]], 0.7)}
+      ${mixRow("#B97E66", "#B77B65", [["47%", "Vermilion", true], ["7%", "Ivory black"], ["46%", "Titanium white"]], 1.2)}
+      </div>`,
+    ctx: ctxBar(`<span style="color:var(--sub);padding:0 4px">Sample</span><div class="seg"><span style="height:28px">Point</span><span style="height:28px">5 px</span><span class="on" style="height:28px">11 px</span><span style="height:28px">21 px</span><span style="height:28px">41 px</span></div>
+      <span style="display:inline-flex;align-items:center;gap:6px;color:var(--sub);padding:0 6px">Under pointer <i style="width:22px;height:16px;border-radius:3px;background:#C99079"></i> #C99079</span>`) })}
+  ${mark(13, 744, 46)}${mark(14, 952, 94)}${mark(15, 952, 252)}${mark(16, 150, 772)}
+`, `
+  <h3><span class="n">13</span>Color workspace</h3>
+  <p>⌃2 (or the switch). Tools: Pick (I), Simplify (S), Highlight (H), Grid (G).</p>
+  <h3><span class="n">14</span>Swatches, docked</h3>
+  <p>All swatches in the project as chips, highlight range under them. Click a chip or a marker on the canvas to select.</p>
+  <h3><span class="n">15</span>Details | Paints &amp; mixes</h3>
+  <p>The same tabs and mix layout as iPad and iPhone: chip (yours | mix, touching), one line per paint led by its %, ΔE and how close, ⚠ for an uncertain color. More rows fit; scroll for the rest.</p>
+  <h3><span class="n">16</span>Pick</h3>
+  <p>The context bar holds the sample size (the prototype's Point to 41 px) and the color under the pointer, live as you move — something the iPad can't do without touching.</p>
+`);
+
+// ---------- Paint library ----------
+const paints = [["#F2F1EC", "Titanium White", "Gamblin", "PW6", "1", "I", "Opaque", "", true], ["#C99A45", "Yellow Ochre", "Gamblin", "PY43", "1", "I", "Semi-opaque", "medium", true],
+  ["#C8432D", "Cadmium Red Light", "Winsor & Newton", "PR108", "4", "I", "Opaque", "slow", false], ["#B5432F", "Vermilion (hue)", "Michael Harding", "PR255, PY65", "2", "I", "Opaque", "medium, 3–4 days", true],
+  ["#8E4A36", "Burnt Sienna", "Gamblin", "PR101", "1", "I", "Transparent", "fast", false], ["#2B2A2A", "Ivory Black", "Old Holland", "PBk9", "A", "I", "Semi-opaque", "slow", true],
+  ["#1D3F8A", "Ultramarine Blue", "Gamblin", "PB29", "1", "I", "Transparent", "", false], ["#1F4E5B", "Phthalo Turquoise", "Michael Harding", "PB15:3, PG7", "3", "I", "Transparent", "", false]];
+const kv = (k, v, w = 150) => `<div class="vrow"><span style="width:92px;color:var(--sub);text-align:right">${k}</span><span class="mfield" style="width:${w}px;font-size:13px">${v}</span></div>`;
+S("paint-library", "Paint library", `
+  ${menubar()}
+  <div class="win">
+    <div class="tbar" style="padding-left:240px">${lights}<b style="font-size:14px">Paint Library</b><div style="flex:1"></div>
+      <span class="tbtn box">Import Saved Page…</span><span class="tbtn box">${ic("plus", "sm")}Add Paint</span>
+      <div class="mfield vrow" style="width:200px;padding:5px 8px;color:var(--sub);font-size:13px">${ic("search", "sm")}Search</div></div>
+    <div class="abs" style="left:0;top:0;bottom:0;width:220px;background:#252527;border-right:1px solid #111;padding:60px 10px 0;z-index:9">${lights}
+      <div class="lbl" style="padding:6px 8px">Media</div>
+      ${[["Oil", 42, true], ["Watercolor", 28], ["Acrylic", 9], ["Gouache", 6], ["★ Favorites", 14]].map(([n, c, on]) => `<div class="vrow" style="height:28px;padding:0 8px;border-radius:6px;${on ? "background:rgba(52,99,168,.45)" : ""}"><span style="flex:1">${n}</span><span style="color:var(--sub)">${c}</span></div>`).join("")}
+      <div class="lbl" style="padding:14px 8px 6px">My palettes</div>
+      ${["Portrait, warm", "Landscape, limited"].map(n => `<div style="height:28px;padding:0 8px;display:flex;align-items:center">${n}</div>`).join("")}
+      <div class="lbl" style="padding:14px 8px 6px">Classic palettes</div>
+      ${["Zorn", "Old masters", "Primary triad"].map(n => `<div style="height:28px;padding:0 8px;display:flex;align-items:center">${n}</div>`).join("")}
+    </div>
+    <div class="abs" style="left:220px;top:52px;right:330px;bottom:0;overflow:hidden">
+      <table class="lib"><tr><th></th><th>Name ⌄</th><th>Brand</th><th>Pigments</th><th>Series</th><th>Lightfast</th><th>Drying</th><th>★</th></tr>
+      ${paints.map((p, i) => `<tr class="${i === 3 ? "sel" : ""}"><td><div class="chip" style="width:22px;height:22px;background:${p[0]}"></div></td><td>${p[1]}</td><td style="color:var(--sub)">${p[2]}</td><td>${p[3]}</td><td>${p[4]}</td><td>${p[5]}</td><td style="color:var(--sub)">${p[7]}</td><td class="star">${p[8] ? "★" : "<span style='color:#555'>☆</span>"}</td></tr>`).join("")}</table>
+    </div>
+    <div class="abs col" style="right:0;top:52px;bottom:0;width:330px;background:#232325;border-left:1px solid #111;padding:16px;gap:9px">
+      <div class="vrow" style="gap:12px"><div style="width:84px;height:84px;border-radius:10px;background:#B5432F"></div>
+        <div class="col" style="gap:6px">${kv("Hex", "#B5432F", 110).replace('width:92px', 'width:40px')}${kv("L*a*b*", "48.2  52.0  38.1", 110).replace('width:92px', 'width:40px')}</div></div>
+      <div style="color:var(--sub);font-size:11px">Type either; the other follows. Or paste the site's color text.</div>
+      ${kv("Medium", "Oil  ⌃")}${kv("Name", "Vermilion (hue)", 200)}${kv("Brand", "Michael Harding", 200)}${kv("Series", "2", 60)}${kv("Pigments", "PR255, PY65", 200)}
+      ${kv("Opacity", "Opaque  ⌃")}${kv("Lightfast", "ASTM I  ⌃")}${kv("Drying", "medium, 3–4 days <span style='color:#F2C14E'>●</span>", 200)}${kv("Source", "<span style='color:var(--accent-hi)'>artistpigments.org ↗</span>", 200)}
+      <div class="vrow" style="gap:16px;padding-left:100px"><label class="vrow" style="gap:6px"><i class="check on"></i>Favorite</label><label class="vrow" style="gap:6px"><i class="check on"></i>Use in mixes</label></div>
+      ${kv("Stand-in", "Automatic  ⌃")}
+      <div style="flex:1"></div>
+      <div class="vrow"><span style="color:var(--sub);font-size:11px;flex:1">Measured on a color chart · 1 field edited</span><span class="tbtn box" style="height:26px">Revert to Site</span></div>
+    </div>
+  </div>
+  ${mark(17, 196, 64)}${mark(18, 640, 46)}${mark(19, 880, 100)}
+`, `
+  <h3><span class="n">17</span>Its own window</h3>
+  <p>Window → Paint Library ⇧⌘L, or from Paints &amp; mixes. Sidebar: media with counts and Favorites, your palettes, classic palettes. A palette shows its roles filled from your paints, with gaps marked.</p>
+  <h3><span class="n">18</span>Table</h3>
+  <p>Sortable columns (name, brand, pigments, series, lightfastness, drying, favorite; right-click the header for more, such as opacity); search across all of them. Import Saved Page… takes several artistpigments.org pages at once — the Mac is where you'd do this after browsing.</p>
+  <h3><span class="n">19</span>Edit in place</h3>
+  <p>No separate edit sheet: the inspector <i>is</i> the editor, the Mac convention. Same fields as iPad and iPhone, hex or L*a*b*, Medium moves the paint between lists, ● marks a field you changed from the site's value. Delete with ⌫ in the table.</p>
+`);
+
+// ---------- Settings ----------
+S("settings", "Settings", `
+  ${menubar()}
+  <div class="abs" style="left:320px;top:120px;width:640px;height:470px;background:#262628;border-radius:12px;border:1px solid #444;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden">
+    <div style="height:84px;background:#2E2E30;border-bottom:1px solid #111;position:relative">${lights}<b class="abs" style="left:50%;transform:translateX(-50%);top:14px">Defaults</b>
+      <div class="abs vrow" style="left:50%;transform:translateX(-50%);top:36px;gap:6px">${[["gear", "General"], ["folder", "Storage"], ["layers", "Defaults", true], ["compare", "Keys"]].map(([i, l, on]) => `<div class="col" style="align-items:center;gap:2px;width:72px;padding:4px 0;border-radius:6px;${on ? "background:#45454A" : ""}">${ic(i, "sm")}<span style="font-size:11px">${l}</span></div>`).join("")}</div></div>
+    <div class="col" style="padding:24px 40px;gap:14px">
+      ${[["Units", `<div class="seg small"><span class="on">in</span><span>cm</span></div>`], ["New reference layer", `<span class="popup">Multiply ⌃</span><span class="mfield">60 %</span>`],
+         ["New canvas photo", `<span class="popup">Normal ⌃</span><span class="mfield">100 %</span>`], ["Auto levels", `<label class="vrow" style="gap:6px"><i class="check on"></i>References</label><label class="vrow" style="gap:6px"><i class="check"></i>Canvas photos</label>`],
+         ["Grid", `<span class="mfield">4</span>×<span class="mfield">5</span><span class="popup">White ⌃</span><span class="popup">Thin ⌃</span>`], ["Blink speed", `<div class="slider m" style="--v:40%;width:160px;flex:none"></div><span class="mfield">0.6 s</span>`]]
+        .map(([k, v]) => `<div class="vrow" style="gap:10px"><span style="width:170px;text-align:right">${k}</span>${v}</div>`).join("")}
+    </div>
+  </div>
+  ${mark(20, 290, 140)}
+`, `
+  <h3><span class="n">20</span>Settings window</h3>
+  <p>⌘, as on every Mac app. <b>General</b>: open projects in tabs or windows. <b>Storage</b>: projects folder and paint library location (iCloud Drive by default). <b>Defaults</b> (shown): the same defaults as iPad and iPhone, shared through iCloud. <b>Keys</b>: the shortcut list.</p>
+`);
+
+// ---------- render ----------
+const main = document.getElementById("screens"), toc = document.getElementById("toc");
+screens.forEach((s, i) => {
+  toc.insertAdjacentHTML("beforeend", `<a href="#${s.id}">${i + 1} · ${s.title}</a>`);
+  main.insertAdjacentHTML("beforeend", `<section class="screen" id="${s.id}"><h2>${i + 1} · ${s.title}</h2>
+    <div class="row"><div class="stage m"><div class="mac">${s.html}</div></div><div class="notes">${s.notes}</div></div></section>`);
+  const sec = main.lastElementChild, map = {};
+  sec.querySelectorAll(".notes .n").forEach(n => { map[n.textContent] ??= String(Object.keys(map).length + 1); n.textContent = map[n.textContent]; });
+  sec.querySelectorAll(".mac .mark").forEach(m => { m.textContent = map[m.textContent] ?? m.textContent; });
+});
+function fit() {
+  const w = Math.min(document.documentElement.clientWidth, 1700) - 32;
+  const beside = w >= 1280 * 0.65 + 24 + 360;
+  const avail = beside ? w - 24 - 380 : w;
+  document.documentElement.style.setProperty("--s", Math.min(1, avail / 1280).toFixed(4));
+}
+fit(); addEventListener("resize", fit);
+</script>
+</body>
+</html>
