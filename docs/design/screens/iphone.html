@@ -428,7 +428,7 @@ const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-
   <div class="col" style="gap:3px;flex:none"><div style="display:flex;width:76px;height:76px;border-radius:10px;overflow:hidden"><i style="flex:1;background:${a}"></i><i style="flex:1;background:${b}"></i></div>
     <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
   <div class="col" style="flex:1;min-width:0;gap:3px">
-    ${paints.map(([amt, n]) => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><b style="width:44px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}</div>`).join("")}
+    ${paints.map(([amt, n, warn]) => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><b style="width:44px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}${warn ? `<span style="color:#F2C14E" title="Color uncertain">⚠</span>` : ""}</div>`).join("")}
     <b style="margin-top:3px;font-size:15px;font-weight:600;color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de} · ${parseFloat(de) < 2 ? "very close" : parseFloat(de) < 5 ? "close" : parseFloat(de) < 10 ? "noticeably different" : "far off"}</b>
   </div></div>`;
 S("color-mixes", "Color — Paints & mixes", `
@@ -449,8 +449,9 @@ S("color-mixes", "Color — Paints & mixes", `
     ${mixRow("#B97E66", "#B27959", [["62%", "Yellow ochre"], ["38%", "Titanium white"]], "4.8")}
     <div class="lbl" style="margin-top:12px">Two-paint mixes</div>
     ${mixRow("#B97E66", "#BA7F66", [["55%", "Yellow ochre"], ["18%", "Vermilion"], ["27%", "Titanium white"]], "0.7")}
-    ${mixRow("#B97E66", "#B77B65", [["47%", "Vermilion"], ["7%", "Ivory black"], ["46%", "Titanium white"]], "1.2")}
-    <div class="vrow" style="height:44px;justify-content:center;color:var(--accent-hi);gap:6px">${ic("book", "sm blue")}Paint library</div>
+    ${mixRow("#B97E66", "#B77B65", [["47%", "Vermilion", true], ["7%", "Ivory black"], ["46%", "Titanium white"]], "1.2")}
+    <div style="color:var(--sub);font-size:12px;margin-top:8px"><span style="color:#F2C14E">⚠</span> color uncertain — tap the mix for why</div>
+    <div class="vrow" style="height:40px;justify-content:center;color:var(--accent-hi);gap:6px">${ic("book", "sm blue")}Paint library</div>
   </div>
   ${mark(27, 280, 160)}${mark(28, 352, 278)}${mark(29, 96, 326)}${mark(30, 352, 438)}
 `, `
@@ -461,7 +462,7 @@ S("color-mixes", "Color — Paints & mixes", `
   <h3><span class="n">29</span>Mix from · Lighten with</h3>
   <p>All your paints in a medium, one of your palettes, or a classic palette (Zorn here); a white or water as the lightener.</p>
   <h3><span class="n">30</span>Mixes</h3>
-  <p>Sized to read at arm’s length: a 76 pt chip (your swatch | the predicted mix), each paint on its own line led by its share of the mix (%, adding up to 100), then ΔE and how close it is (very close / close / noticeably different / far off; blue under 2). The two halves of the chip touch, so you see exactly how the mix shifts from your swatch — a very close match is meant to look almost seamless. Amounts are a guide. The sheet opens tall for this tab; scroll for more mixes and the Paint library link, or drag it down to see the canvas.</p>
+  <p>Sized to read at arm’s length: a 76 pt chip (your swatch | the predicted mix), each paint on its own line led by its share of the mix (%, adding up to 100), then ΔE and how close it is (very close / close / noticeably different / far off; blue under 2). The two halves of the chip touch, so you see exactly how the mix shifts from your swatch — a very close match is meant to look almost seamless. ⚠ = this paint’s color is uncertain: outside what a screen can show, or mixed using a stand-in’s color. Tap the mix to see which. Amounts are a guide. The sheet opens tall for this tab; scroll for more mixes and the Paint library link, or drag it down to see the canvas.</p>
 `);
 
 // ---------- Paint library ----------
