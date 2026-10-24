@@ -32,6 +32,12 @@ These get the biggest, closest-to-hand controls.
 | C | **Pencil and touch both** pick colors and drag handles. **Zoom and pan as in Procreate**: pinch to zoom and rotate, two-finger drag to pan, quick pinch to fit. | Two-finger tap = undo, three-finger tap = redo (Procreate convention). |
 | D | **Share button**: exports the composited canvas at full resolution, without panels, via the share sheet (AirDrop to the Mac, Messages, Files). | Replaces taking screenshots. Also: share a swatch sheet. |
 | E | Panels float over a full-screen canvas, as in **Procreate and Fresco**. | No permanent sidebar. |
+| F | **Canvas fits clear of the UI by default.** It is sized to the space between the tool strip, layer bar, top bar and context bar, and keeps that size whether or not a bar is showing. | Pinch / two-finger drag still move it, but normally not needed. |
+| G | **Full-screen mode** for working at the easel: all UI hidden, the canvas fills the screen. | Top-bar button to enter; faint exit button (fades) or four-finger tap to leave (Procreate convention). |
+| H | **Layer bar collapses to a thin icon bar** (thumbnails only) on the right. | Expanded (names, blend · opacity) only while setting layers up. |
+| I | **Opacity and blend mode live in the Look popover**, opacity first and largest. | Layer cards show them as a one-line summary only. |
+| J | **Blue for active and primary controls** (active tool, selected segment, Done, slider fills, switches). Panels stay neutral gray. | Replaces the earlier one-accent-only rule. |
+| K | **Portrait iPad: the same layout, rotated.** | Works because the layer bar collapses and full screen hides the UI. |
 
 ## Screen map
 
@@ -71,52 +77,42 @@ These get the biggest, closest-to-hand controls.
   Perspective, Grid, Compare. The active tool shows its options in a bar at the
   bottom (Transform: Proportional / Free / Skew / Distort, Flip H / V, Fit,
   Done / Cancel).
-- **Layer strip** (right edge, always visible): each layer is a thumbnail with
-  its opacity slider and blend mode (Normal, Multiply, Screen, Linear Light)
-  directly under it; eye toggle; tap a layer to select it, tap again to open
-  its **Look** popover (levels, hue / saturation / colorize, invert,
-  perspective). ＋ adds a layer from the camera or Photos. The strip collapses
-  to thumbnails only with a swipe.
+- **Layer bar** (right edge): collapsed by default to a thin icon bar of
+  thumbnails; ‹ expands it to show name, eye and a blend · opacity summary.
+  Tap a layer to select it, tap again to open its **Look** popover: opacity,
+  blend mode (Normal, Multiply, Screen, Linear Light), levels, hue /
+  saturation / colorize, invert, perspective. ＋ adds a layer from the camera
+  or Photos.
 - **Top bar**: back to Gallery, project name, the Transfer | Color switch,
-  undo / redo, Share.
+  undo / redo, Full screen, Share.
 - **Canvas**: neutral gray surround; gestures per decision C.
-- **Neutral chrome**: panels in neutral grays, no colored accents near the
-  image (colored UI next to the image changes how its colors look). One accent
-  color only for the selection and active tool.
+- **Chrome**: panels in neutral grays; blue for active and primary controls
+  (decision J).
 
 ### Wireframes (done)
 
-Figma page *2 · Workspace · Transfer* has two iPad frames, each with numbered
+Figma page *2 · Workspace · Transfer* has four iPad frames, each with numbered
 notes beside it:
 
-- **Transform active** — top bar, tool strip (Transform selected), canvas with
-  transform handles on the drawing layer, layer strip (three layers), and the
-  Transform context bar.
-- **Look popover** — the same screen with no tool active and the Look popover
-  open on the Drawing layer: Levels (histogram + Black / Gamma / White boxes),
-  Hue / Saturation / Lightness, Colorize, Invert, Perspective → Edit corners.
-  It opens to the left of the layer strip so the layer stays visible.
+1. **Transform** — tool strip with Transform active, canvas fitted clear of the
+   UI with transform handles on the drawing, collapsed layer bar, context bar
+   (Proportional / Free / Skew / Distort, Flip H / V, Fit, Cancel, **Done**).
+2. **Look popover** — opened from the collapsed layer bar: Opacity (largest),
+   blend mode, Levels (histogram + Black / Gamma / White), Hue / Saturation /
+   Lightness, Colorize, Invert, Perspective → Edit corners.
+3. **Layers expanded** — the layer bar with names and summaries.
+4. **Full screen** — UI hidden, canvas fills the height, faint exit button.
 
-Reusable components on that page: `icon/*` (15 line icons), **Tool button**
-(Default / Active, icon swap), **Layer card** (Selected yes / no; Name, Opacity,
-Blend text properties; opacity set by the slider's right padding).
-
-Choices made while drawing:
-
-- Chrome is dark neutral gray (#222224 panels on a #3A3A3C surround); the blue
-  accent appears only on the active tool and the selected layer. **Done** is a
-  light neutral button, not accent, to keep it to one accent.
-- The layer strip is ~166 pt wide, and the canvas fits between it and the tool
-  strip at a 16 × 20 aspect.
+Reusable components on that page: `icon/*` (19 line icons), **Tool button**
+(Default / Active, icon swap), **Layer card** (Size Expanded / Collapsed ×
+Selected; Name and Summary text properties).
 
 Open questions:
 
-1. The Transform context bar overlaps the bottom of a tall canvas. Either
-   shrink the fit area while a tool is active, or accept it (the canvas pans).
-2. Is a 320 pt Look popover too big over the canvas? Alternative: a bottom
-   sheet with Levels only and *More* for the rest.
-3. Opacity as a one-finger vertical drag on the canvas while a layer is
-   selected — faster at the easel than reaching for the strip?
-4. Portrait iPad: does the layer strip move to the bottom?
+1. The Look popover is tall (~615 pt) and covers the right edge of the canvas.
+   Acceptable for quick changes; could be made draggable if it gets in the way.
+2. Colorize needs its own hue / saturation sliders when on — not drawn yet.
+3. Should a tap in full screen do anything (e.g. blink the drawing layer)? Off
+   by default to avoid accidental changes.
 
 Next: Camera, Compare, Color workspace and Gallery.
