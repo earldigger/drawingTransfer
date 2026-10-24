@@ -86,7 +86,7 @@ shown in is just “the view”.
 8. Share — export view or swatch sheet.
 9. Settings — projects folder, paint library location, units, grid defaults.
 
-**iPhone:** Gallery · Capture (photo → corners → add to a project or share) · Sketchbook transfer (reference over the sketchbook photo, grid, transform, opacity, value simplify) · Quick look.
+**iPhone:** Gallery · New project · Camera (photo → corners → add to any project, or share) · Transfer workspace (sketchbook transfer is an ordinary project) · Layers & Look sheet · Compare · Color (mostly Simplify) · Paint library. “Quick look” is Full screen.
 
 **Mac:** Gallery · Workspace (dockable panels, shortcuts, menus) · Add images (drag from a browser or Finder, paste, import) · Paint library & palettes (table view; saved-page import lives here).
 
@@ -182,5 +182,29 @@ the swatch bar shows all swatches; mix ratios stay, as a guide; the paint
 library is full-featured on every device, with hex in the detail; the
 Gallery groups by time; the canvas-size chips stay as they are.
 
-Not yet designed: iPhone (Gallery, Capture, Sketchbook transfer, Quick look)
-and Mac (Workspace with docked panels, Add images, Paint library table).
+## iPhone screens
+
+[`screens/iphone.html`](screens/iphone.html): the same projects and workflow
+on a phone held upright (393 × 852 pt). A sketchbook is just a project whose
+canvas is the sketchbook page.
+
+| Screen | Key points |
+|---|---|
+| Gallery | Large title, two columns, grouped by month; Open from Files, Settings, ＋. |
+| New project | Bottom sheet; same three choices; Create opens Camera with Canvas chosen. |
+| Camera — Capture | Project is a menu (shoot for any project, or New project…); Canvas \| Reference above the shutter; Photos. |
+| Camera — Adjust corners | Bigger handles, loupe beside the corner; compact sheet; **Add layer** or **Share photo instead**. |
+| Transfer — Transform | Top bar: back, undo, Transfer \| Color, Full screen, Share. One-row context bar (mode menu, ⋯ for flips and Fit). Bottom toolbar replaces the tool strip and adds **Layers**. |
+| Transfer — Layers & Look | One half-height sheet: layer row on top, the selected layer's Look below (opacity first, blend; Levels and Hue / Saturation one level down). |
+| Transfer — Full screen | Canvas as wide as the phone; replaces the separate “Quick look”. |
+| Compare — Split | A / B chosen from the labels on the canvas; modes in one row. |
+| Color — Simplify | Value check for sketchbook shading; Swatches sheet holds Details and Paints & mixes. |
+| Paint library | iOS list with search, Paints \| Palettes, medium chips. |
+| Edit paint | Grouped form, same fields as iPad. |
+
+Not drawn for iPhone (same content as iPad, in a sheet or list): Look's
+Levels and Hue / Saturation pages, Compare — Blink, Color — Pick and the
+Swatches sheet, Share, Settings.
+
+Not yet designed: Mac (Workspace with docked panels, Add images, Paint
+library table).
