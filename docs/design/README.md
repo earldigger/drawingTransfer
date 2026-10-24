@@ -84,4 +84,39 @@ These get the biggest, closest-to-hand controls.
   image (colored UI next to the image changes how its colors look). One accent
   color only for the selection and active tool.
 
-Next: wireframes of this screen, then Camera, Compare, Color workspace and Gallery.
+### Wireframes (done)
+
+Figma page *2 · Workspace · Transfer* has two iPad frames, each with numbered
+notes beside it:
+
+- **Transform active** — top bar, tool strip (Transform selected), canvas with
+  transform handles on the drawing layer, layer strip (three layers), and the
+  Transform context bar.
+- **Look popover** — the same screen with no tool active and the Look popover
+  open on the Drawing layer: Levels (histogram + Black / Gamma / White boxes),
+  Hue / Saturation / Lightness, Colorize, Invert, Perspective → Edit corners.
+  It opens to the left of the layer strip so the layer stays visible.
+
+Reusable components on that page: `icon/*` (15 line icons), **Tool button**
+(Default / Active, icon swap), **Layer card** (Selected yes / no; Name, Opacity,
+Blend text properties; opacity set by the slider's right padding).
+
+Choices made while drawing:
+
+- Chrome is dark neutral gray (#222224 panels on a #3A3A3C surround); the blue
+  accent appears only on the active tool and the selected layer. **Done** is a
+  light neutral button, not accent, to keep it to one accent.
+- The layer strip is ~166 pt wide, and the canvas fits between it and the tool
+  strip at a 16 × 20 aspect.
+
+Open questions:
+
+1. The Transform context bar overlaps the bottom of a tall canvas. Either
+   shrink the fit area while a tool is active, or accept it (the canvas pans).
+2. Is a 320 pt Look popover too big over the canvas? Alternative: a bottom
+   sheet with Levels only and *More* for the rest.
+3. Opacity as a one-finger vertical drag on the canvas while a layer is
+   selected — faster at the easel than reaching for the strip?
+4. Portrait iPad: does the layer strip move to the bottom?
+
+Next: Camera, Compare, Color workspace and Gallery.
