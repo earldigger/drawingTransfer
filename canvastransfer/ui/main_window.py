@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import time
 from pathlib import Path
 
@@ -32,7 +33,8 @@ from ..geometry import (
     normalize_quad,
 )
 from ..history import History, Snapshot
-from ..models import BlendMode, CompareMode, Layer, Project, Swatch, new_id
+from ..image_ops import default_look, has_default_look
+from ..models import BlendMode, CompareMode, Layer, LayerKind, Project, Swatch, new_id
 from ..paints import PaintLibrary
 from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
 from .canvas_view import CanvasView, LayerEntry, Marker
@@ -155,7 +157,8 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction("Projects Folder…", self.change_projects_folder)
         file_menu.addSeparator()
-        self.add_layer_action = file_menu.addAction("Add Image Layer…", self._import_image)
+        self.add_canvas_action = file_menu.addAction("Add Canvas Photo…", lambda: self._add_layer(LayerKind.CANVAS))
+        self.add_layer_action = file_menu.addAction("Add Reference…", lambda: self._add_layer(LayerKind.REFERENCE))
 
         edit_menu = self.menuBar().addMenu("&Edit")
         self.undo_action = edit_menu.addAction("Undo", QKeySequence.Undo, self._undo)
@@ -231,7 +234,7 @@ class MainWindow(QMainWindow):
                 lid, "adjustments", adj, key=("adjust", slider, lid) if slider else None
             )
         )
-        lp.addLayerRequested.connect(self._import_image)
+        lp.addLayerRequested.connect(lambda kind: self._add_layer(LayerKind(kind)))
         lp.deleteLayerRequested.connect(self._on_delete_layer)
         lp.moveLayerUpRequested.connect(lambda lid: self._on_move_layer(lid, +1))
         lp.moveLayerDownRequested.connect(lambda lid: self._on_move_layer(lid, -1))
@@ -259,7 +262,8 @@ class MainWindow(QMainWindow):
         self.grid_panel.setEnabled(has_project)
         self.compare_panel.setEnabled(has_project)
         self.color_panel.setEnabled(has_project)
-        for action in (self.close_action, self.save_action, self.save_as_action, self.add_layer_action):
+        for action in (self.close_action, self.save_action, self.save_as_action, self.add_canvas_action,
+                       self.add_layer_action):
             action.setEnabled(has_project)
         # no project: the start screen, without the editing toolbar and panels
         self.stack.setCurrentWidget(self.canvas_view if has_project else self.start_screen)
@@ -531,11 +535,14 @@ class MainWindow(QMainWindow):
 
     # -- image import -----------------------------------------------------
 
-    def _import_image(self) -> None:
+    def _add_layer(self, kind: LayerKind) -> None:
+        """Workflow steps 1 and 3: a canvas photo, or a reference on top of it.
+        Each kind starts with its own look (see DEFAULT_LOOK)."""
         if self.doc is None:
             QMessageBox.information(self, "No Project", "Create or open a project first.")
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Import Image", "", IMAGE_FILE_FILTER)
+        title = "Add Canvas Photo" if kind == LayerKind.CANVAS else "Add Reference"
+        path, _ = QFileDialog.getOpenFileName(self, title, "", IMAGE_FILE_FILTER)
         if not path:
             return
         try:
@@ -546,16 +553,32 @@ class MainWindow(QMainWindow):
 
         self._record()
         layer_id = new_id("layer")
-        layer = Layer(id=layer_id, name=Path(path).stem, image_filename=f"{layer_id}.png")
+        opacity, blend, adjustments = default_look(kind, image)
+        today = datetime.date.today()
+        layer = Layer(
+            id=layer_id,
+            name=f"{'Canvas' if kind == LayerKind.CANVAS else 'Reference'} · {today:%b} {today.day}",
+            image_filename=f"{layer_id}.png",
+            opacity=opacity,
+            blend_mode=blend,
+            adjustments=adjustments,
+            kind=kind,
+            perspective_fill_canvas=kind == LayerKind.CANVAS,
+        )
         self.doc.set_layer_image(layer_id, image)
         self.doc.project.add_layer(layer)
         self._refresh_all()
-        self.transform_action.setChecked(True)
-        self.statusBar().showMessage(
-            "Image fitted to the canvas. Drag inside the box to move, drag handles to scale, "
-            "drag the blue dot to rotate. Return = Done, Esc = Cancel."
-        )
         self._schedule_autosave()
+        if kind == LayerKind.CANVAS:
+            # step 2: put the four corners on the canvas's corners
+            self._on_perspective_correct(layer_id)
+            self.statusBar().showMessage("Canvas photo added. It fills the canvas at Normal 100 %.")
+        else:
+            self.transform_action.setChecked(True)
+            self.statusBar().showMessage(
+                "Reference added at Multiply 60 %, fitted to the canvas. Drag inside the box to move, "
+                "drag handles to scale, drag the blue dot to rotate. Return = Done, Esc = Cancel."
+            )
 
     # -- layer handlers ------------------------------------------------------
 
@@ -626,8 +649,16 @@ class MainWindow(QMainWindow):
             self._record()
             layer.perspective_corners = dialog.result_corners()
             layer.perspective_fill_canvas = dialog.result_fill_canvas()
+            kind = LayerKind.CANVAS if layer.perspective_fill_canvas else LayerKind.REFERENCE
+            if kind != layer.kind:
+                # switched between canvas and reference: take the new kind's look,
+                # unless the old one was already changed by hand
+                untouched = has_default_look(layer, raw)
+                layer.kind = kind
+                if untouched:
+                    layer.opacity, layer.blend_mode, layer.adjustments = default_look(kind, raw)
             layer.quad = None  # re-place the corrected image
-            self._refresh_canvas()
+            self._refresh_all()
             self._schedule_autosave()
 
     # -- transform tool ---------------------------------------------------------

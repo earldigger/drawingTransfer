@@ -1,5 +1,5 @@
 """Four-point perspective correction dialog: drag a corner onto each corner
-of the photographed drawing/canvas; Apply warps that quad to a rectangle.
+of the photographed canvas or reference; Apply warps that quad to a rectangle.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class PerspectiveDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Perspective Correction")
+        self.setWindowTitle("Adjust Corners")
         self.resize(820, 700)
 
         h, w = image_rgba.shape[:2]
@@ -68,7 +68,7 @@ class PerspectiveDialog(QDialog):
         self._result_corners: PerspectiveCorners | None = None
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Drag each red handle onto a corner of the drawing or canvas."))
+        layout.addWidget(QLabel("Drag each red handle onto a corner of the canvas or reference."))
 
         self.scene = QGraphicsScene(self)
         self.view = QGraphicsView(self.scene)
@@ -96,11 +96,11 @@ class PerspectiveDialog(QDialog):
             self._handles.append(handle)
         self._update_polygon()
 
-        self.keep_radio = QRadioButton("Keep the photo's proportions (drawing or reference)")
-        self.fill_radio = QRadioButton("Stretch to fill the canvas (photo of the canvas itself)")
+        self.fill_radio = QRadioButton("Canvas: stretch to fill the canvas exactly (Normal 100 %)")
+        self.keep_radio = QRadioButton("Reference: keep the photo's proportions (Multiply 60 %)")
         (self.fill_radio if fill_canvas else self.keep_radio).setChecked(True)
-        layout.addWidget(self.keep_radio)
         layout.addWidget(self.fill_radio)
+        layout.addWidget(self.keep_radio)
 
         buttons = QHBoxLayout()
         reset_btn = QPushButton("Reset")

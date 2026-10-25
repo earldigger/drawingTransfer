@@ -14,7 +14,7 @@ import math
 import numpy as np
 import cv2
 
-from .models import Adjustments, PerspectiveCorners
+from .models import DEFAULT_LOOK, Adjustments, BlendMode, Layer, LayerKind, PerspectiveCorners
 
 MAX_DISPLAY_EDGE = 2400
 
@@ -66,6 +66,41 @@ def levels_curve(black: int, gamma: float, white: int, invert: bool = False) -> 
     span = max(float(white - black), 1.0)
     t = np.clip((x - black) / span, 0.0, 1.0)
     return t ** (1.0 / max(gamma, 1e-3))
+
+
+AUTO_LEVELS_CLIP = 0.5  # percent of pixels allowed to clip at each end
+AUTO_LEVELS_MIN_SPAN = 32  # never stretch a nearly flat image into noise
+
+
+def auto_levels(image: np.ndarray) -> tuple[int, int]:
+    """Dark and light points (0..255) that stretch the image's luminance to
+    the full range, ignoring the darkest and lightest AUTO_LEVELS_CLIP %
+    (specks, glare). For a photographed drawing this turns gray paper white
+    and the lines dark. Transparent pixels are ignored."""
+    rgb = image[..., :3].astype(np.float32)
+    luma = rgb @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
+    if image.shape[-1] == 4:
+        luma = luma[image[..., 3] > 0]
+    if luma.size == 0:
+        return 0, 255
+    black, white = (int(round(v)) for v in np.percentile(luma, [AUTO_LEVELS_CLIP, 100 - AUTO_LEVELS_CLIP]))
+    if white - black < AUTO_LEVELS_MIN_SPAN:
+        return 0, 255
+    return black, white
+
+
+def default_look(kind: LayerKind, image: np.ndarray) -> tuple[float, BlendMode, Adjustments]:
+    """Opacity, blend mode and adjustments a new layer of this kind starts with."""
+    opacity, blend, levels = DEFAULT_LOOK[kind]
+    black, white = auto_levels(image) if levels else (0, 255)
+    return opacity, blend, Adjustments(black=black, white=white)
+
+
+def has_default_look(layer: Layer, image: np.ndarray) -> bool:
+    """True when the layer still looks exactly as its kind starts, i.e. the
+    user hasn't touched opacity, blend or adjustments."""
+    opacity, blend, adjustments = default_look(layer.kind, image)
+    return (layer.opacity, layer.blend_mode, layer.adjustments) == (opacity, blend, adjustments)
 
 
 def _rgba_lut(rgb_lut: np.ndarray) -> np.ndarray:

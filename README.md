@@ -1,10 +1,11 @@
 # Canvas Transfer -- Python Prototype
 
 A desktop prototype validating the workflow described in the Canvas
-Transfer App project spec: photograph a drawing, correct its perspective,
-overlay it on a photographed canvas with Multiply blending and a grid,
-compare successive canvas photos, and save/reopen the project with
-everything intact.
+Transfer App project spec: photograph the canvas and correct its
+perspective, add a reference (a photo or drawing) on top with Multiply
+blending and a grid, fit it with Transform, compare successive canvas
+photos, and save/reopen the project with everything intact. Names and
+defaults follow the app design in `docs/design/README.md`.
 
 **This is deliberately not the target platform.** The spec calls for a
 native iPhone/iPad/Mac app in Swift, SwiftUI, Core Image, AVFoundation, and
@@ -26,13 +27,25 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   File > Projects Folder… or on the start screen. Save As still saves a
   copy anywhere; a project that couldn't be saved asks before closing
 - Project creation with canvas width/height/units (in/cm)
-- Image import (file picker); phone photos are rotated upright from their
-  EXIF orientation
-- Four-point perspective correction with draggable handles, either keeping
-  the photo's proportions (drawings) or stretching to fill the canvas
-  (photos of the canvas itself)
-- Imported images are fitted inside the canvas (never cropped) and open
-  with the transform box active
+- Two kinds of layer, added from the file picker (File menu or the Layers
+  panel); phone photos are rotated upright from their EXIF orientation:
+  - **Add Canvas Photo…**: a photo of your canvas. Opens **Adjust Corners**
+    straight away, then stretches to fill the canvas exactly. Starts at
+    Normal 100 % with no auto levels, so the painting's values stay true.
+    Goes just under the references, above older canvas photos, which are
+    left as they were
+  - **Add Reference…**: the photo or drawing to transfer. Goes on top at
+    Multiply 60 % (white paper disappears) with auto levels (paper to
+    white, lines to dark, as an editable Levels setting), fitted inside
+    the canvas (never cropped), with the transform box active
+  - Named by kind and date ("Canvas · Oct 25", "Reference · Oct 25");
+    rename by double-clicking
+- **Adjust Corners**: four-point perspective correction with draggable
+  handles, as Canvas (stretch to fill the canvas) or Reference (keep the
+  photo's proportions). Switching between them takes the other kind's
+  look, unless you had already changed opacity, blend or adjustments.
+  Projects saved before layers had a kind open with canvas photos
+  recognised by their fill-the-canvas setting
 - Fresco-style transform tool: 8 handles plus a rotation handle; drag
   inside the box to move; modes **Proportional**, **Free** (independent
   width/height), **Skew**, **Distort**; Flip Horizontal/Vertical; Fit to
@@ -45,14 +58,15 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Undo/Redo (Cmd+Z / Shift+Cmd+Z) for every project edit; a slider drag
   is one step. Compare-mode settings are not undoable (viewing choice)
 - Layers: add, delete, rename (double-click), reorder, show/hide, select
-- Per-layer opacity and blend mode: Normal, Multiply, Screen, Linear Light
+- Per-layer **Look**: opacity and blend mode (Normal, Multiply, Screen, Linear Light)
 - Per-layer Levels (dark point, midtones, light point) and Invert values
 - Per-layer Hue / Saturation (hue, saturation, lightness) with Colorize,
   Photoshop-style; every adjustment slider has a typeable number box
 - Grid overlay: rows, columns, opacity, thickness, RGB color picker,
   3x3 / 4x5 / 8x10 presets
-- Compare: Overlay, Blink Layer A only (rest of the stack stays on),
-  Blink A/B (alternate), Split view
+- Compare: Overlay, Blink reference (layer A only; the rest of the stack
+  stays on), Blink A/B (alternate), Split. A defaults to the top reference
+  and B to the newest canvas photo
 - Save/open as a `.ctproj` package; autosave (debounced) once saved
 
 ### Color Study (side panel tab)
@@ -209,12 +223,13 @@ color, mouse-driven dragging, color picking and highlight pixels.
 
 ```
 canvastransfer/
-  models.py        Project, Layer (placement quad, perspective corners,
-                    blend, adjustments), GridSettings, Swatch
+  models.py        Project, Layer (kind, placement quad, perspective corners,
+                    blend, adjustments), DEFAULT_LOOK, GridSettings, Swatch
   geometry.py       pure transform-tool math: fit, move, rotate,
                     proportional/free scale, skew, distort, flip
   image_ops.py      perspective correction, downscaling, levels,
-                    hue/saturation, invert
+                    hue/saturation, invert, auto levels, and each
+                    layer kind's default look
   color_study.py    sampling, CIELAB/Munsell, warm-cool, complement,
                     tints/shades/tones (Mixbox), similar-color masks
   paints.py         paint library, saved-page import, stand-ins

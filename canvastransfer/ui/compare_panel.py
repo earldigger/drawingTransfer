@@ -12,12 +12,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..compare import default_compare_layers
 from ..models import CompareMode, Project
 
 
 class ComparePanel(QWidget):
     """Overlay / Blink / Split comparison between two chosen layers --
-    typically the source drawing and the latest canvas photo.
+    by default the reference and the newest canvas photo.
     """
 
     settingsChanged = Signal()  # re-read via current_* methods
@@ -33,9 +34,9 @@ class ComparePanel(QWidget):
 
         self.mode = QComboBox()
         self.mode.addItem("Overlay (normal stack)", CompareMode.OVERLAY.value)
-        self.mode.addItem("Blink Layer A only (rest stays on)", CompareMode.BLINK_A.value)
+        self.mode.addItem("Blink reference (layer A only; the rest stays on)", CompareMode.BLINK_A.value)
         self.mode.addItem("Blink A / B (alternate)", CompareMode.BLINK.value)
-        self.mode.addItem("Split View (A left, B right)", CompareMode.SPLIT.value)
+        self.mode.addItem("Split (A left, B right)", CompareMode.SPLIT.value)
         form.addRow("Mode", self.mode)
 
         self.layer_a = QComboBox()
@@ -66,12 +67,16 @@ class ComparePanel(QWidget):
 
     def refresh_layers(self, project: Project) -> None:
         self._updating = True
-        for combo, selected in ((self.layer_a, project.compare_layer_a), (self.layer_b, project.compare_layer_b)):
+        ids = {l.id for l in project.layers}
+        default_a, default_b = default_compare_layers(project)
+        for combo, selected, default in ((self.layer_a, project.compare_layer_a, default_a),
+                                         (self.layer_b, project.compare_layer_b, default_b)):
             combo.clear()
             for layer in reversed(project.layers):  # same order as the Layers list
                 combo.addItem(layer.name, layer.id)
-            if selected and combo.findData(selected) >= 0:
-                combo.setCurrentIndex(combo.findData(selected))
+            chosen = selected if selected in ids else default
+            if chosen and combo.findData(chosen) >= 0:
+                combo.setCurrentIndex(combo.findData(chosen))
         idx = self.mode.findData(project.compare_mode.value)
         if idx >= 0:
             self.mode.setCurrentIndex(idx)

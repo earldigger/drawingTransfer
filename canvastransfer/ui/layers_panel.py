@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..models import Adjustments, BlendMode, Layer, Project
+from ..models import Adjustments, BlendMode, Layer, LayerKind, Project
 from .slider_row import ValueSliderRow
 
 LAYER_ID_ROLE = Qt.UserRole + 1
@@ -57,7 +57,7 @@ class LayersPanel(QWidget):
     # layer id, new Adjustments, control name ("" = discrete change; the same
     # name in quick succession is merged into one undo step)
     layerAdjustmentsChanged = Signal(str, object, str)
-    addLayerRequested = Signal()
+    addLayerRequested = Signal(str)  # a LayerKind value
     deleteLayerRequested = Signal(str)
     moveLayerUpRequested = Signal(str)
     moveLayerDownRequested = Signal(str)
@@ -88,26 +88,34 @@ class LayersPanel(QWidget):
         self.list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
         v.addWidget(self.list_widget)
 
+        adds = QHBoxLayout()
+        self.add_canvas_button = QPushButton("Add Canvas Photo…")
+        self.add_canvas_button.setToolTip("A photo of your canvas: you set its corners and it fills the canvas")
+        self.add_button = QPushButton("Add Reference…")
+        self.add_button.setToolTip("The photo or drawing to transfer: added on top at Multiply 60 %")
+        adds.addWidget(self.add_canvas_button)
+        adds.addWidget(self.add_button)
+        v.addLayout(adds)
         buttons = QHBoxLayout()
-        self.add_button = QPushButton("Add Image…")
         self.delete_button = QPushButton("Delete")
         self.up_button = QPushButton("↑")
         self.down_button = QPushButton("↓")
-        for b in (self.add_button, self.delete_button, self.up_button, self.down_button):
+        for b in (self.delete_button, self.up_button, self.down_button):
             buttons.addWidget(b)
         v.addLayout(buttons)
-        self.add_button.clicked.connect(self.addLayerRequested)
+        self.add_canvas_button.clicked.connect(lambda: self.addLayerRequested.emit(LayerKind.CANVAS.value))
+        self.add_button.clicked.connect(lambda: self.addLayerRequested.emit(LayerKind.REFERENCE.value))
         self.delete_button.clicked.connect(lambda: self._emit_for_current(self.deleteLayerRequested))
         self.up_button.clicked.connect(lambda: self._emit_for_current(self.moveLayerUpRequested))
         self.down_button.clicked.connect(lambda: self._emit_for_current(self.moveLayerDownRequested))
 
-        self.perspective_button = QPushButton("Perspective Correct…")
+        self.perspective_button = QPushButton("Edit Corners…")
         self.perspective_button.clicked.connect(lambda: self._emit_for_current(self.perspectiveCorrectRequested))
         v.addWidget(self.perspective_button)
         return box
 
     def _build_appearance_box(self) -> QGroupBox:
-        box = QGroupBox("Layer Appearance")
+        box = QGroupBox("Look")
         grid = QGridLayout(box)
         grid.addWidget(QLabel("Opacity"), 0, 0)
         self.opacity_slider = QSlider(Qt.Horizontal)

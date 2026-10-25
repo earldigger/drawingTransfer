@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .models import Project, CompareMode, BlendMode
+from .models import Project, CompareMode, BlendMode, LayerKind
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,17 @@ def display_states(project: Project, blink_phase_on: bool) -> dict[str, DisplayS
         return states
 
     return normal
+
+
+def default_compare_layers(project: Project) -> tuple[str | None, str | None]:
+    """A = the top reference, B = the newest canvas photo (the top one, since a
+    new canvas photo goes above the older ones). Falls back to the top layers."""
+    references = [l.id for l in project.layers if l.kind == LayerKind.REFERENCE]
+    canvases = [l.id for l in project.layers if l.kind == LayerKind.CANVAS]
+    stack = [l.id for l in reversed(project.layers)]
+    a = references[-1] if references else (stack[0] if stack else None)
+    b = canvases[-1] if canvases else next((lid for lid in stack if lid != a), a)
+    return a, b
 
 
 def uses_split_line(project: Project) -> bool:
