@@ -161,7 +161,7 @@ class MainWindow(QMainWindow):
         self.add_canvas_action = file_menu.addAction("Add Canvas Photo…", lambda: self._add_layer(LayerKind.CANVAS))
         self.add_layer_action = file_menu.addAction("Add Reference…", lambda: self._add_layer(LayerKind.REFERENCE))
 
-        edit_menu = self.menuBar().addMenu("&Edit")
+        edit_menu = self.edit_menu = self.menuBar().addMenu("&Edit")
         self.undo_action = edit_menu.addAction("Undo", QKeySequence.Undo, self._undo)
         self.redo_action = edit_menu.addAction("Redo", QKeySequence.Redo, self._redo)
 
@@ -197,6 +197,20 @@ class MainWindow(QMainWindow):
         self.cancel_action.setToolTip("Undo everything since Transform was turned on (Esc)")
         bar.addSeparator()
 
+        self.crop_action = QAction("Crop", self)
+        self.crop_action.setCheckable(True)
+        self.crop_action.setShortcut("Alt+Ctrl+K")
+        self.crop_action.setToolTip("Trim the selected reference: drag the corners or edges (⌥⌘K). "
+                                    "Done keeps it, Cancel undoes it")
+        self.crop_action.toggled.connect(self._on_crop_toggled)
+        bar.addAction(self.crop_action)
+        self.reset_crop_action = bar.addAction("Reset Crop", self._reset_crop)
+        self.reset_crop_action.setToolTip("Show the whole reference again")
+        self.edit_menu.addSeparator()
+        self.edit_menu.addAction(self.crop_action)
+        self.edit_menu.addAction(self.reset_crop_action)
+        bar.addSeparator()
+
         self.pick_action = QAction("Pick Color", self)
         self.pick_action.setCheckable(True)
         self.pick_action.setShortcut("I")
@@ -223,17 +237,7 @@ class MainWindow(QMainWindow):
         self.flip_v_action = bar.addAction("Flip Vertical", lambda: self._flip(horizontal=False))
         self.fit_action = bar.addAction("Fit to Canvas", self._fit_active)
         self.fit_action.setToolTip("Reset the selected layer to fit inside the canvas")
-        bar.addSeparator()
 
-        self.crop_action = QAction("Crop", self)
-        self.crop_action.setCheckable(True)
-        self.crop_action.setShortcut("Alt+Ctrl+K")
-        self.crop_action.setToolTip("Trim the selected reference: drag the corners or edges (⌥⌘K). "
-                                    "Done keeps it, Cancel undoes it")
-        self.crop_action.toggled.connect(self._on_crop_toggled)
-        bar.addAction(self.crop_action)
-        self.reset_crop_action = bar.addAction("Reset Crop", self._reset_crop)
-        self.reset_crop_action.setToolTip("Show the whole reference again")
 
     def _wire_panels(self) -> None:
         lp = self.layers_panel
@@ -252,6 +256,7 @@ class MainWindow(QMainWindow):
         lp.moveLayerDownRequested.connect(lambda lid: self._on_move_layer(lid, -1))
         lp.renameLayerRequested.connect(self._on_rename_layer)
         lp.perspectiveCorrectRequested.connect(self._on_perspective_correct)
+        lp.cropRequested.connect(self._crop_layer)
 
         self.grid_panel.gridChanged.connect(self._on_grid_changed)
         self.compare_panel.settingsChanged.connect(self._on_compare_changed)
@@ -717,6 +722,14 @@ class MainWindow(QMainWindow):
                 "Return = Done, Esc = Cancel.")
         else:
             self.canvas_view.set_crop_mode(False)
+
+    def _crop_layer(self, layer_id: str) -> None:
+        """Crop… in the Layers panel: crop that layer."""
+        if self.doc is None or self.doc.project.get_layer(layer_id) is None:
+            return
+        if layer_id != self.doc.project.active_layer_id:
+            self._on_layer_selected(layer_id)
+        self.crop_action.setChecked(True)
 
     def _on_crop_committed(self, layer_id: str, crop) -> None:
         layer = self.doc.project.get_layer(layer_id) if self.doc else None

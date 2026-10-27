@@ -53,7 +53,8 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   width/height), **Skew**, **Distort**; Flip Horizontal/Vertical; Fit to
   Canvas. Content pushed past the canvas edge is hidden, not lost, and
   shows faintly while the box is active
-- **Crop** a reference (toolbar, ⌥⌘K): drag the crop's corners or edges to
+- **Crop** a reference (toolbar next to Transform, Edit menu, Crop… in the
+  Layers panel, or ⌥⌘K): drag the crop's corners or edges to
   trim tape, a table edge or another sketch; drag inside to slide it. The
   cut-off part shows faintly while cropping and is hidden after Done. The
   crop is stored with the layer as fractions of its image, so it moves,

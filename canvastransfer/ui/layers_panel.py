@@ -63,6 +63,7 @@ class LayersPanel(QWidget):
     moveLayerDownRequested = Signal(str)
     renameLayerRequested = Signal(str, str)
     perspectiveCorrectRequested = Signal(str)
+    cropRequested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -109,9 +110,15 @@ class LayersPanel(QWidget):
         self.up_button.clicked.connect(lambda: self._emit_for_current(self.moveLayerUpRequested))
         self.down_button.clicked.connect(lambda: self._emit_for_current(self.moveLayerDownRequested))
 
+        corners_row = QHBoxLayout()
         self.perspective_button = QPushButton("Edit Corners…")
         self.perspective_button.clicked.connect(lambda: self._emit_for_current(self.perspectiveCorrectRequested))
-        v.addWidget(self.perspective_button)
+        self.crop_button = QPushButton("Crop…")
+        self.crop_button.setToolTip("Trim the selected reference (⌥⌘K). Canvas photos are cropped by their corners")
+        self.crop_button.clicked.connect(lambda: self._emit_for_current(self.cropRequested))
+        corners_row.addWidget(self.perspective_button)
+        corners_row.addWidget(self.crop_button)
+        v.addLayout(corners_row)
         return box
 
     def _build_appearance_box(self) -> QGroupBox:
@@ -212,6 +219,7 @@ class LayersPanel(QWidget):
     def sync_appearance(self, layer: Layer | None) -> None:
         self._updating = True
         self._set_layer_controls_enabled(layer is not None)
+        self.crop_button.setEnabled(layer is not None and layer.kind == LayerKind.REFERENCE)
         if layer is not None:
             self.opacity_slider.setValue(round(layer.opacity * 100))
             self.blend_combo.setCurrentIndex(self.blend_combo.findData(layer.blend_mode.value))

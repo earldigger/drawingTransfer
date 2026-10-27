@@ -169,3 +169,20 @@ def test_dragging_a_crop_corner_with_the_mouse(view, qapp):
     (lid, crop), = committed
     assert lid == "a" and crop == pytest.approx((0.0, 0.0, 0.75, 0.5), abs=0.03)
     assert view.quad("a") == [(20, 20), (60, 20), (60, 60), (20, 60)]  # the layer itself didn't move
+
+
+def test_crop_is_reachable_without_the_toolbar(window):
+    """Narrow windows hide the end of the toolbar, so Crop is also in the
+    Edit menu and the Layers panel."""
+    w, (_, top) = window
+    assert w.crop_action in w.edit_menu.actions()
+    assert w.layers_panel.crop_button.isEnabled()
+    w.layers_panel.crop_button.click()
+    assert w.crop_action.isChecked() and w.transform_action.isChecked()
+
+
+def test_crop_button_is_off_for_canvas_photos(window):
+    w, (bottom, _) = window
+    bottom.kind = LayerKind.CANVAS
+    w._on_layer_selected(bottom.id)
+    assert not w.layers_panel.crop_button.isEnabled()
