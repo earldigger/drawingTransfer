@@ -33,7 +33,7 @@ from ..geometry import (
     normalize_quad,
 )
 from ..history import History, Snapshot
-from ..image_ops import default_look, has_default_look
+from ..image_ops import default_look, has_default_look, layer_default_look
 from ..models import BlendMode, CompareMode, Layer, LayerKind, Project, Swatch, new_id
 from ..paints import PaintLibrary
 from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
@@ -557,7 +557,8 @@ class MainWindow(QMainWindow):
         today = datetime.date.today()
         layer = Layer(
             id=layer_id,
-            name=f"{'Canvas' if kind == LayerKind.CANVAS else 'Reference'} · {today:%b} {today.day}",
+            # canvas photos are told apart by date, references by what they show
+            name=f"Canvas · {today:%b} {today.day}" if kind == LayerKind.CANVAS else Path(path).stem,
             image_filename=f"{layer_id}.png",
             opacity=opacity,
             blend_mode=blend,
@@ -647,16 +648,14 @@ class MainWindow(QMainWindow):
         dialog = PerspectiveDialog(raw, layer.perspective_corners, layer.perspective_fill_canvas, self)
         if dialog.exec() == PerspectiveDialog.Accepted:
             self._record()
+            untouched = has_default_look(layer, raw)  # judged before the new corners
             layer.perspective_corners = dialog.result_corners()
             layer.perspective_fill_canvas = dialog.result_fill_canvas()
-            kind = LayerKind.CANVAS if layer.perspective_fill_canvas else LayerKind.REFERENCE
-            if kind != layer.kind:
-                # switched between canvas and reference: take the new kind's look,
-                # unless the old one was already changed by hand
-                untouched = has_default_look(layer, raw)
-                layer.kind = kind
-                if untouched:
-                    layer.opacity, layer.blend_mode, layer.adjustments = default_look(kind, raw)
+            layer.kind = LayerKind.CANVAS if layer.perspective_fill_canvas else LayerKind.REFERENCE
+            if untouched:
+                # the kind's look, with auto levels measured inside the new corners;
+                # a look changed by hand is kept
+                layer.opacity, layer.blend_mode, layer.adjustments = layer_default_look(layer, raw)
             layer.quad = None  # re-place the corrected image
             self._refresh_all()
             self._schedule_autosave()

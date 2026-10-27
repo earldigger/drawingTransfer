@@ -149,7 +149,7 @@ class FakeCornersDialog:
 def test_add_reference_goes_on_top_at_multiply_60_with_transform_on(window):
     window._add_layer(LayerKind.REFERENCE)
     added = window.doc.project.layers[-1]
-    assert added.kind == LayerKind.REFERENCE and added.name.startswith("Reference · ")
+    assert added.kind == LayerKind.REFERENCE and added.name == "photo"  # named after the file
     assert (added.opacity, added.blend_mode) == (0.6, BlendMode.MULTIPLY)
     assert (added.adjustments.black, added.adjustments.white) == (60, 200)
     assert window.transform_action.isChecked()
@@ -180,6 +180,34 @@ def test_switching_to_reference_in_corners_takes_the_reference_look(window, monk
     added = window.doc.project.layers[-1]
     assert added.kind == LayerKind.REFERENCE
     assert (added.opacity, added.blend_mode) == (0.6, BlendMode.MULTIPLY)
+
+
+def test_auto_levels_are_measured_again_inside_the_corners(window, monkeypatch, tmp_path):
+    """A drawing photographed on a dark table: before the corners are set the
+    table is the darkest thing; after, only the paper and the lines count."""
+    import canvastransfer.ui.main_window as mw
+    from PySide6.QtWidgets import QFileDialog
+    from canvastransfer.models import PerspectiveCorners
+
+    photo = np.full((60, 60, 4), 20, dtype=np.uint8)  # dark table
+    photo[..., 3] = 255
+    photo[10:50, 10:50, :3] = 200  # paper
+    photo[20:24, 15:45, :3] = 90  # a line on the paper
+    path = tmp_path / "on_table.png"
+    cv2.imwrite(str(path), cv2.cvtColor(photo, cv2.COLOR_RGBA2BGRA))
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(lambda *a, **k: (str(path), "")))
+    window._add_layer(LayerKind.REFERENCE)
+    added = window.doc.project.layers[-1]
+    assert added.adjustments.black == 20  # the table set the dark point
+
+    class PaperCorners(FakeCornersDialog):
+        def __init__(self, *a, **k):
+            self._corners = PerspectiveCorners((10, 10), (50, 10), (50, 50), (10, 50))
+
+    monkeypatch.setattr(mw, "PerspectiveDialog", PaperCorners)
+    PaperCorners.fill = False
+    window._on_perspective_correct(added.id)
+    assert (added.adjustments.black, added.adjustments.white) == (90, 200)
 
 
 def test_switching_kind_keeps_a_look_changed_by_hand(window, monkeypatch):

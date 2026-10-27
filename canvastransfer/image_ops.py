@@ -96,11 +96,27 @@ def default_look(kind: LayerKind, image: np.ndarray) -> tuple[float, BlendMode, 
     return opacity, blend, Adjustments(black=black, white=white)
 
 
-def has_default_look(layer: Layer, image: np.ndarray) -> bool:
+LEVELS_SOURCE_EDGE = 1200  # auto levels only needs a statistic, not every pixel
+
+
+def levels_source(layer: Layer, raw: np.ndarray) -> np.ndarray:
+    """What auto levels measures: the area inside the layer's corners once
+    they are set, so a table or wall around the paper doesn't count."""
+    if layer.perspective_corners is None:
+        return raw
+    size = capped_size(*corrected_size(layer.perspective_corners), LEVELS_SOURCE_EDGE)
+    return perspective_correct(raw, layer.perspective_corners, size)
+
+
+def layer_default_look(layer: Layer, raw: np.ndarray) -> tuple[float, BlendMode, Adjustments]:
+    """The default look for this layer's kind, measured on its current corners."""
+    return default_look(layer.kind, levels_source(layer, raw))
+
+
+def has_default_look(layer: Layer, raw: np.ndarray) -> bool:
     """True when the layer still looks exactly as its kind starts, i.e. the
     user hasn't touched opacity, blend or adjustments."""
-    opacity, blend, adjustments = default_look(layer.kind, image)
-    return (layer.opacity, layer.blend_mode, layer.adjustments) == (opacity, blend, adjustments)
+    return (layer.opacity, layer.blend_mode, layer.adjustments) == layer_default_look(layer, raw)
 
 
 def _rgba_lut(rgb_lut: np.ndarray) -> np.ndarray:

@@ -38,12 +38,14 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
     Multiply 60 % (white paper disappears) with auto levels (paper to
     white, lines to dark, as an editable Levels setting), fitted inside
     the canvas (never cropped), with the transform box active
-  - Named by kind and date ("Canvas · Oct 25", "Reference · Oct 25");
-    rename by double-clicking
+  - Canvas photos are named by date ("Canvas · Oct 25"), references by
+    their file name; rename by double-clicking
 - **Adjust Corners**: four-point perspective correction with draggable
   handles, as Canvas (stretch to fill the canvas) or Reference (keep the
   photo's proportions). Switching between them takes the other kind's
   look, unless you had already changed opacity, blend or adjustments.
+  Auto levels are measured again inside the new corners, so a table or
+  wall around the paper doesn't set the dark point
   Projects saved before layers had a kind open with canvas photos
   recognised by their fill-the-canvas setting
 - Fresco-style transform tool: 8 handles plus a rotation handle; drag
