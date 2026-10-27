@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas Transfer iPhone Screens</title>
+<style>
+:root {
+  --page: #ECEBE8; --page-text: #1C1C1E; --note-bg: #F7F6F4; --note-text: #333; --note-sub: #666;
+  --surround: #3A3A3C; --panel: rgba(34,34,36,.96); --panel-solid: #222224; --stroke: #38383B;
+  --ctl: #2E2E31; --seg: #4A4A4E; --text: #EDEDED; --sub: #9A9A9E; --accent: #3463A8; --accent-hi: #7FA8EC;
+  --mark: #96643C; --s: 1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --page: #161617; --page-text: #EDEDED; --note-bg: #232325; --note-text: #CFCFD2; --note-sub: #9A9A9E; }
+}
+:root[data-theme="dark"] { --page: #161617; --page-text: #EDEDED; --note-bg: #232325; --note-text: #CFCFD2; --note-sub: #9A9A9E; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif; }
+header.doc { padding: 32px 16px 8px; max-width: 1700px; margin: 0 auto; }
+header.doc h1 { margin: 0 0 4px; font-size: 28px; }
+header.doc p { margin: 0 0 12px; color: var(--note-sub); max-width: 760px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+nav.toc a { color: inherit; }
+main { max-width: 1700px; margin: 0 auto; padding: 12px 16px 40px; display: flex; flex-wrap: wrap; gap: 40px 32px; }
+section.screen { width: calc(393px * var(--s)); flex: none; }
+section.screen > h2 { margin: 0 0 10px; font-size: 17px; }
+.stage { width: calc(393px * var(--s)); height: calc(852px * var(--s)); }
+.notes { margin-top: 14px; background: var(--note-bg); border-radius: 12px; padding: 16px 18px; color: var(--note-text); font-size: 14px; }
+.notes h3 { margin: 12px 0 2px; font-size: 14px; color: var(--page-text); }
+.notes h3:first-child { margin-top: 0; }
+.notes p { margin: 0 0 6px; }
+.n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 10px; background: var(--mark); color: #fff; font-size: 11px; font-weight: 700; margin-right: 6px; vertical-align: 1px; }
+
+/* ---------- iPhone frame ---------- */
+.phone { position: relative; width: 393px; height: 852px; overflow: hidden; background: var(--surround); color: var(--text);
+  transform: scale(var(--s)); transform-origin: 0 0; border-radius: 54px; font-size: 13px; box-shadow: 0 0 0 10px #111, 0 10px 40px rgba(0,0,0,.3);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; }
+.abs { position: absolute; }
+.status { position: absolute; left: 0; right: 0; top: 0; height: 54px; z-index: 60; display: flex; align-items: center; justify-content: space-between; padding: 6px 34px 0 46px; font-weight: 600; font-size: 16px; color: #fff; pointer-events: none; }
+.island { position: absolute; left: 50%; top: 11px; width: 126px; height: 37px; margin-left: -63px; border-radius: 19px; background: #000; z-index: 61; }
+.home { position: absolute; left: 50%; bottom: 8px; width: 134px; height: 5px; margin-left: -67px; border-radius: 3px; background: #fff; opacity: .85; z-index: 61; }
+.panel { background: var(--panel); border: 1px solid var(--stroke); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+.ic { width: 24px; height: 24px; stroke: #E6E6E6; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ic.sm { width: 18px; height: 18px; }
+.ic.blue { stroke: var(--accent-hi); }
+.nav { position: absolute; left: 0; right: 0; top: 54px; height: 48px; display: flex; align-items: center; padding: 0 6px; gap: 2px; background: var(--panel-solid); border-bottom: 1px solid var(--stroke); z-index: 5; }
+.nav .sp { flex: 1; }
+.iconbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 9px; flex: none; }
+.seg { display: flex; gap: 2px; padding: 2px; background: var(--ctl); border-radius: 9px; }
+.seg > span { padding: 0 10px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--sub); font-size: 13px; white-space: nowrap; }
+.seg > span.on { background: var(--accent); color: #fff; font-weight: 600; }
+.seg.fill > span { flex: 1; padding: 0 4px; }
+.seg.small > span { height: 28px; font-size: 12px; }
+.toolbar { position: absolute; left: 0; right: 0; bottom: 0; height: 90px; background: var(--panel-solid); border-top: 1px solid var(--stroke); display: flex; justify-content: space-around; padding: 6px 4px 0; z-index: 5; }
+.tb { width: 60px; height: 50px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10px; color: var(--sub); position: relative; }
+.tb.on { background: var(--accent); color: #fff; }
+.badge { position: absolute; right: 10px; top: 3px; min-width: 16px; height: 16px; border-radius: 8px; background: #555; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+.canvas { position: absolute; box-shadow: 0 6px 24px rgba(0,0,0,.4); overflow: hidden; }
+.canvas > svg, .canvas > div > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ctx { position: absolute; left: 8px; right: 8px; bottom: 98px; padding: 6px; display: flex; align-items: center; gap: 6px; z-index: 6; }
+.btn { height: 40px; padding: 0 12px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
+.btn.quiet { color: var(--sub); }
+.btn.fill { background: var(--ctl); }
+.mark { position: absolute; width: 24px; height: 24px; border-radius: 12px; background: var(--mark); color: #fff; font-weight: 700; font-size: 12px; display: grid; place-items: center; z-index: 70; }
+.lbl { font-size: 11px; font-weight: 600; letter-spacing: .6px; color: var(--sub); text-transform: uppercase; }
+.slider { position: relative; height: 28px; flex: 1; }
+.col > .slider { flex: none; }
+.slider::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--v), #4A4A4E var(--v)); }
+.slider::after { content: ""; position: absolute; top: 2px; left: calc(var(--v) - 12px); width: 24px; height: 24px; border-radius: 12px; background: #fff; border: 2px solid var(--accent); box-sizing: border-box; }
+.switch { width: 50px; height: 30px; border-radius: 15px; background: #4A4A4E; position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 26px; height: 26px; border-radius: 13px; background: #fff; }
+.switch.on { background: var(--accent); }
+.switch.on::after { left: 22px; }
+.field { background: var(--ctl); border-radius: 8px; padding: 10px 12px; font-size: 15px; }
+.pill { position: absolute; padding: 0 14px; height: 36px; border-radius: 18px; display: flex; align-items: center; gap: 8px; background: rgba(34,34,36,.95); font-size: 14px; white-space: nowrap; }
+.vrow { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 30; background: #1C1C1E; border-radius: 14px 14px 0 0; border-top: 1px solid var(--stroke); box-shadow: 0 -8px 32px rgba(0,0,0,.4); }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: #555; margin: 6px auto 0; }
+.list > div { display: flex; align-items: center; gap: 12px; padding: 0 16px; min-height: 48px; border-bottom: 1px solid #2A2A2D; font-size: 15px; }
+.list > div .sp { flex: 1; }
+.list > div .v { color: var(--sub); }
+.group { background: #232325; border-radius: 12px; margin: 0 16px; overflow: hidden; }
+.group > div { display: flex; align-items: center; gap: 10px; padding: 0 14px; min-height: 46px; border-bottom: 1px solid #2E2E31; font-size: 15px; }
+.group > div:last-child { border-bottom: 0; }
+.group .k { width: 104px; color: var(--sub); flex: none; }
+.ghead { margin: 18px 32px 6px; font-size: 12px; color: var(--sub); text-transform: uppercase; letter-spacing: .5px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-transform" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/><rect x="3.5" y="3.5" width="4" height="4" fill="#E6E6E6"/><rect x="16.5" y="3.5" width="4" height="4" fill="#E6E6E6"/><rect x="3.5" y="16.5" width="4" height="4" fill="#E6E6E6"/><rect x="16.5" y="16.5" width="4" height="4" fill="#E6E6E6"/></symbol>
+    <symbol id="i-perspective" viewBox="0 0 24 24"><path d="M8 5h8l4 14H4z"/><path d="M12 5v14M6 12h12"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9.33h16M4 14.66h16M9.33 4v16M14.66 4v16"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="#E6E6E6"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a5.5 5.5 0 0 1 0 11h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 5 5 5-5 5"/><path d="M21 10H10a5.5 5.5 0 0 0 0 11h3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H5v11h14V10h-2"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-flipH" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 7 4 17h5zM15 7l5 10h-5z"/></symbol>
+    <symbol id="i-flipV" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 9 17 4v5zM7 15l10 5v-5z"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v16h16M2 6h16v16"/></symbol>
+    <symbol id="art-ref" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <use href="#art-lines" width="500" height="625"/>
+      <rect x="452" y="0" width="48" height="625" fill="#5A4636"/>
+      <rect x="6" y="10" width="78" height="26" fill="#CDBB8E" transform="rotate(-12 45 23)"/>
+      <path d="M14 590c25-22 60-24 92-4M24 612c20-12 44-12 66 0M70 560v30" fill="none" stroke="#2E2018" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+    <symbol id="i-pick" viewBox="0 0 24 24"><path d="M14 4l6 6-2 2-6-6z"/><path d="M13 7 5 15l-1 5 5-1 8-8"/></symbol>
+    <symbol id="i-simplify" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h8V4M12 20v-8h8"/></symbol>
+    <symbol id="i-highlight" viewBox="0 0 24 24"><path d="M9 15 4 20h5l2-2"/><path d="m9 15 3 3 8-8-3-3z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z"/></symbol>
+
+    <!-- artwork, 500 x 625 (16 x 20) -->
+    <symbol id="art-paint" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#9AA3AB"/><rect y="430" width="500" height="195" fill="#B7AE9F"/>
+      <path d="M150 230c-10-110 50-170 105-170s120 50 105 175c-10 60-20 120-30 150H180c-15-40-28-90-30-155z" fill="#4A3426"/>
+      <path d="M215 350h75v85h-75z" fill="#C48E74"/>
+      <ellipse cx="255" cy="250" rx="92" ry="125" fill="#D9A58A"/>
+      <path d="M300 140c45 45 55 130 30 190-15 30-40 45-60 42 40-50 50-160 30-232z" fill="#B97E66"/>
+      <path d="M60 625c20-150 100-200 195-200s170 50 190 200z" fill="#3F5A6E"/>
+      <ellipse cx="225" cy="240" rx="13" ry="6" fill="#3B2A1E"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#3B2A1E"/>
+      <ellipse cx="258" cy="335" rx="22" ry="7" fill="#A85A55"/>
+    </symbol>
+    <symbol id="art-lines" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <g fill="none" stroke="#2E2018" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M163 250c0-95 42-160 92-160s92 65 92 160c0 80-38 125-92 125s-92-45-92-125z"/>
+        <path d="M210 240c10-7 22-7 32 0M275 240c10-7 22-7 32 0"/><path d="M257 255c-5 30-10 48-1 56 8 5 17 1 21-3"/>
+        <path d="M236 335c14 8 30 8 44 0"/><path d="M150 230c-10-110 50-170 105-170s120 50 105 175"/>
+        <path d="M215 375c-3 30-8 45-25 55-65 15-115 50-125 195M290 375c3 30 8 45 25 55 65 15 115 50 125 195"/>
+      </g>
+    </symbol>
+    <symbol id="art-paper" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#F4F2EE"/><use href="#art-lines"/>
+    </symbol>
+    <symbol id="art-values" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#ABABAB"/><rect y="430" width="500" height="195" fill="#ABABAB"/>
+      <path d="M150 230c-10-110 50-170 105-170s120 50 105 175c-10 60-20 120-30 150H180c-15-40-28-90-30-155z" fill="#1B1B1B"/>
+      <path d="M215 350h75v85h-75z" fill="#777777"/>
+      <ellipse cx="255" cy="250" rx="92" ry="125" fill="#ABABAB"/>
+      <path d="M300 140c45 45 55 130 30 190-15 30-40 45-60 42 40-50 50-160 30-232z" fill="#777777"/>
+      <path d="M60 625c20-150 100-200 195-200s170 50 190 200z" fill="#474747"/>
+      <path d="M215 205c20-30 60-35 80-10" fill="none" stroke="#E2E2E2" stroke-width="18" stroke-linecap="round"/>
+      <ellipse cx="225" cy="240" rx="13" ry="6" fill="#1B1B1B"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#1B1B1B"/>
+      <ellipse cx="258" cy="335" rx="22" ry="7" fill="#777777"/>
+    </symbol>
+    <symbol id="scene" viewBox="0 0 1180 820">
+      <rect width="1180" height="820" fill="#5E564E"/><rect y="560" width="1180" height="260" fill="#4A433C"/><rect x="590" y="700" width="18" height="120" fill="#3A332C"/>
+      <polygon points="330,150 860,120 900,700 300,690" fill="#EEEAE2"/>
+      <g transform="matrix(1.06,-0.06,-0.048,0.864,330,150)"><use href="#art-lines" width="500" height="625"/></g>
+      <ellipse cx="760" cy="260" rx="90" ry="50" fill="#fff" opacity=".35"/>
+    </symbol>
+    <symbol id="i-exitfull" viewBox="0 0 24 24"><path d="M20 4l-6 6M14 5v5h5M4 20l6-6M10 19v-5H5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="art-toned" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#C9B79C"/><path d="M0 0h500v625H0z" fill="#B9A587" opacity=".35" transform="skewX(-8)"/>
+      <ellipse cx="330" cy="420" rx="160" ry="120" fill="#BFA98A" opacity=".5"/>
+    </symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+    <symbol id="i-swatch" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="scene-p" viewBox="0 0 393 852">
+      <rect width="393" height="852" fill="#6B5D4F"/><rect width="393" height="852" fill="#5A4D40" opacity=".5" transform="skewY(12)"/>
+      <polygon points="52,236 346,214 372,628 34,648" fill="#3C3A38"/>
+      <polygon points="60,230 340,210 365,620 40,640" fill="#EFEBE3"/>
+      <g transform="matrix(0.56,-0.04,-0.032,0.656,60,230)"><use href="#art-lines" width="500" height="625"/></g>
+    </symbol>
+    <symbol id="art-paint-early" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#A9B0B5"/><rect y="430" width="500" height="195" fill="#C0B8AB"/>
+      <ellipse cx="250" cy="245" rx="105" ry="140" fill="#6B5040"/>
+      <ellipse cx="258" cy="255" rx="85" ry="115" fill="#D3A68E"/>
+      <path d="M70 625c20-150 100-195 190-195s165 50 185 195z" fill="#556B7C"/>
+    </symbol>
+  </defs>
+</svg>
+<header class="doc">
+  <p class="switch-dev" style="margin:0 0 6px;font-size:14px"><a href="ipad.html" style="color:inherit">iPad</a> · <b>iPhone</b> · <a href="mac.html" style="color:inherit">Mac</a></p>
+  <h1>Canvas Transfer — iPhone screens</h1>
+  <p>The same projects and workflow as the iPad (see <code>ipad.html</code>), on a phone held upright: 393 × 852 pt, drawn to scale. Taking photos for a project and sketchbook transfer at a cafe come first; the color tools are there but rarely used. Numbered markers refer to the notes under each screen.</p>
+  <nav class="toc" id="toc"></nav>
+</header>
+<main id="screens"></main>
+
+<script>
+const ic = (id, cls = "") => `<svg class="ic ${cls}"><use href="#i-${id}"/></svg>`;
+const mark = (n, x, y) => `<div class="mark" style="left:${x}px;top:${y}px">${n}</div>`;
+const art = (id, extra = "") => `<svg viewBox="0 0 500 625" preserveAspectRatio="none" ${extra}><use href="#${id}"/></svg>`;
+const chrome = (light = false) => `<div class="island"></div><div class="status" style="${light ? "color:#111" : ""}"><span>9:41</span><span style="letter-spacing:2px">▮▮▮ ◔ ▭</span></div><div class="home" style="${light ? "background:#111" : ""}"></div>`;
+const canvas = (x, y, w, h, inner) => `<div class="canvas" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${inner}</div>`;
+
+// Workspace fit: between the nav bar (bottom 102) and the context bar (top ~706), 8 pt side margins.
+const WF = { x: 8, y: 150, w: 377, h: 471 };
+const REF = { x: 34, y: 34, w: 170, h: 212 };  // reference placed small, upper left (inside the canvas)
+const placedRef = `<div class="abs" style="left:${REF.x}px;top:${REF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
+const workCanvas = () => canvas(WF.x, WF.y, WF.w, WF.h, art("art-toned") + placedRef);
+const handles = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid var(--accent);z-index:4">
+  ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 8px);top:calc(${b}% - 8px);width:16px;height:16px;background:#fff;border:2px solid var(--accent);border-radius:4px"></i>`).join("")}</div>`;
+
+function nav(ws = "Transfer") {
+  return `<div class="nav"><div class="iconbtn">${ic("back")}</div><div class="iconbtn">${ic("undo")}</div><div class="sp"></div>
+    <div class="iconbtn">${ic("full")}</div><div class="iconbtn">${ic("share")}</div>
+    <div class="seg abs" style="left:50%;transform:translateX(-50%)"><span class="${ws === "Transfer" ? "on" : ""}" style="width:76px">Transfer</span><span class="${ws === "Color" ? "on" : ""}" style="width:76px">Color</span></div></div>`;
+}
+const TOOLS = { Transfer: [["camera", "Camera"], ["transform", "Transform"], ["perspective", "Perspective"], ["grid", "Grid"], ["compare", "Compare"], ["layers", "Layers"]],
+                Color: [["pick", "Pick"], ["simplify", "Simplify"], ["highlight", "Highlight"], ["grid", "Grid"], ["swatch", "Swatches"], ["layers", "Layers"]] };
+function toolbar(ws, active) {
+  return `<div class="toolbar">${TOOLS[ws].map(([id, l]) => `<div class="tb ${id === active ? "on" : ""}">${ic(id, "sm")}${l}${id === "layers" ? `<span class="badge">3</span>` : ""}</div>`).join("")}</div>`;
+}
+
+const screens = [];
+const S = (id, title, html, notes) => screens.push({ id, title, html, notes });
+
+// ---------- Gallery ----------
+const projects = [["Portrait of Ana", "16 × 20 in · Today", "art-toned"], ["Sketchbook, Lisbon", "8 × 10 in · Oct 21", "art-paper"],
+  ["Still life, pears", "12 × 16 in · Oct 12", "art-paint"], ["Self portrait", "11 × 14 in · Sep 30", "art-values"]];
+S("gallery", "Gallery", `
+  <div class="abs" style="inset:0;background:#1C1C1E"></div>${chrome()}
+  <div class="abs vrow" style="top:54px;left:8px;right:8px;height:44px;justify-content:flex-end;gap:0">
+    <div class="iconbtn">${ic("folder")}</div><div class="iconbtn">${ic("gear")}</div><div class="iconbtn">${ic("plus", "blue")}</div></div>
+  <div class="abs" style="left:16px;top:100px;font-size:32px;font-weight:700">Projects</div>
+  <div class="abs vrow" style="left:16px;top:144px;color:var(--sub);gap:6px">${ic("cloud", "sm")}iCloud Drive</div>
+  ${[["October", projects.slice(0, 3), 180], ["September", projects.slice(3), 712]].map(([g, list, top]) => `
+    <div class="abs" style="left:16px;top:${top}px;font-size:17px;font-weight:600">${g}</div>
+    <div class="abs" style="left:16px;right:16px;top:${top + 32}px;display:grid;grid-template-columns:1fr 1fr;gap:18px 12px">
+      ${list.map((p, i) => `<div class="col" style="gap:6px"><div style="height:170px;border-radius:12px;background:#2A2A2D;display:grid;place-items:center;${top === 180 && i === 0 ? "outline:3px solid var(--accent);outline-offset:2px" : ""}">
+        <div style="width:118px;height:148px;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.4)">${art(p[2], 'style="position:absolute;inset:0;width:100%;height:100%"')}</div></div>
+        <div><b style="font-size:14px">${p[0]}</b><div style="color:var(--sub);font-size:12px">${p[1]}</div></div></div>`).join("")}
+    </div>`).join("")}
+  ${mark(1, 222, 64)}${mark(2, 120, 180)}
+`, `
+  <h3><span class="n">1</span>Same Gallery, phone-sized</h3>
+  <p>Large title, two columns, grouped by month like the iPad. Top right: Open from Files, Settings, <b>＋ New project</b>. Projects sync through iCloud Drive, so a sketchbook started here opens on the iPad.</p>
+  <h3><span class="n">2</span>Cards</h3>
+  <p>Tap opens; long-press for Rename, Duplicate, Share, Delete.</p>
+`);
+
+// ---------- New project ----------
+const sizes = ["8 × 10", "9 × 12", "11 × 14", "12 × 16", "16 × 20", "18 × 24", "24 × 30", "24 × 36", "30 × 40", "36 × 48", "Custom"];
+S("new-project", "New project", `
+  <div class="abs" style="inset:0;background:#0E0E0F"></div>${chrome()}
+  <div class="sheet" style="top:64px">
+    <div class="grab"></div>
+    <div class="vrow" style="height:48px;padding:0 16px"><span style="color:var(--sub);font-size:16px">Cancel</span><b style="flex:1;text-align:center;font-size:16px">New project</b><span class="btn primary" style="height:34px">Create</span></div>
+    <div class="col" style="padding:8px 16px;gap:16px">
+      <div class="col" style="gap:6px"><span class="lbl">Name</span><div class="field">Sketchbook, Lisbon</div></div>
+      <div class="col" style="gap:8px"><div class="vrow"><span class="lbl" style="flex:1">Canvas size</span><div class="seg small"><span class="on">in</span><span>cm</span></div></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${sizes.map(s => `<span class="btn ${s === "8 × 10" ? "primary" : "fill"}" style="height:38px;min-width:76px;font-size:14px">${s}</span>`).join("")}</div></div>
+      <div class="vrow" style="align-items:flex-start;gap:16px">
+        <div class="col" style="gap:8px;flex:1"><span class="lbl">Orientation</span><div class="seg fill"><span class="on">Portrait</span><span>Landscape</span></div></div>
+        <div style="width:80px;height:100px;background:#E7E1D6;border-radius:3px;box-shadow:0 2px 8px rgba(0,0,0,.4);display:grid;place-items:end center;color:#555;font-size:11px;padding-bottom:4px">8 × 10</div>
+      </div>
+      <div style="color:var(--sub);font-size:12px">Saved at once to iCloud Drive / Canvas Transfer</div>
+    </div>
+  </div>
+  ${mark(3, 358, 178)}
+`, `
+  <h3><span class="n">3</span>Same three choices</h3>
+  <p>Name, size, orientation — a sheet from the bottom instead of a centered dialog. For a sketchbook, the page size is the canvas size (Custom for odd sketchbooks). <b>Create</b> opens Camera with <b>Canvas</b> chosen: photograph the sketchbook page.</p>
+`);
+
+// ---------- Camera — Capture ----------
+S("camera-capture", "Camera — Capture", `
+  <svg class="abs" style="inset:0" width="393" height="852" viewBox="0 0 393 852"><use href="#scene-p" width="393" height="852"/>
+    <polygon points="60,230 340,210 365,620 40,640" fill="#3463A8" fill-opacity=".12" stroke="#5B8FE0" stroke-width="3" stroke-linejoin="round"/>
+    ${[[60,230],[340,210],[365,620],[40,640]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="6" fill="#5B8FE0"/>`).join("")}</svg>
+  ${chrome()}
+  <div class="pill" style="left:12px;top:60px">Cancel</div>
+  <div class="pill" style="right:12px;top:60px;font-size:13px">Sketchbook, Lisbon ${ic("down", "sm")}</div>
+  <div class="pill" style="left:50%;transform:translateX(-50%);top:150px;height:30px;background:var(--accent);color:#fff;font-size:13px">Rectangle found · hold steady</div>
+  <div class="abs" style="left:0;right:0;bottom:0;height:190px;background:rgba(0,0,0,.6)"></div>
+  <div class="abs seg" style="left:50%;transform:translateX(-50%);bottom:136px;border-radius:19px;padding:3px;background:rgba(34,34,36,.95)">
+    <span style="border-radius:16px;padding:0 18px">Canvas</span><span class="on" style="border-radius:16px;padding:0 18px">Reference</span></div>
+  <svg class="abs" style="left:158px;bottom:40px" width="76" height="76" viewBox="0 0 80 80"><circle cx="40" cy="40" r="37" fill="none" stroke="#fff" stroke-width="4"/><circle cx="40" cy="40" r="31" fill="#fff"/></svg>
+  <div class="abs" style="left:40px;bottom:54px;width:46px;height:46px;border-radius:8px;background:#8F8577;border:1.5px solid #fff"></div>
+  ${mark(4, 224, 96)}${mark(5, 52, 705)}${mark(6, 240, 760)}
+`, `
+  <h3><span class="n">4</span>Which project</h3>
+  <p>On the phone you often shoot for a project you'll finish on the iPad, so the project is a menu here: any project, or <b>New project…</b>. Opened from inside a project, it's already chosen.</p>
+  <h3><span class="n">5</span>Canvas | Reference</h3>
+  <p>Same choice and defaults as the iPad (Canvas first, then Reference, then Canvas). Above the shutter, where the thumb reaches.</p>
+  <h3><span class="n">6</span>Shutter, Photos</h3>
+  <p>Bottom center, iOS convention. Photos on the left picks an existing image. Live detection and warnings as on the iPad. No auto capture.</p>
+`);
+
+// ---------- Camera — Adjust corners ----------
+// photo area shows the part of the phone scene around the page: viewBox 20 170 365 470 → 377 × 485 at (8, 110)
+const PK = 377 / 365, PXo = 8, PYo = 110, PQ = [[60,230],[340,210],[365,620],[40,640]].map(([x, y]) => [PXo + (x - 20) * PK, PYo + (y - 170) * PK]);
+S("camera-corners", "Camera — Adjust corners", `
+  <div class="abs" style="inset:0;background:#161617"></div>${chrome()}
+  <div class="abs vrow" style="top:54px;left:16px;right:16px;height:48px;font-size:16px"><span>Retake</span><b style="flex:1;text-align:center">Adjust corners</b><span style="color:var(--sub)">Cancel</span></div>
+  <svg class="abs" style="left:${PXo}px;top:${PYo}px" width="377" height="${470 * PK}" viewBox="20 170 365 470"><use href="#scene-p" width="393" height="852"/>
+    <path fill-rule="evenodd" d="M0 0H393V852H0Z M60 230 L340 210 L365 620 L40 640Z" fill="#000" fill-opacity=".5"/>
+    <polygon points="60,230 340,210 365,620 40,640" fill="none" stroke="#5B8FE0" stroke-width="2.5"/></svg>
+  ${PQ.map(([x, y], i) => `<div class="abs" style="left:${x - 16}px;top:${y - 16}px;width:32px;height:32px;border-radius:16px;border:3px solid var(--accent);background:rgba(255,255,255,${i === 1 ? 1 : .25})"></div>`).join("")}
+  <div class="abs" style="left:${PQ[1][0] - 150}px;top:${PQ[1][1] + 20}px;width:110px;height:110px;border-radius:55px;overflow:hidden;border:3px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.5)">
+    <svg width="110" height="110" viewBox="0 0 110 110"><rect width="110" height="110" fill="#6B5D4F"/><polygon points="-40,62 55,55 60,160 -40,160" fill="#EFEBE3"/><path d="M55 5v100M5 55h100" stroke="#5B8FE0" stroke-width="1.5"/><circle cx="55" cy="55" r="8" fill="none" stroke="#5B8FE0" stroke-width="2"/></svg></div>
+  <div class="sheet" style="height:254px;padding:14px 16px 0">
+    <div class="vrow" style="gap:12px"><div style="width:52px;height:65px;position:relative;flex:none;box-shadow:0 2px 6px rgba(0,0,0,.5)">${art("art-paper", 'style="position:absolute;inset:0;width:100%;height:100%"')}</div>
+      <div class="col" style="flex:1;gap:8px"><div class="seg fill" style="border-radius:18px;padding:3px"><span style="border-radius:15px">Canvas</span><span class="on" style="border-radius:15px">Reference</span></div>
+        <span style="color:var(--sub);font-size:12px">3024 × 3780 px · ratio 4 : 5</span></div></div>
+    <div class="vrow" style="margin-top:12px;height:40px"><span style="flex:1;font-size:15px">Auto levels</span><div class="switch on"></div><div class="iconbtn" style="font-size:20px">↻</div><div class="iconbtn" style="font-size:20px;color:var(--sub)">↺</div></div>
+    <div class="btn primary" style="width:100%;height:50px;border-radius:12px;font-size:16px;margin-top:10px">Add layer</div>
+    <div style="text-align:center;margin-top:10px;color:var(--accent-hi);font-size:14px">Share photo instead</div>
+  </div>
+  ${mark(7, PQ[1][0] - 20, PQ[1][1] - 44)}${mark(8, 360, 656)}${mark(9, 352, 800)}
+`, `
+  <h3><span class="n">7</span>Corners and loupe</h3>
+  <p>As on the iPad, with bigger handles (32 pt) for fingers. The loupe sits beside the corner being dragged — away from the edge of the screen, so it never falls off.</p>
+  <h3><span class="n">8</span>Compact sheet</h3>
+  <p>Preview (no title), Canvas | Reference, pixel size; Auto levels (on for references, off for canvas photos), Rotate 90°, Reset to detected as icons.</p>
+  <h3><span class="n">9</span>Add layer · Share photo instead</h3>
+  <p><b>Add layer</b> adds it to the chosen project — it appears on the iPad through iCloud. <b>Share photo instead</b> sends just the corrected image (AirDrop, Messages, Files) without touching a project.</p>
+`);
+
+// ---------- Transfer — Transform ----------
+const transformBar = `<div class="panel ctx"><div class="btn fill" style="padding:0 10px">Proportional ${ic("down", "sm")}</div><div class="btn fill" style="width:44px;padding:0">⋯</div><div class="btn fill" style="width:44px;padding:0">${ic("crop", "sm")}</div><div style="flex:1"></div><div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>`;
+S("transfer-transform", "Transfer — Transform", `
+  ${chrome()}${nav()}
+  ${workCanvas()}
+  ${handles(WF.x + REF.x, WF.y + REF.y, REF.w, REF.h)}
+  ${transformBar}
+  ${toolbar("Transfer", "transform")}
+  ${mark(10, 96, 64)}${mark(11, 360, 160)}${mark(12, 120, 680)}${mark(13, 360, 772)}
+`, `
+  <h3><span class="n">10</span>Top bar</h3>
+  <p>Back to Gallery, Undo, the Transfer | Color switch, Full screen, Share. Redo is a three-finger tap (as on iPad); the project name is in the Gallery, there isn't room for it here.</p>
+  <h3><span class="n">11</span>The view</h3>
+  <p>The canvas fits the width, between the top bar and the context bar, and keeps that size whether a bar shows or not. Pinch and two-finger pan as on iPad. Here: a sketchbook page with a small reference in the upper left.</p>
+  <h3><span class="n">12</span>Context bar</h3>
+  <p>One row: the mode as a menu (Proportional / Free / Skew / Distort), ⋯ for Flip H, Flip V and Fit, <b>Crop</b> (next screen), then Cancel and <b>Done</b>.</p>
+  <h3><span class="n">13</span>Toolbar</h3>
+  <p>The tool strip becomes a bottom toolbar (thumb reach): Camera, Transform, Perspective, Grid, Compare, and <b>Layers</b> — there's no room for a layer bar on the side.</p>
+`);
+
+// ---------- Transfer — Crop ----------
+const CROP = { l: .06, t: .08, r: .12, b: .09 };
+const cropFrame = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);z-index:4">
+  <i class="abs" style="left:33.3%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="left:66.6%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i>
+  <i class="abs" style="top:33.3%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="top:66.6%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i>
+  ${[["left:-4px;top:-4px", "border-left", "border-top"], ["right:-4px;top:-4px", "border-right", "border-top"], ["left:-4px;bottom:-4px", "border-left", "border-bottom"], ["right:-4px;bottom:-4px", "border-right", "border-bottom"]]
+    .map(([pos, a, b]) => `<i class="abs" style="${pos};width:24px;height:24px;${a}:5px solid #fff;${b}:5px solid #fff"></i>`).join("")}</div>`;
+const refArt = art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"');
+S("transfer-crop", "Transfer — Crop", `
+  ${chrome()}${nav()}
+  ${canvas(WF.x, WF.y, WF.w, WF.h, art("art-toned") + `<div class="abs" style="left:${REF.x}px;top:${REF.y}px;width:${REF.w}px;height:${REF.h}px">
+    <div class="abs" style="inset:0;opacity:.25">${refArt}</div>
+    <div class="abs" style="inset:0;clip-path:inset(${CROP.t * 100}% ${CROP.r * 100}% ${CROP.b * 100}% ${CROP.l * 100}%)">${refArt}</div></div>`)}
+  ${cropFrame(WF.x + REF.x + REF.w * CROP.l, WF.y + REF.y + REF.h * CROP.t, REF.w * (1 - CROP.l - CROP.r), REF.h * (1 - CROP.t - CROP.b))}
+  <div class="panel ctx"><div class="btn fill" style="padding:0 10px">Free ${ic("down", "sm")}</div><div class="btn fill">Reset</div><div style="flex:1"></div><div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>
+  ${toolbar("Transfer", "transform")}
+  ${mark(1, 230, 200)}${mark(2, 150, 680)}
+`, `
+  <h3><span class="n">1</span>Crop a reference</h3>
+  <p>The crop button in the Transform bar (or Crop in the Layers &amp; Look sheet). Drag the corners to trim tape, the table edge or another sketch from the reference; 32 pt corner handles for fingers. What's cut off shows faintly while cropping and is hidden after Done — never deleted.</p>
+  <h3><span class="n">2</span>Crop bar</h3>
+  <p>Free / Original / Square as a menu, Reset, Cancel, <b>Done</b>. The crop moves, scales and flips with the reference afterwards. Canvas photos don't get Crop: their corners already decide what's kept.</p>
+`);
+
+// ---------- Transfer — Layers & Look sheet ----------
+const thumb = (c, name, sel) => `<div class="col" style="width:76px;gap:4px;align-items:center"><div style="width:64px;height:64px;border-radius:10px;background:${c};${sel ? "outline:3px solid var(--accent);outline-offset:2px" : ""}"></div><span style="font-size:10px;line-height:1.2;text-align:center;color:${sel ? "#fff" : "var(--sub)"}">${name}</span></div>`;
+const row = (l, r) => `<div class="vrow" style="height:44px;border-bottom:1px solid #2A2A2D"><span style="flex:1;font-size:15px">${l}</span>${r}</div>`;
+S("transfer-layers", "Transfer — Layers & Look", `
+  ${chrome()}${nav()}
+  ${workCanvas()}
+  <div class="sheet" style="height:484px;padding:0 16px">
+    <div class="grab"></div>
+    <div class="vrow" style="gap:6px;margin-top:12px;overflow:hidden">
+      ${thumb("#F4F2EE", "Reference", true)}${thumb("#C9B79C", "Canvas ·<br>Oct 22", false)}${thumb("#B9A587", "Canvas ·<br>Oct 15", false)}
+      <div class="col" style="width:64px;align-items:center;gap:4px"><div style="width:56px;height:56px;border-radius:10px;background:var(--ctl);display:grid;place-items:center;margin-top:4px">${ic("plus")}</div><span style="font-size:11px;color:var(--sub)">Layer</span></div>
+    </div>
+    <div class="vrow" style="margin-top:14px"><b style="font-size:16px;flex:1">Opacity</b><b style="font-size:16px">60%</b><span style="opacity:1;margin-left:12px">${ic("eye", "sm")}</span></div>
+    <div class="slider" style="--v:60%;margin-top:6px;height:32px;flex:none"></div>
+    <div class="seg fill small" style="margin-top:8px"><span>Normal</span><span class="on">Multiply</span><span>Screen</span><span>Lin. Light</span></div>
+    <div style="margin-top:6px">
+      ${row("Levels", `<span style="color:var(--sub)">12 · 1.20 · 236 ›</span>`)}
+      ${row("Hue / Saturation", `<span style="color:var(--sub)">Sat −60 ›</span>`)}
+      ${row("Invert", `<div class="switch"></div>`)}
+      ${row("Crop", `<span style="color:var(--sub)">Edit crop ›</span>`)}
+      ${row("Perspective", `<span style="color:var(--sub)">Edit corners ›</span>`)}
+    </div>
+  </div>
+  ${mark(14, 352, 386)}${mark(15, 92, 498)}${mark(16, 84, 614)}
+`, `
+  <h3><span class="n">14</span>Layers and Look in one sheet</h3>
+  <p>Layers in the toolbar opens this sheet. The top row is the layers (tap to select, ＋ to add, long-press to hide, rename, delete, reorder); everything below is the selected layer's Look. One sheet instead of two keeps the phone usable with one hand.</p>
+  <h3><span class="n">15</span>Opacity first</h3>
+  <p>Full width, the biggest control, then blend mode. Defaults as on iPad: references Multiply 60 %, canvas photos Normal 100 %.</p>
+  <h3><span class="n">16</span>The rest one level down</h3>
+  <p>Levels and Hue / Saturation open as their own pages inside the sheet, with the same controls as the iPad. The sheet stops at half height so the canvas stays visible while adjusting; drag it up for more.</p>
+`);
+
+// ---------- Full screen ----------
+S("transfer-full", "Transfer — Full screen", `
+  <div class="abs" style="inset:0;background:#0E0E0F"></div>
+  ${canvas(0, 180, 393, 491, art("art-toned") + `<div class="abs" style="left:36px;top:36px;width:176px;height:220px">${art("art-lines", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`)}
+  ${chrome()}
+  <div class="abs" style="left:16px;top:64px;width:40px;height:40px;border-radius:20px;background:rgba(255,255,255,.12);opacity:.7;display:grid;place-items:center">${ic("exitfull")}</div>
+  ${mark(17, 64, 72)}
+`, `
+  <h3><span class="n">17</span>Full screen</h3>
+  <p>Canvas only, as wide as the phone. Turn the phone sideways for a landscape canvas. Exit with the faint button or a four-finger tap. Compare keeps running; a tap pauses the blink.</p>
+  <p>This also covers the old “Quick look” idea: opening a project and going full screen is the quick look.</p>
+`);
+
+// ---------- Compare ----------
+S("compare-split", "Compare — Split", `
+  ${chrome()}${nav()}
+  ${canvas(WF.x, WF.y, WF.w, WF.h, `<div class="abs" style="inset:0;clip-path:inset(0 45% 0 0)">${art("art-paper")}</div><div class="abs" style="inset:0;clip-path:inset(0 0 0 55%)">${art("art-paint")}</div>
+    <div class="abs" style="left:55%;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.5)"></div>
+    <div class="abs" style="left:55%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:20px;background:#fff;color:#333;display:grid;place-items:center;font-size:17px;box-shadow:0 2px 8px rgba(0,0,0,.4)">⇆</div>
+    <div class="pill" style="left:8px;top:8px;height:30px;font-size:12px;padding:0 10px">A · Reference ${ic("down", "sm")}</div>
+    <div class="pill" style="right:8px;top:8px;height:30px;font-size:12px;padding:0 10px">B · Oct 22 ${ic("down", "sm")}</div>`)}
+  <div class="panel ctx"><div class="seg fill small" style="flex:1"><span>Overlay</span><span>Blink ref.</span><span>Blink A/B</span><span class="on">Split</span></div></div>
+  ${toolbar("Transfer", "compare")}
+  ${mark(18, 140, 120)}${mark(19, 360, 680)}
+`, `
+  <h3><span class="n">18</span>A and B on the canvas</h3>
+  <p>No room for A / B menus in the bar, so the labels on the canvas are the menus: tap “A · Reference ▾” to choose another layer. Swap with the ⇆ handle (double-tap). Vertical split line only, as on iPad.</p>
+  <h3><span class="n">19</span>Mode</h3>
+  <p>Overlay, Blink reference, Blink A/B, Split in one row. In Blink, a speed slider replaces the split handle on the canvas. New canvas photo: Camera in the toolbar.</p>
+`);
+
+// ---------- Color — Simplify ----------
+S("color-simplify", "Color — Simplify", `
+  ${chrome()}${nav("Color")}
+  ${canvas(WF.x, WF.y, WF.w, WF.h, art("art-values"))}
+  <div class="abs" style="left:${WF.x}px;top:${WF.y + WF.h + 4}px;width:${WF.w}px;display:flex;height:14px;border-radius:4px;overflow:hidden">${["#1B1B1B","#474747","#474747","#777777","#ABABAB","#ABABAB","#ABABAB","#ABABAB","#E2E2E2"].map(c => `<i style="flex:1;background:${c}"></i>`).join("")}</div>
+  <div class="panel ctx"><div class="btn fill" style="padding:0 10px">Value scale ${ic("down", "sm")}</div><span style="color:var(--sub)">Steps</span><div class="slider" style="--v:20%"></div><span style="width:14px">5</span></div>
+  ${toolbar("Color", "simplify")}
+  ${mark(20, 360, 160)}${mark(21, 120, 680)}${mark(22, 290, 772)}
+`, `
+  <h3><span class="n">20</span>Value check in the sketchbook</h3>
+  <p>The one color tool likely to be used on the phone: Simplify the reference (or the sketchbook page) to 3–5 values to plan the shading. The strip under the canvas shows how much of each value there is.</p>
+  <h3><span class="n">21</span>Context bar</h3>
+  <p>Colors / Values / Value scale as a menu, and Steps. Smoothing and “Add as swatches” are under the menu.</p>
+  <h3><span class="n">22</span>Color toolbar</h3>
+  <p>Pick, Simplify, Highlight, Grid, Swatches, Layers. <b>Swatches</b> opens a sheet with the swatch list, Details and Paints &amp; mixes — the same content as the iPad panel, stacked.</p>
+`);
+
+// ---------- Color — Swatches sheet, Paints & mixes ----------
+const SW = [["#4A3426", 1], ["#D9A58A", 2], ["#B97E66", 3], ["#3F5A6E", 4], ["#9AA3AB", 5]];
+const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
+// a mix: chip = your swatch | the predicted mix, touching so the shift shows; one line per paint led by its share; ΔE and how close
+const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
+  <div class="col" style="gap:3px;flex:none"><div style="width:76px;height:76px;border-radius:10px;background:linear-gradient(90deg, ${a} 50%, ${b} 50%)"></div>
+    <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
+  <div class="col" style="flex:1;min-width:0;gap:3px">
+    ${paints.map(([amt, n, warn]) => `<div class="vrow" style="gap:8px;font-size:16px;line-height:1.25"><b style="width:44px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}${warn ? `<span style="color:#F2C14E" title="Color uncertain">⚠</span>` : ""}</div>`).join("")}
+    <b style="margin-top:3px;font-size:15px;font-weight:600;color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de} · ${parseFloat(de) < 2 ? "very close" : parseFloat(de) < 5 ? "close" : parseFloat(de) < 10 ? "noticeably different" : "far off"}</b>
+  </div></div>`;
+S("color-mixes", "Color — Paints & mixes", `
+  ${chrome()}${nav("Color")}
+  ${canvas(WF.x, WF.y, WF.w, WF.h, art("art-paint"))}
+    <div class="sheet" style="top:150px;padding:0 16px">
+    <div class="grab"></div>
+    <div class="vrow" style="gap:8px;margin-top:12px">
+      ${SW.map(([c, n]) => `<div style="position:relative;width:44px;height:44px;border-radius:9px;background:${c};${n === 3 ? "outline:3px solid var(--accent);outline-offset:2px" : ""}"><span style="position:absolute;left:4px;top:2px;font-size:10px;font-weight:700;color:${n === 2 || n === 5 ? "#222" : "#fff"}">${n}</span></div>`).join("")}
+      <div style="flex:1"></div><span style="color:var(--sub);font-size:12px">Pick to add</span></div>
+    <div class="seg fill small" style="margin-top:12px"><span>Details</span><span class="on">Paints &amp; mixes</span></div>
+    <div class="vrow" style="margin-top:12px;gap:10px"><div style="width:44px;height:30px;border-radius:6px;background:#B97E66"></div><div class="col"><b style="font-size:14px">Swatch 3 · Face, shadow</b><span style="color:var(--sub);font-size:12px">#B97E66 · 5YR 6/6</span></div></div>
+    <div style="margin-top:6px">
+      <div class="vrow" style="height:40px;border-bottom:1px solid #2A2A2D"><span style="flex:1;color:var(--sub)">Mix from</span><span>Zorn palette (oil) ›</span></div>
+      <div class="vrow" style="height:40px;border-bottom:1px solid #2A2A2D"><span style="flex:1;color:var(--sub)">Lighten with</span><span>Titanium white ›</span></div>
+    </div>
+    <div class="lbl" style="margin-top:12px">One paint</div>
+    ${mixRow("#B97E66", "#B27959", [["62%", "Yellow ochre"], ["38%", "Titanium white"]], "4.8")}
+    <div class="lbl" style="margin-top:12px">Two-paint mixes</div>
+    ${mixRow("#B97E66", "#BA7F66", [["55%", "Yellow ochre"], ["18%", "Vermilion"], ["27%", "Titanium white"]], "0.7")}
+    ${mixRow("#B97E66", "#B77B65", [["47%", "Vermilion", true], ["7%", "Ivory black"], ["46%", "Titanium white"]], "1.2")}
+    <div style="color:var(--sub);font-size:12px;margin-top:8px"><span style="color:#F2C14E">⚠</span> color uncertain — tap the mix for why</div>
+    <div class="vrow" style="height:40px;justify-content:center;color:var(--accent-hi);gap:6px">${ic("book", "sm blue")}Paint library</div>
+  </div>
+  ${mark(27, 280, 160)}${mark(28, 352, 278)}${mark(29, 96, 326)}${mark(30, 352, 438)}
+`, `
+  <h3><span class="n">27</span>Swatches sheet</h3>
+  <p><b>Swatches</b> in the Color toolbar opens this sheet. The top row is every swatch in the project; tap one to select it (its marker on the canvas is ringed when the sheet is dragged down). New swatches come from Pick.</p>
+  <h3><span class="n">28</span>Details | Paints &amp; mixes</h3>
+  <p>The same two tabs as the iPad panel, stacked. Details shows hex, L*a*b*, Munsell, value, warm / cool and the tint, shade, tone and complement strips.</p>
+  <h3><span class="n">29</span>Mix from · Lighten with</h3>
+  <p>All your paints in a medium, one of your palettes, or a classic palette (Zorn here); a white or water as the lightener.</p>
+  <h3><span class="n">30</span>Mixes</h3>
+  <p>Sized to read at arm’s length: a 76 pt chip (your swatch | the predicted mix), each paint on its own line led by its share of the mix (%, adding up to 100), then ΔE and how close it is (very close / close / noticeably different / far off; blue under 2). The two halves of the chip touch, so you see exactly how the mix shifts from your swatch — a very close match is meant to look almost seamless. ⚠ = this paint’s color is uncertain: outside what a screen can show, or mixed using a stand-in’s color. Tap the mix to see which. Amounts are a guide. The sheet opens tall for this tab; scroll for more mixes and the Paint library link, or drag it down to see the canvas.</p>
+`);
+
+// ---------- Paint library ----------
+const paints = [["#F2F1EC", "Titanium White", "Gamblin · PW6", true], ["#C99A45", "Yellow Ochre", "Gamblin · PY43", true], ["#C8432D", "Cadmium Red Light", "Winsor & Newton · PR108", false],
+  ["#B5432F", "Vermilion (hue)", "Michael Harding · PR255, PY65", true], ["#8E4A36", "Burnt Sienna", "Gamblin · PR101", false], ["#2B2A2A", "Ivory Black", "Old Holland · PBk9", true],
+  ["#1D3F8A", "Ultramarine Blue", "Gamblin · PB29", false]];
+S("paint-library", "Paint library", `
+  <div class="abs" style="inset:0;background:#1C1C1E"></div>${chrome()}
+  <div class="abs vrow" style="top:54px;left:8px;right:16px;height:44px"><span class="vrow" style="color:var(--accent-hi);font-size:16px;gap:0">${ic("back", "blue")}Color</span><div style="flex:1"></div><span style="color:var(--accent-hi);font-size:16px">Import</span><div class="iconbtn">${ic("plus", "blue")}</div></div>
+  <div class="abs" style="left:16px;top:98px;font-size:32px;font-weight:700">Paint library</div>
+  <div class="abs field vrow" style="left:16px;right:16px;top:146px;padding:8px 10px;color:var(--sub);font-size:15px">${ic("search", "sm")}Search paints, pigments</div>
+  <div class="abs seg fill" style="left:16px;right:16px;top:192px"><span class="on">Paints</span><span>Palettes</span></div>
+  <div class="abs vrow" style="left:16px;top:238px;gap:8px;white-space:nowrap">${[["Oil 42", true], ["Watercolor 28"], ["Acrylic 9"], ["Gouache 6"]].map(([l, on]) => `<span class="btn ${on ? "primary" : "fill"}" style="height:32px;border-radius:16px;font-size:13px">${l}</span>`).join("")}</div>
+  <div class="abs list" style="left:0;right:0;top:282px">
+    ${paints.map(p => `<div style="height:64px"><div style="width:40px;height:40px;border-radius:8px;background:${p[0]};flex:none"></div><div class="col" style="flex:1;min-width:0"><span>${p[1]}</span><span style="color:var(--sub);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p[2]}</span></div><span style="color:${p[3] ? "#E8C35A" : "#555"}">${p[3] ? "★" : "☆"}</span></div>`).join("")}
+  </div>
+  ${mark(23, 340, 104)}${mark(24, 364, 210)}
+`, `
+  <h3><span class="n">23</span>Full-featured on the phone</h3>
+  <p>A normal iOS list: search, Paints | Palettes, medium chips with counts, rows with color, name, brand · pigments, favorite star. <b>Import</b> a saved artistpigments.org page from Files; ＋ adds a paint by hand.</p>
+  <h3><span class="n">24</span>Medium</h3>
+  <p>The iPad's side list becomes chips; Favorites is the last chip.</p>
+`);
+
+// ---------- Edit paint ----------
+S("edit-paint", "Edit paint", `
+  <div class="abs" style="inset:0;background:#1C1C1E"></div>${chrome()}
+  <div class="abs vrow" style="top:54px;left:16px;right:16px;height:44px;font-size:16px"><span style="color:var(--sub)">Cancel</span><b style="flex:1;text-align:center">Edit paint</b><span style="color:var(--accent-hi);font-weight:600">Save</span></div>
+  <div class="abs" style="left:0;right:0;top:104px">
+    <div style="margin:4px 16px 0;height:86px;border-radius:12px;background:#B5432F"></div>
+    <div class="ghead">Color</div>
+    <div class="group"><div><span class="k">Hex</span>#B5432F</div><div><span class="k">L*a*b* (D50)</span>48.2  52.0  38.1</div></div>
+    <div class="ghead">Paint</div>
+    <div class="group">
+      <div><span class="k">Medium</span><span style="flex:1">Oil</span><span style="color:var(--sub)">›</span></div>
+      <div><span class="k">Name</span>Vermilion (hue)</div><div><span class="k">Brand</span>Michael Harding</div><div><span class="k">Series</span>2</div>
+      <div><span class="k">Pigments</span>PR255, PY65</div><div><span class="k">Opacity</span><span style="flex:1">Opaque</span><span style="color:var(--sub)">›</span></div>
+      <div><span class="k">Lightfast</span><span style="flex:1">ASTM I</span><span style="color:var(--sub)">›</span></div>
+      <div><span class="k">Drying</span><span style="flex:1">medium, 3–4 days</span><span style="color:#E8C35A;font-size:11px">● edited</span></div>
+    </div>
+  </div>
+  ${mark(25, 352, 214)}${mark(26, 316, 366)}
+`, `
+  <h3><span class="n">25</span>Same fields, stacked</h3>
+  <p>An iOS grouped form with the same fields as the iPad: color as hex or L*a*b* (type either; the other follows), then medium, name, brand, series, pigments, opacity, lightfastness, drying. Scroll for Source, Favorite, Use in mixes, Stand-in, Revert to site and Delete.</p>
+  <h3><span class="n">26</span>Medium</h3>
+  <p>Changing it (Oil → Watercolor) moves the paint to that list. Fields you change on an imported paint are marked ● edited and survive a re-import.</p>
+`);
+
+// ---------- render ----------
+const main = document.getElementById("screens"), toc = document.getElementById("toc");
+screens.forEach((s, i) => {
+  toc.insertAdjacentHTML("beforeend", `<a href="#${s.id}">${i + 1} · ${s.title}</a>`);
+  main.insertAdjacentHTML("beforeend", `<section class="screen" id="${s.id}"><h2>${i + 1} · ${s.title}</h2>
+    <div class="stage"><div class="phone">${s.html}</div></div><div class="notes">${s.notes}</div></section>`);
+  const sec = main.lastElementChild, map = {};
+  sec.querySelectorAll(".notes .n").forEach(n => { map[n.textContent] ??= String(Object.keys(map).length + 1); n.textContent = map[n.textContent]; });
+  sec.querySelectorAll(".phone .mark").forEach(m => { m.textContent = map[m.textContent] ?? m.textContent; });
+});
+function fit() {
+  const w = document.documentElement.clientWidth - 32;
+  document.documentElement.style.setProperty("--s", Math.min(1, (w - 20) / 393).toFixed(4));
+}
+fit(); addEventListener("resize", fit);
+</script>
+</body>
+</html>

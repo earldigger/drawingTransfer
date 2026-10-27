@@ -85,7 +85,7 @@ class StartScreen(QWidget):
         f.setPointSize(f.pointSize() + 14)
         f.setBold(True)
         title.setFont(f)
-        subtitle = QLabel("Transfer a drawing onto your canvas")
+        subtitle = QLabel("Transfer a reference onto your canvas")
         subtitle.setObjectName("hint")
 
         self.new_button = QPushButton("New Project…")

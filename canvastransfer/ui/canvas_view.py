@@ -1,6 +1,8 @@
 """The canvas: composites every layer live (via canvas_render) and hosts
 the Fresco-style transform tool (8 handles + rotation handle on the active
-layer, drag inside to move) and the color picker with its swatch markers.
+layer, drag inside to move), its crop mode (4 corners + 4 edges of the crop,
+drag inside to slide it; the cut-off part shows faintly), and the color
+picker with its swatch markers.
 """
 
 from __future__ import annotations
@@ -13,7 +15,18 @@ from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap, QPoly
 from PySide6.QtWidgets import QGraphicsScene, QGraphicsView
 
 from ..compare import DisplayState
-from ..geometry import Quad, TransformMode, apply_drag, edge_midpoints, point_in_quad, rotation_handle
+from ..geometry import (
+    FULL_CROP,
+    Quad,
+    TransformMode,
+    apply_drag,
+    crop_corners,
+    crop_edge_midpoints,
+    drag_crop,
+    edge_midpoints,
+    point_in_quad,
+    rotation_handle,
+)
 from ..models import BlendMode, GridSettings
 from .canvas_render import RenderLayer, quad_transform, render_canvas
 
@@ -42,10 +55,12 @@ class LayerEntry:
     pixmap: QPixmap
     quad: Quad
     state: DisplayState
+    crop: tuple[float, float, float, float] | None = None
 
 
 class CanvasView(QGraphicsView):
     quadCommitted = Signal(str, object)  # layer_id, quad in canvas px
+    cropCommitted = Signal(str, object)  # layer_id, crop as (left, top, right, bottom) fractions
     colorPicked = Signal(float, float)  # scene point clicked in pick mode
     pickHover = Signal(object)  # scene (x, y) under the cursor in pick mode, or None
     markerClicked = Signal(str)  # swatch id
@@ -63,6 +78,8 @@ class CanvasView(QGraphicsView):
         self._canvas = QRectF(0, 0, 1, 1)
         self._entries: list[LayerEntry] = []
         self._quads: dict[str, Quad] = {}
+        self._crops: dict[str, tuple | None] = {}
+        self._crop_mode = False
         self._grid: GridSettings | None = None
         self._split_fraction: float | None = None
         self._active_id: str | None = None
@@ -96,8 +113,10 @@ class CanvasView(QGraphicsView):
         for entry in entries:
             if entry.layer_id != dragging:
                 self._quads[entry.layer_id] = list(entry.quad)
+                self._crops[entry.layer_id] = entry.crop
         wanted = {e.layer_id for e in entries}
         self._quads = {k: v for k, v in self._quads.items() if k in wanted}
+        self._crops = {k: v for k, v in self._crops.items() if k in wanted}
         self._split_fraction = split_fraction
         self._overlays = list(overlays or [])
         self.viewport().update()
@@ -120,8 +139,33 @@ class CanvasView(QGraphicsView):
             self.refit()
         self.viewport().update()
 
+    def set_crop_mode(self, enabled: bool) -> None:
+        """While the transform tool is on: crop handles instead of transform handles."""
+        self._crop_mode = enabled
+        self.viewport().update()
+
     def quad(self, layer_id: str) -> Quad | None:
         return self._quads.get(layer_id)
+
+    def crop(self, layer_id: str) -> tuple | None:
+        return self._crops.get(layer_id)
+
+    def _layer_transform(self, layer_id: str) -> QTransform | None:
+        entry = self.entry(layer_id)
+        return quad_transform(entry.pixmap, self._quads[layer_id]) if entry else None
+
+    def _uv_to_scene(self, layer_id: str, uv) -> QPointF:
+        entry = self.entry(layer_id)
+        return self._layer_transform(layer_id).map(QPointF(uv[0] * entry.pixmap.width(), uv[1] * entry.pixmap.height()))
+
+    def _scene_to_uv(self, layer_id: str, scene: QPointF) -> tuple[float, float] | None:
+        entry = self.entry(layer_id)
+        tf = self._layer_transform(layer_id)
+        inverse, ok = tf.inverted() if tf is not None else (None, False)
+        if not ok:
+            return None
+        p = inverse.map(scene)
+        return p.x() / entry.pixmap.width(), p.y() / entry.pixmap.height()
 
     # -- rendering ----------------------------------------------------------
 
@@ -136,11 +180,13 @@ class CanvasView(QGraphicsView):
                 c = self._canvas
                 clip = (QRectF(c.left(), c.top(), split_x - c.left(), c.height()) if e.state.clip == "left"
                         else QRectF(split_x, c.top(), c.right() - split_x, c.height()))
-            layers.append(RenderLayer(e.pixmap, self._quads[e.layer_id], e.state.opacity, e.state.blend, clip))
+            layers.append(RenderLayer(e.pixmap, self._quads[e.layer_id], e.state.opacity, e.state.blend, clip,
+                                      self._crops.get(e.layer_id)))
         for layer_id, pixmap in self._overlays:
             entry = self.entry(layer_id)
             if entry is not None and entry.state.visible:
-                layers.append(RenderLayer(pixmap, self._quads[layer_id], 1.0, BlendMode.NORMAL))
+                layers.append(RenderLayer(pixmap, self._quads[layer_id], 1.0, BlendMode.NORMAL,
+                                          crop=self._crops.get(layer_id)))
         return layers
 
     def set_markers(self, markers: list[Marker]) -> None:
@@ -192,7 +238,15 @@ class CanvasView(QGraphicsView):
         if not self._active_editable():
             return None
         e = self.entry(self._active_id)
-        return RenderLayer(e.pixmap, self._quads[e.layer_id], 1.0, BlendMode.NORMAL)
+        return RenderLayer(e.pixmap, self._quads[e.layer_id], 1.0, BlendMode.NORMAL, crop=self._crops.get(e.layer_id))
+
+    def _cropped_off(self) -> RenderLayer | None:
+        """While cropping: the active layer, so its cut-off part can show faintly."""
+        if not (self._crop_mode and self._active_editable()):
+            return None
+        e = self.entry(self._active_id)
+        return RenderLayer(e.pixmap, self._quads[e.layer_id], 1.0, BlendMode.NORMAL,
+                           crop=self._crops.get(e.layer_id) or FULL_CROP)
 
     def render_canvas_image(self) -> QImage:
         """The composited canvas at 1 image pixel per canvas pixel."""
@@ -223,7 +277,8 @@ class CanvasView(QGraphicsView):
         self._buffer.setDevicePixelRatio(1.0)
         scene_to_device = self.viewportTransform() * QTransform.fromScale(dpr, dpr)
         render_canvas(self._buffer, scene_to_device, self._canvas, self._render_layers(), self._grid,
-                      self._split_x(), self._ghost(), smooth=self._drag is None, scratch=self._scratch)
+                      self._split_x(), self._ghost(), smooth=self._drag is None, scratch=self._scratch,
+                      cropped_off=self._cropped_off())
         self._buffer.setDevicePixelRatio(dpr)
         painter.save()
         painter.resetTransform()
@@ -265,6 +320,9 @@ class CanvasView(QGraphicsView):
             v = self.mapFromScene(QPointF(*p))
             return math.hypot(v.x() - vx, v.y() - vy) <= HIT_RADIUS_PX
 
+        if self._crop_mode:
+            return self._crop_hit(view_pos, near)
+
         rot, _ = rotation_handle(quad, ROTATE_OFFSET_PX / self._scale())
         if near(rot):
             return ("rotate",)
@@ -277,6 +335,26 @@ class CanvasView(QGraphicsView):
         s = self.mapToScene(view_pos)
         if point_in_quad(quad, (s.x(), s.y())):
             return ("move",)
+        return None
+
+    def _crop_hit(self, view_pos, near) -> tuple | None:
+        layer_id = self._active_id
+        crop = self._crops.get(layer_id) or FULL_CROP
+
+        def scene_point(uv):
+            q = self._uv_to_scene(layer_id, uv)
+            return q.x(), q.y()
+
+        for i, uv in enumerate(crop_corners(crop)):
+            if near(scene_point(uv)):
+                return ("crop-corner", i)
+        for i, uv in enumerate(crop_edge_midpoints(crop)):
+            if near(scene_point(uv)):
+                return ("crop-edge", i)
+        uv = self._scene_to_uv(layer_id, self.mapToScene(view_pos))
+        left, top, right, bottom = crop
+        if uv is not None and left <= uv[0] <= right and top <= uv[1] <= bottom:
+            return ("crop-move",)
         return None
 
     def mousePressEvent(self, event):
@@ -297,7 +375,12 @@ class CanvasView(QGraphicsView):
             handle = self._hit(pos)
             if handle is not None:
                 s = self.mapToScene(pos)
-                self._drag = (handle, (s.x(), s.y()), list(self._quads[self._active_id]))
+                if handle[0].startswith("crop"):
+                    start = self._scene_to_uv(self._active_id, s)
+                    if start is not None:
+                        self._drag = (handle, start, self._crops.get(self._active_id) or FULL_CROP)
+                else:
+                    self._drag = (handle, (s.x(), s.y()), list(self._quads[self._active_id]))
                 event.accept()
                 return
         super().mousePressEvent(event)
@@ -309,6 +392,14 @@ class CanvasView(QGraphicsView):
             self.pickHover.emit((self._hover.x(), self._hover.y()))
             self.viewport().setCursor(Qt.PointingHandCursor if self._marker_at(pos) else Qt.CrossCursor)
             self.viewport().update()
+            event.accept()
+            return
+        if self._drag is not None and self._drag[0][0].startswith("crop"):
+            handle, start, start_crop = self._drag
+            uv = self._scene_to_uv(self._active_id, self.mapToScene(pos))
+            if uv is not None:
+                self._crops[self._active_id] = drag_crop(start_crop, handle, start, uv)
+                self.viewport().update()
             event.accept()
             return
         if self._drag is not None:
@@ -328,6 +419,13 @@ class CanvasView(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._drag is not None and event.button() == Qt.LeftButton and self._drag[0][0].startswith("crop"):
+            self._drag = None
+            crop = self._crops.get(self._active_id)
+            self.cropCommitted.emit(self._active_id, None if crop in (None, FULL_CROP) else tuple(crop))
+            self.viewport().update()
+            event.accept()
+            return
         if self._drag is not None and event.button() == Qt.LeftButton:
             self._drag = None
             layer_id = self._active_id
@@ -344,7 +442,7 @@ class CanvasView(QGraphicsView):
     def _update_cursor(self, handle) -> None:
         if handle is None:
             self.viewport().unsetCursor()
-        elif handle[0] == "move":
+        elif handle[0] in ("move", "crop-move"):
             self.viewport().setCursor(Qt.SizeAllCursor)
         elif handle[0] == "rotate":
             self.viewport().setCursor(Qt.OpenHandCursor)
@@ -401,6 +499,9 @@ class CanvasView(QGraphicsView):
         self._draw_pick_cursor(painter, scale)
         if not self._active_editable():
             return
+        if self._crop_mode:
+            self._draw_crop_frame(painter)
+            return
         quad = self._quads[self._active_id]
         scale = self._scale()
         r = HANDLE_RADIUS_PX / scale
@@ -422,3 +523,34 @@ class CanvasView(QGraphicsView):
             painter.drawEllipse(QPointF(*p), r * 0.85, r * 0.85)
         painter.setBrush(QBrush(ACCENT))
         painter.drawEllipse(QPointF(*rot), r, r)
+
+    def _draw_crop_frame(self, painter: QPainter) -> None:
+        """The crop as a white frame with L-shaped corners and edge bars,
+        drawn in screen pixels so it reads the same at any zoom."""
+        layer_id = self._active_id
+        crop = self._crops.get(layer_id) or FULL_CROP
+        corners = [self.mapFromScene(self._uv_to_scene(layer_id, uv)) for uv in crop_corners(crop)]
+        mids = [self.mapFromScene(self._uv_to_scene(layer_id, uv)) for uv in crop_edge_midpoints(crop)]
+        painter.save()
+        painter.resetTransform()
+        frame = QPolygonF([QPointF(p) for p in corners])
+        for color, width in ((QColor(0, 0, 0, 120), 3.0), (Qt.white, 1.5)):
+            painter.setPen(QPen(color, width))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawPolygon(frame)
+        pen = QPen(Qt.white, 5)
+        pen.setCapStyle(Qt.SquareCap)
+        painter.setPen(pen)
+        arm = 16.0
+        for i, c in enumerate(corners):
+            for j in ((i + 1) % 4, (i + 3) % 4):  # a short arm toward each neighbouring corner
+                d = QPointF(corners[j]) - QPointF(c)
+                length = math.hypot(d.x(), d.y()) or 1.0
+                painter.drawLine(QPointF(c), QPointF(c) + d * (min(arm, length / 3) / length))
+        for i, m in enumerate(mids):
+            a, b = QPointF(corners[i]), QPointF(corners[(i + 1) % 4])
+            d = b - a
+            length = math.hypot(d.x(), d.y()) or 1.0
+            half = d * (min(10.0, length / 6) / length)
+            painter.drawLine(QPointF(m) - half, QPointF(m) + half)
+        painter.restore()

@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas Transfer iPad Screens</title>
+<style>
+:root {
+  --page: #ECEBE8; --page-text: #1C1C1E; --note-bg: #F7F6F4; --note-text: #333; --note-sub: #666;
+  --surround: #3A3A3C; --panel: rgba(34,34,36,.95); --panel-solid: #222224; --stroke: #38383B;
+  --ctl: #2E2E31; --seg: #4A4A4E; --text: #EDEDED; --sub: #9A9A9E; --accent: #3463A8; --accent-hi: #7FA8EC;
+  --mark: #96643C; --s: 1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --page: #161617; --page-text: #EDEDED; --note-bg: #232325; --note-text: #CFCFD2; --note-sub: #9A9A9E; }
+}
+:root[data-theme="dark"] { --page: #161617; --page-text: #EDEDED; --note-bg: #232325; --note-text: #CFCFD2; --note-sub: #9A9A9E; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif; }
+header.doc { padding: 32px 16px 8px; max-width: 1700px; margin: 0 auto; }
+header.doc h1 { margin: 0 0 4px; font-size: 28px; }
+header.doc p { margin: 0 0 12px; color: var(--note-sub); max-width: 760px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; }
+nav.toc a { color: inherit; }
+section.screen { max-width: 1700px; margin: 0 auto; padding: 28px 16px; }
+section.screen > h2 { margin: 0 0 12px; font-size: 20px; }
+.row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.stage { width: calc(1180px * var(--s)); height: calc(820px * var(--s)); flex: none; }
+.notes { flex: 1 1 360px; max-width: 460px; background: var(--note-bg); border-radius: 12px; padding: 20px 22px; color: var(--note-text); font-size: 14px; }
+.notes h3 { margin: 14px 0 2px; font-size: 14px; color: var(--page-text); }
+.notes h3:first-child { margin-top: 0; }
+.notes h3.q { color: #B07A4C; }
+.notes p, .notes ul { margin: 0 0 6px; }
+.notes ul { padding-left: 18px; }
+.n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 10px; background: var(--mark); color: #fff; font-size: 11px; font-weight: 700; margin-right: 6px; vertical-align: 1px; }
+
+/* ---------- iPad frame ---------- */
+.ipad { position: relative; width: 1180px; height: 820px; overflow: hidden; background: var(--surround); color: var(--text);
+  transform: scale(var(--s)); transform-origin: 0 0; border-radius: 18px; font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.abs { position: absolute; }
+.panel { background: var(--panel); border: 1px solid var(--stroke); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.35); }
+.ic { width: 24px; height: 24px; stroke: #E6E6E6; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ic.sm { width: 18px; height: 18px; }
+.topbar { position: absolute; left: 0; top: 0; width: 100%; height: 52px; background: var(--panel-solid); border-bottom: 1px solid var(--stroke);
+  display: flex; align-items: center; gap: 4px; padding: 0 12px 0 8px; z-index: 5; }
+.topbar .back { display: flex; align-items: center; gap: 2px; font-size: 15px; padding: 10px 10px 10px 4px; }
+.topbar .title { font-size: 15px; font-weight: 600; }
+.topbar .sp { flex: 1; }
+.iconbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 9px; flex: none; }
+.ws { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); }
+.seg { display: flex; gap: 2px; padding: 2px; background: var(--ctl); border-radius: 9px; }
+.seg > span { min-width: 0; padding: 0 12px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 7px; color: var(--sub); font-size: 13px; white-space: nowrap; }
+.seg > span.on { background: var(--accent); color: #fff; font-weight: 600; }
+.seg.fill > span { flex: 1; }
+.seg.small > span { height: 30px; font-size: 12px; padding: 0 8px; }
+.tools { left: 12px; top: 64px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+.tool { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; }
+.tool.on { background: var(--accent); }
+.layers { right: 12px; top: 64px; padding: 6px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.lthumb { width: 48px; height: 48px; border-radius: 10px; padding: 4px; }
+.lthumb > div { width: 40px; height: 40px; border-radius: 6px; }
+.lthumb.on { border: 2px solid var(--accent); padding: 2px; background: #2C2C30; }
+.lthumb.on > div { width: 40px; height: 40px; }
+.addbtn { width: 44px; height: 44px; border-radius: 10px; background: var(--ctl); display: grid; place-items: center; }
+.canvas { position: absolute; box-shadow: 0 6px 24px rgba(0,0,0,.4); overflow: hidden; }
+.canvas > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ctx { bottom: 12px; left: 50%; transform: translateX(-50%); padding: 8px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.div { width: 1px; height: 28px; background: var(--stroke); flex: none; }
+.btn { height: 44px; padding: 0 16px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; white-space: nowrap; }
+.btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
+.btn.quiet { color: var(--sub); }
+.btn.fill { background: var(--ctl); }
+.mark { position: absolute; width: 24px; height: 24px; border-radius: 12px; background: var(--mark); color: #fff; font-weight: 700; font-size: 12px; display: grid; place-items: center; z-index: 50; }
+.lbl { font-size: 11px; font-weight: 600; letter-spacing: .6px; color: var(--sub); text-transform: uppercase; }
+.slider { position: relative; height: 28px; flex: 1; }
+.col > .slider { flex: none; }
+.slider::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 6px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent) var(--v), #4A4A4E var(--v)); }
+.slider::after { content: ""; position: absolute; top: 3px; left: calc(var(--v) - 11px); width: 22px; height: 22px; border-radius: 11px; background: #fff; border: 2px solid var(--accent); box-sizing: border-box; }
+.switch { width: 44px; height: 26px; border-radius: 13px; background: #4A4A4E; position: relative; flex: none; }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 22px; height: 22px; border-radius: 11px; background: #fff; }
+.switch.on { background: var(--accent); }
+.switch.on::after { left: 20px; }
+.field { background: var(--ctl); border-radius: 8px; padding: 9px 12px; font-size: 14px; }
+.pill { position: absolute; padding: 0 16px; height: 40px; border-radius: 20px; display: flex; align-items: center; gap: 10px; background: rgba(34,34,36,.95); font-size: 14px; white-space: nowrap; }
+.chip { width: 28px; height: 28px; border-radius: 6px; flex: none; }
+.vrow { display: flex; align-items: center; gap: 8px; }
+.col { display: flex; flex-direction: column; }
+.dim { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 20; }
+.sheet { position: absolute; z-index: 30; background: #1C1C1E; border-radius: 16px; border: 1px solid var(--stroke); box-shadow: 0 12px 48px rgba(0,0,0,.5); }
+.sheet .hd { height: 56px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--stroke); font-size: 16px; font-weight: 600; gap: 12px; }
+.sheet .hd .sp { flex: 1; }
+.strip { display: flex; height: 22px; border-radius: 5px; overflow: hidden; }
+.strip > i { flex: 1; }
+table.lib { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.lib th { text-align: left; color: var(--sub); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--stroke); white-space: nowrap; }
+table.lib td { padding: 7px 10px; border-bottom: 1px solid #2A2A2D; white-space: nowrap; }
+table.lib tr.sel td { background: rgba(52,99,168,.25); }
+.star { color: #E8C35A; }
+.list > div { display: flex; align-items: center; gap: 12px; padding: 0 16px; height: 52px; border-bottom: 1px solid #2A2A2D; font-size: 15px; }
+.list > div .sp { flex: 1; }
+.list > div .v { color: var(--sub); }
+</style>
+</head>
+<body>
+
+<!-- Shared SVG: icons and placeholder artwork -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-transform" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"/><rect x="3.5" y="3.5" width="4" height="4" fill="#E6E6E6"/><rect x="16.5" y="3.5" width="4" height="4" fill="#E6E6E6"/><rect x="3.5" y="16.5" width="4" height="4" fill="#E6E6E6"/><rect x="16.5" y="16.5" width="4" height="4" fill="#E6E6E6"/></symbol>
+    <symbol id="i-perspective" viewBox="0 0 24 24"><path d="M8 5h8l4 14H4z"/><path d="M12 5v14M6 12h12"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9.33h16M4 14.66h16M9.33 4v16M14.66 4v16"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="#E6E6E6"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M8 5 3 10l5 5"/><path d="M3 10h11a5.5 5.5 0 0 1 0 11h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m16 5 5 5-5 5"/><path d="M21 10H10a5.5 5.5 0 0 0 0 11h3"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 10H5v11h14V10h-2"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-flipH" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 7 4 17h5zM15 7l5 10h-5z"/></symbol>
+    <symbol id="i-flipV" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 9 17 4v5zM7 15l10 5v-5z"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v16h16M2 6h16v16"/></symbol>
+    <symbol id="art-ref" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <use href="#art-lines" width="500" height="625"/>
+      <rect x="452" y="0" width="48" height="625" fill="#5A4636"/>
+      <rect x="6" y="10" width="78" height="26" fill="#CDBB8E" transform="rotate(-12 45 23)"/>
+      <path d="M14 590c25-22 60-24 92-4M24 612c20-12 44-12 66 0M70 560v30" fill="none" stroke="#2E2018" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+    <symbol id="i-pick" viewBox="0 0 24 24"><path d="M14 4l6 6-2 2-6-6z"/><path d="M13 7 5 15l-1 5 5-1 8-8"/></symbol>
+    <symbol id="i-simplify" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h8V4M12 20v-8h8"/></symbol>
+    <symbol id="i-highlight" viewBox="0 0 24 24"><path d="M9 15 4 20h5l2-2"/><path d="m9 15 3 3 8-8-3-3z"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z"/></symbol>
+
+    <!-- artwork, 500 x 625 (16 x 20) -->
+    <symbol id="art-paint" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#9AA3AB"/><rect y="430" width="500" height="195" fill="#B7AE9F"/>
+      <path d="M150 230c-10-110 50-170 105-170s120 50 105 175c-10 60-20 120-30 150H180c-15-40-28-90-30-155z" fill="#4A3426"/>
+      <path d="M215 350h75v85h-75z" fill="#C48E74"/>
+      <ellipse cx="255" cy="250" rx="92" ry="125" fill="#D9A58A"/>
+      <path d="M300 140c45 45 55 130 30 190-15 30-40 45-60 42 40-50 50-160 30-232z" fill="#B97E66"/>
+      <path d="M60 625c20-150 100-200 195-200s170 50 190 200z" fill="#3F5A6E"/>
+      <ellipse cx="225" cy="240" rx="13" ry="6" fill="#3B2A1E"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#3B2A1E"/>
+      <ellipse cx="258" cy="335" rx="22" ry="7" fill="#A85A55"/>
+    </symbol>
+    <symbol id="art-lines" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <g fill="none" stroke="#2E2018" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M163 250c0-95 42-160 92-160s92 65 92 160c0 80-38 125-92 125s-92-45-92-125z"/>
+        <path d="M210 240c10-7 22-7 32 0M275 240c10-7 22-7 32 0"/><path d="M257 255c-5 30-10 48-1 56 8 5 17 1 21-3"/>
+        <path d="M236 335c14 8 30 8 44 0"/><path d="M150 230c-10-110 50-170 105-170s120 50 105 175"/>
+        <path d="M215 375c-3 30-8 45-25 55-65 15-115 50-125 195M290 375c3 30 8 45 25 55 65 15 115 50 125 195"/>
+      </g>
+    </symbol>
+    <symbol id="art-paper" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#F4F2EE"/><use href="#art-lines"/>
+    </symbol>
+    <symbol id="art-values" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#ABABAB"/><rect y="430" width="500" height="195" fill="#ABABAB"/>
+      <path d="M150 230c-10-110 50-170 105-170s120 50 105 175c-10 60-20 120-30 150H180c-15-40-28-90-30-155z" fill="#1B1B1B"/>
+      <path d="M215 350h75v85h-75z" fill="#777777"/>
+      <ellipse cx="255" cy="250" rx="92" ry="125" fill="#ABABAB"/>
+      <path d="M300 140c45 45 55 130 30 190-15 30-40 45-60 42 40-50 50-160 30-232z" fill="#777777"/>
+      <path d="M60 625c20-150 100-200 195-200s170 50 190 200z" fill="#474747"/>
+      <path d="M215 205c20-30 60-35 80-10" fill="none" stroke="#E2E2E2" stroke-width="18" stroke-linecap="round"/>
+      <ellipse cx="225" cy="240" rx="13" ry="6" fill="#1B1B1B"/><ellipse cx="290" cy="240" rx="13" ry="6" fill="#1B1B1B"/>
+      <ellipse cx="258" cy="335" rx="22" ry="7" fill="#777777"/>
+    </symbol>
+    <symbol id="scene" viewBox="0 0 1180 820">
+      <rect width="1180" height="820" fill="#5E564E"/><rect y="560" width="1180" height="260" fill="#4A433C"/><rect x="590" y="700" width="18" height="120" fill="#3A332C"/>
+      <polygon points="330,150 860,120 900,700 300,690" fill="#EEEAE2"/>
+      <g transform="matrix(1.06,-0.06,-0.048,0.864,330,150)"><use href="#art-lines" width="500" height="625"/></g>
+      <ellipse cx="760" cy="260" rx="90" ry="50" fill="#fff" opacity=".35"/>
+    </symbol>
+    <symbol id="i-exitfull" viewBox="0 0 24 24"><path d="M20 4l-6 6M14 5v5h5M4 20l6-6M10 19v-5H5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="art-toned" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#C9B79C"/><path d="M0 0h500v625H0z" fill="#B9A587" opacity=".35" transform="skewX(-8)"/>
+      <ellipse cx="330" cy="420" rx="160" ry="120" fill="#BFA98A" opacity=".5"/>
+    </symbol>
+    <symbol id="art-paint-early" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <rect width="500" height="625" fill="#A9B0B5"/><rect y="430" width="500" height="195" fill="#C0B8AB"/>
+      <ellipse cx="250" cy="245" rx="105" ry="140" fill="#6B5040"/>
+      <ellipse cx="258" cy="255" rx="85" ry="115" fill="#D3A68E"/>
+      <path d="M70 625c20-150 100-195 190-195s165 50 185 195z" fill="#556B7C"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="doc">
+  <p class="switch-dev" style="margin:0 0 6px;font-size:14px"><b>iPad</b> · <a href="iphone.html" style="color:inherit">iPhone</a> · <a href="mac.html" style="color:inherit">Mac</a></p>
+  <h1>Canvas Transfer — iPad screens</h1>
+  <p>Every iPad screen, in workflow order. This page replaces the Figma file; names follow the table in <code>docs/design/README.md</code>. iPad landscape, 1180 × 820 pt, drawn to scale. Numbered markers refer to the notes beside each screen. Layout and behaviour, not final visuals.</p>
+  <nav class="toc" id="toc"></nav>
+</header>
+
+<main id="screens"></main>
+
+<script>
+// ---------- builders for the shared chrome ----------
+const ic = (id, cls = "") => `<svg class="ic ${cls}"><use href="#i-${id}"/></svg>`;
+const mark = (n, x, y) => `<div class="mark" style="left:${x}px;top:${y}px">${n}</div>`;
+
+function topBar(ws = "Transfer", { title = "Portrait of Ana" } = {}) {
+  return `<div class="topbar">
+    <div class="back">${ic("back")}Gallery</div><div class="title">${title}</div><div class="sp"></div>
+    <div class="iconbtn">${ic("undo")}</div><div class="iconbtn">${ic("redo")}</div>
+    <div class="iconbtn">${ic("full")}</div><div class="iconbtn">${ic("share")}</div>
+    <div class="ws seg"><span class="${ws === "Transfer" ? "on" : ""}" style="width:104px;height:32px">Transfer</span><span class="${ws === "Color" ? "on" : ""}" style="width:104px;height:32px">Color</span></div>
+  </div>`;
+}
+function toolStrip(tools, active) {
+  return `<div class="abs panel tools">${tools.map(t => `<div class="tool ${t === active ? "on" : ""}">${ic(t)}</div>`).join("")}</div>`;
+}
+const TRANSFER_TOOLS = ["camera", "transform", "perspective", "grid", "compare"];
+const COLOR_TOOLS = ["pick", "simplify", "highlight", "grid"];
+function layerBar(layers, sel) {
+  return `<div class="abs panel layers"><div class="iconbtn">${ic("back")}</div>
+    ${layers.map((c, i) => `<div class="lthumb ${i === sel ? "on" : ""}"><div style="background:${c}"></div></div>`).join("")}
+    <div class="addbtn">${ic("plus")}</div></div>`;
+}
+const LAYERS = ["#F4F2EE", "#B7977E", "#A9A196"]; // reference, canvas Oct 22, canvas Oct 15
+function canvas(x, y, w, h, inner) {
+  return `<div class="canvas" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${inner}</div>`;
+}
+const art = (id, extra = "") => `<svg viewBox="0 0 500 625" preserveAspectRatio="none" ${extra}><use href="#${id}"/></svg>`;
+const overlay = () => art("art-paint") + art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply"');
+// Transfer fit area: between tool strip (right edge 68) and collapsed layer bar (x 1104), top bar and context bar
+const TF = { x: 330, y: 80, w: 512, h: 640 };
+// Color fit area: the right-hand panel is always shown, so the canvas fits to its left
+const CF = { x: 173, y: 80, w: 512, h: 640 };
+
+const screens = [];
+const S = (id, title, html, notes) => screens.push({ id, title, html, notes });
+
+// ---------- 1 · Camera — layer added ----------
+S("camera-added", "Camera — Layer added", `
+  ${topBar()}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-paint") + art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply;transform:translate(14px,-10px) scale(.94);transform-origin:center"'))}
+  <div class="abs" style="left:${TF.x + 82}px;top:${TF.y + 40}px;width:330px;height:580px;border:1.5px solid var(--accent)">
+    ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 7px);top:calc(${b}% - 7px);width:14px;height:14px;background:#fff;border:2px solid var(--accent);border-radius:3px"></i>`).join("")}
+  </div>
+  ${toolStrip(TRANSFER_TOOLS, "transform")}
+  ${layerBar(["#F4F2EE", "#E9E4DA", "#B7977E", "#A9A196"], 0)}
+  <div class="pill" style="left:50%;transform:translateX(-50%);top:64px">Reference added — place it with Transform <b style="color:var(--accent-hi)">Undo</b></div>
+  <div class="abs panel ctx">
+    <div class="seg"><span class="on">Proportional</span><span>Free</span><span>Skew</span><span>Distort</span></div><div class="div"></div>
+    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="btn">${ic("crop")}Crop</div><div class="div"></div>
+    <div class="btn quiet">Cancel</div><div class="btn primary">Done</div>
+  </div>
+  ${mark(1, 300, 72)}${mark(2, 1062, 118)}
+`, `
+  <h3><span class="n">1</span>Straight into Transform</h3>
+  <p>After <b>Add layer</b> on the Adjust corners screen, a new reference lands selected, at Multiply 60 %, fitted inside the canvas, with Transform already on — placing it is always the next step (workflow step 4). It often ends up much smaller than the canvas, e.g. a face in one corner. A toast confirms it, with Undo.</p>
+  <h3><span class="n">2</span>New layer on top</h3>
+  <p>References go on top so they stay over the canvas photos. Named by type and date (“Reference · Oct 24”); rename in the expanded layer bar.</p>
+  <h3>Canvas photo instead</h3>
+  <p>No Transform: the corrected photo already fills the canvas exactly. It lands at Normal 100 % just under the references. Older canvas photos are left exactly as they were — never hidden, opacity unchanged. The toast reads “Canvas photo added · <b>Compare with Oct 22</b>”, which opens Compare with A = new, B = previous.</p>
+  <h3>First photo of a project</h3>
+  <p>Create (New project) opens Camera with <b>Canvas</b> chosen: workflow step 1.</p>
+`);
+
+// ---------- 2 · Compare — split ----------
+S("compare-split", "Compare — Split", `
+  ${topBar()}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, `
+    <div class="abs" style="inset:0;clip-path:inset(0 42% 0 0)">${art("art-paper")}</div>
+    <div class="abs" style="inset:0;clip-path:inset(0 0 0 58%)">${art("art-paint")}</div>
+    <div class="abs" style="left:58%;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.5)"></div>
+    <div class="abs" style="left:58%;top:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:18px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:grid;place-items:center;color:#333;font-size:16px">⇆</div>
+    <div class="abs pill" style="left:10px;top:10px;height:28px;font-size:12px;padding:0 10px">A · Reference</div>
+    <div class="abs pill" style="right:10px;top:10px;height:28px;font-size:12px;padding:0 10px">B · Canvas · Oct 22</div>`)}
+  ${toolStrip(TRANSFER_TOOLS, "compare")}
+  ${layerBar(LAYERS, 1)}
+  <div class="abs panel ctx">
+    <div class="seg"><span>Overlay</span><span>Blink reference</span><span>Blink A / B</span><span class="on">Split</span></div><div class="div"></div>
+    <div class="btn fill"><span style="color:var(--sub)">A</span> Reference ${ic("down","sm")}</div>
+    <div class="btn fill"><span style="color:var(--sub)">B</span> Canvas · Oct 22 ${ic("down","sm")}</div>
+    <div class="btn" title="Swap A and B">⇄</div><div class="div"></div>
+    <div class="btn primary">${ic("camera")}New photo</div>
+  </div>
+  ${mark(3, 122, 772)}${mark(4, 780, 380)}${mark(5, 1036, 772)}
+`, `
+  <h3><span class="n">3</span>Mode</h3>
+  <p>The four modes from the prototype, one tap each: <b>Overlay</b> (the normal stack), <b>Blink reference</b> (only A, usually the reference, toggles on and off; everything else stays), <b>Blink A / B</b> (alternate two layers), <b>Split</b>.</p>
+  <h3><span class="n">4</span>Split line</h3>
+  <p>A vertical line only. Drag it (or its handle) with Pencil or finger; A on the left, B on the right, each labelled. Defaults to the middle. The view does not move while dragging.</p>
+  <h3>A and B</h3>
+  <p>Default: A = the reference, B = the newest canvas photo. ⇄ swaps them.</p>
+  <h3><span class="n">5</span>New photo</h3>
+  <p>One tap to Camera with <i>Canvas</i> already chosen; the result comes back as the new B.</p>
+`);
+
+// ---------- 3 · Compare — blink ----------
+S("compare-blink", "Compare — Blink A / B", `
+  ${topBar()}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-paint-early") + `<div class="abs pill" style="left:10px;top:10px;height:28px;font-size:12px;padding:0 10px">B · Canvas · Oct 15</div>`)}
+  ${toolStrip(TRANSFER_TOOLS, "compare")}
+  ${layerBar(LAYERS, 2)}
+  <div class="abs panel ctx">
+    <div class="seg"><span>Overlay</span><span>Blink reference</span><span class="on">Blink A / B</span><span>Split</span></div><div class="div"></div>
+    <div class="btn fill"><span style="color:var(--sub)">A</span> Oct 22 ${ic("down","sm")}</div>
+    <div class="btn fill"><span style="color:var(--sub)">B</span> Oct 15 ${ic("down","sm")}</div><div class="div"></div>
+    <div class="btn">${ic("pause")}</div>
+    <div class="vrow" style="width:170px"><span style="color:var(--sub)">Speed</span><div class="slider" style="--v:40%"></div><span>0.6 s</span></div>
+  </div>
+  <div class="abs" style="left:${TF.x}px;top:${TF.y + TF.h + 6}px;width:${TF.w}px;display:flex;gap:6px;justify-content:center">
+    <i style="width:40px;height:4px;border-radius:2px;background:#666"></i><i style="width:40px;height:4px;border-radius:2px;background:var(--accent)"></i>
+  </div>
+  ${mark(6, 300, 690)}${mark(7, 1020, 772)}
+`, `
+  <h3><span class="n">6</span>Blinking</h3>
+  <p>The canvas alternates between A and B; a small label shows which one is up, and two bars under the canvas show the rhythm. Tap the canvas (or ❚❚) to pause on the current one — useful to study a change.</p>
+  <h3><span class="n">7</span>Speed</h3>
+  <p>0.1 – 5 s, default 0.6 s (the prototype's range).</p>
+  <h3>Comparing two canvas photos</h3>
+  <p>Here A and B are both canvas photos — how the painting changed in a week. Works the same with the reference as A.</p>
+  <h3>Full screen</h3>
+  <p>Compare keeps running in full screen, so you can blink the reference over the painting at the easel with no UI showing. This answers the earlier “what does a tap do in full screen” question: <b>tap = pause / resume the blink</b>, only while Compare is on.</p>
+`);
+
+// ---------- 4 · Color — Pick, Highlight, Details ----------
+const SW = [
+  { n: 1, c: "#4A3426", x: 352, y: 285, name: "Hair" },
+  { n: 2, c: "#D9A58A", x: 408, y: 326, name: "Face, light", hl: true },
+  { n: 3, c: "#B97E66", x: 496, y: 346, name: "Face, shadow" },
+  { n: 4, c: "#3F5A6E", x: 327, y: 653, name: "Jacket" },
+  { n: 5, c: "#9AA3AB", x: 603, y: 182, name: "Wall" },
+];
+const swMarkers = (sel) => SW.map(s => `<div class="abs" style="left:${s.x - 14}px;top:${s.y - 14}px;width:28px;height:28px;border-radius:14px;background:${s.c};border:${s.n === sel ? "3px solid var(--accent)" : "2px solid #fff"};box-shadow:0 1px 4px rgba(0,0,0,.5);display:grid;place-items:center;font-size:11px;font-weight:700;color:${s.n === 2 || s.n === 5 ? "#222" : "#fff"}">${s.n}</div>`).join("");
+const swatchBar = (sel, tolerance = true) => `<div class="abs panel" style="left:80px;bottom:12px;width:${CF.w + 186}px;padding:8px;display:flex;align-items:center;gap:8px">
+  ${SW.map(s => `<div style="position:relative;width:44px;height:44px;border-radius:9px;background:${s.c};${s.n === sel ? "outline:3px solid var(--accent);outline-offset:2px" : ""}">
+    <span style="position:absolute;left:4px;top:2px;font-size:10px;font-weight:700;color:${s.n === 2 || s.n === 5 ? "#222" : "#fff"}">${s.n}</span>
+    ${s.hl ? `<span style="position:absolute;right:-4px;top:-4px;width:16px;height:16px;border-radius:8px;background:#E0409A;border:2px solid #222"></span>` : ""}</div>`).join("")}
+  <div class="div"></div>
+  ${tolerance ? `<div class="vrow" style="flex:1"><span style="color:var(--sub);white-space:nowrap">Highlight range</span><div class="slider" style="--v:30%"></div><span>ΔE 12</span></div>` : `<div style="flex:1;color:var(--sub)">Tap the canvas with Pick to add a swatch</div>`}
+</div>`;
+const strip = (cols) => `<div class="strip">${cols.map(c => `<i style="background:${c}"></i>`).join("")}</div>`;
+S("color-pick", "Color — Pick, Highlight, Swatch details", `
+  ${topBar("Color")}
+  ${canvas(CF.x, CF.y, CF.w, CF.h, art("art-paint") + `<svg viewBox="0 0 500 625" preserveAspectRatio="none" class="abs" style="inset:0;width:100%;height:100%"><ellipse cx="250" cy="255" rx="80" ry="112" fill="#E0409A" opacity=".5"/></svg>`)}
+  ${swMarkers(2)}
+  <div class="abs" style="left:408px;top:150px;width:96px;height:96px;border-radius:48px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.5);background:conic-gradient(#D9A58A 0 50%, #D2A085 50% 100%);display:grid;place-items:center">
+    <div style="width:22px;height:22px;border:2px solid #fff;border-radius:3px;box-shadow:0 0 0 1px #000"></div></div>
+  ${toolStrip(COLOR_TOOLS, "pick")}
+  ${layerBar(LAYERS, 1)}
+  <div class="abs panel col" style="left:790px;top:64px;width:302px;padding:14px;gap:12px">
+    <div class="vrow"><div class="seg fill small" style="flex:1"><span class="on">Details</span><span>Paints &amp; mixes</span></div><div class="iconbtn" style="width:32px;height:32px">${ic("chev")}</div></div>
+    <div class="vrow" style="gap:12px"><div style="width:64px;height:64px;border-radius:10px;background:#D9A58A"></div>
+      <div class="col" style="flex:1"><b style="font-size:17px">#D9A58A</b><span style="color:var(--sub)">RGB 217 165 138</span><span style="color:var(--sub)">Swatch 2 · Face, light</span></div>
+      <div class="btn fill" style="height:32px;padding:0 10px;font-size:12px">Copy</div></div>
+    <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">L*a*b* (D50)</span><span>71.4  13.9  20.6</span></div>
+    <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Munsell</span><span>5YR 7/5</span></div>
+    <div class="col" style="gap:4px"><div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Value</span><span>7 of 10 · light</span></div>
+      <div style="position:relative">${strip(["#1b1b1b","#303030","#474747","#5e5e5e","#777","#919191","#ababab","#c6c6c6","#e2e2e2","#fafafa"])}<i class="abs" style="left:66%;top:-3px;width:3px;height:28px;background:var(--accent)"></i></div></div>
+    <div class="col" style="gap:4px"><div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Temperature</span><span>warm</span></div>
+      <div style="position:relative"><div class="strip" style="background:linear-gradient(90deg,#4a78c8,#9aa3ab,#e08a3a)"></div><i class="abs" style="left:74%;top:-3px;width:3px;height:28px;background:#fff"></i></div></div>
+    <div class="col" style="gap:4px"><span style="color:var(--sub)">Tints + white</span>${strip(["#D9A58A","#E1B39B","#E8C2AE","#EFD2C2","#F6E3D8"])}</div>
+    <div class="col" style="gap:4px"><span style="color:var(--sub)">Shades + black</span>${strip(["#D9A58A","#B38A73","#8C6C5B","#664F43","#3F322B"])}</div>
+    <div class="col" style="gap:4px"><span style="color:var(--sub)">Tones + gray</span>${strip(["#D9A58A","#C8A08B","#B69B8D","#A5968F","#949191"])}</div>
+    <div class="col" style="gap:4px"><span style="color:var(--sub)">Complementary</span>${strip(["#D9A58A","#B9A39B","#98A2AC","#7AA0BE","#5C9ED0"])}</div>
+  </div>
+  ${swatchBar(2)}
+  ${mark(8, 30, 330)}${mark(9, 512, 160)}${mark(10, 760, 72)}${mark(11, 50, 760)}${mark(12, 640, 330)}
+`, `
+  <h3><span class="n">8</span>Color workspace tools</h3>
+  <p><b>Pick</b>, <b>Simplify</b>, <b>Highlight</b>, Grid. Same canvas and layers as Transfer; the switch in the top bar flips between them.</p>
+  <h3><span class="n">9</span>Pick</h3>
+  <p>Touch the selected layer with Pencil or finger: a loupe shows the color under the point (left half) against the area average (right half) and the sample square. Lift to add a numbered swatch there. Tapping a marker selects its swatch. Sample size (point → large) lives in a small context bar while Pick is on — not drawn here.</p>
+  <h3><span class="n">10</span>Details | Paints &amp; mixes</h3>
+  <p>One floating panel, two tabs. › collapses it to a thin bar on the right (like the layer bar); the canvas stays where it is, so nothing jumps. The Color workspace fits the canvas to the left of the open panel.</p>
+  <p>Details: hex (Copy), RGB, L*a*b*, Munsell, value on a 10-step scale, warm / cool, and pigment-mixed tints, shades, tones and complement strips.</p>
+  <h3><span class="n">11</span>Swatch bar</h3>
+  <p>All the project's swatches, from every layer, as large chips along the bottom. Tap = select (and its layer); the magenta dot means its highlight is on (long-press or Highlight tool to toggle). Highlight range (ΔE) sits beside them because it only matters when a highlight is on.</p>
+  <h3><span class="n">12</span>Highlight</h3>
+  <p>Areas similar to a swatch are tinted with that swatch's highlight color — here everywhere the face light is within ΔE 12.</p>
+`);
+
+// ---------- 5 · Color — Simplify, Paints & mixes ----------
+const PAINT = { "Yellow ochre": "#C99A45", "Vermilion": "#B5432F", "Ivory black": "#2B2A2A", "Titanium white": "#F2F1EC" };
+// a mix: chip = your swatch | the predicted mix, touching so the shift shows; one line per paint led by its share; ΔE and how close
+const mixRow = (a, b, paints, de) => `<div class="vrow" style="align-items:flex-start;gap:14px;padding:12px 0;border-bottom:1px solid #2A2A2D">
+  <div class="col" style="gap:3px;flex:none"><div style="width:64px;height:64px;border-radius:10px;background:linear-gradient(90deg, ${a} 50%, ${b} 50%)"></div>
+    <div style="display:flex;font-size:10px;color:var(--sub)"><span style="flex:1;text-align:center">yours</span><span style="flex:1;text-align:center">mix</span></div></div>
+  <div class="col" style="flex:1;min-width:0;gap:3px">
+    ${paints.map(([amt, n, warn]) => `<div class="vrow" style="gap:8px;font-size:14px;line-height:1.25"><b style="width:40px;text-align:right;font-variant-numeric:tabular-nums">${amt}</b><i style="width:12px;height:12px;border-radius:6px;background:${PAINT[n]};box-shadow:0 0 0 1px #555;flex:none"></i>${n}${warn ? `<span style="color:#F2C14E" title="Color uncertain">⚠</span>` : ""}</div>`).join("")}
+    <b style="margin-top:3px;font-size:13px;font-weight:600;color:${parseFloat(de) < 2 ? "var(--accent-hi)" : "var(--sub)"}">ΔE ${de} · ${parseFloat(de) < 2 ? "very close" : parseFloat(de) < 5 ? "close" : parseFloat(de) < 10 ? "noticeably different" : "far off"}</b>
+  </div></div>`;
+S("color-simplify", "Color — Simplify (value scale), Paints & mixes", `
+  ${topBar("Color")}
+  ${canvas(CF.x, CF.y, CF.w, CF.h, art("art-values"))}
+  ${toolStrip(COLOR_TOOLS, "simplify")}
+  ${layerBar(LAYERS, 1)}
+  <div class="abs panel col" style="left:790px;top:64px;width:302px;padding:14px;gap:10px">
+    <div class="vrow"><div class="seg fill small" style="flex:1"><span>Details</span><span class="on">Paints &amp; mixes</span></div><div class="iconbtn" style="width:32px;height:32px">${ic("chev")}</div></div>
+    <div class="vrow"><div style="width:48px;height:32px;border-radius:6px;background:#B97E66"></div><div class="col"><b>Swatch 3 · Face, shadow</b><span style="color:var(--sub)">#B97E66 · 5YR 6/6</span></div></div>
+    <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Mix from</span><span class="field" style="padding:6px 10px">Zorn palette (oil) ${"▾"}</span></div>
+    <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Lighten with</span><span class="field" style="padding:6px 10px">Titanium white ${"▾"}</span></div>
+    <div class="lbl" style="margin-top:4px">One paint</div>
+    ${mixRow("#B97E66", "#B27959", [["62%", "Yellow ochre"], ["38%", "Titanium white"]], "4.8")}
+    <div class="lbl" style="margin-top:4px">Two-paint mixes</div>
+    ${mixRow("#B97E66", "#BA7F66", [["55%", "Yellow ochre"], ["18%", "Vermilion"], ["27%", "Titanium white"]], "0.7")}
+    ${mixRow("#B97E66", "#B77B65", [["47%", "Vermilion", true], ["7%", "Ivory black"], ["46%", "Titanium white"]], "1.2")}
+    <div style="color:var(--sub);font-size:11px;line-height:1.35">Percentages are a guide: strong paints need less, earths more. <span style="color:#F2C14E">⚠</span> color uncertain. Scroll for more.</div>
+    <div class="btn fill" style="margin-top:2px">${ic("book")}Paint library</div>
+  </div>
+  <div class="abs panel ctx" style="left:${80 + (CF.w + 186) / 2}px">
+    <div class="seg"><span>Colors</span><span>Values</span><span class="on">Value scale</span></div><div class="div"></div>
+    <div class="vrow" style="width:150px"><span style="color:var(--sub)">Steps</span><div class="slider" style="--v:20%"></div><span>5</span></div>
+    <div class="vrow" style="width:170px"><span style="color:var(--sub)">Smooth</span><div class="slider" style="--v:33%"></div><span>2</span></div><div class="div"></div>
+    <div class="btn fill">Add as swatches</div>
+  </div>
+  <div class="abs" style="left:${CF.x}px;top:${CF.y + CF.h + 4}px;width:${CF.w}px">${strip(["#1B1B1B","#474747","#474747","#777777","#ABABAB","#ABABAB","#ABABAB","#ABABAB","#E2E2E2"])}</div>
+  ${mark(13, 20, 772)}${mark(14, 760, 72)}${mark(15, 760, 582)}
+`, `
+  <h3><span class="n">13</span>Simplify</h3>
+  <p>Shows the selected layer as a few flat colors or values, to see the big shapes. <b>Colors</b> · <b>Values</b> (fitted to this image) · <b>Value scale</b> (equal steps, L* 10 – 90, the same for every image). Steps 2 – 24, Smooth 0 – 6. The strip under the canvas shows each value as wide as the area it covers. <i>Add as swatches</i> makes one swatch per flat color.</p>
+  <h3><span class="n">14</span>Paints &amp; mixes</h3>
+  <p>For the selected swatch: the closest single paints and two-paint mixes from the chosen <i>Mix from</i> group — all your oils, one of your palettes, or a classic palette (Zorn here) — lightened with a white or water. Each mix: a 64 pt chip (your swatch | the predicted mix, touching, so you see how the mix shifts), one line per paint led by its share of the mix (%, adding up to 100), then ΔE and how close it is (very close under 2, in blue; close; noticeably different; far off). ⚠ = this paint’s color is uncertain: outside what a screen can show, or mixed using a stand-in’s color. Tap the mix to see which.</p>
+  <h3><span class="n">15</span>Paint library</h3>
+  <p>Opens the full-screen library sheet.</p>
+`);
+
+// ---------- 6 · Paint library ----------
+const paints = [
+  ["#F2F1EC", "Titanium White", "Gamblin", "PW6", "1", "I", "Opaque", true],
+  ["#C99A45", "Yellow Ochre", "Gamblin", "PY43", "1", "I", "Semi-opaque", true],
+  ["#C8432D", "Cadmium Red Light", "Winsor & Newton", "PR108", "4", "I", "Opaque", false],
+  ["#B5432F", "Vermilion (hue)", "Michael Harding", "PR255, PY65", "2", "I", "Opaque", true],
+  ["#8E4A36", "Burnt Sienna", "Gamblin", "PR101", "1", "I", "Transparent", false],
+  ["#2B2A2A", "Ivory Black", "Old Holland", "PBk9", "A", "I", "Semi-opaque", true],
+  ["#1D3F8A", "Ultramarine Blue", "Gamblin", "PB29", "1", "I", "Transparent", false],
+  ["#1F4E5B", "Phthalo Turquoise", "Michael Harding", "PB15:3, PG7", "3", "I", "Transparent", false],
+];
+S("paint-library", "Paint library", `
+  ${topBar("Color")}
+  ${canvas(CF.x, CF.y, CF.w, CF.h, art("art-paint"))}
+  <div class="dim"></div>
+  <div class="sheet" style="left:40px;top:40px;right:40px;bottom:0;border-radius:16px 16px 0 0">
+    <div class="hd"><span>Paint library</span><div class="seg small" style="margin-left:16px"><span class="on">Paints</span><span>Palettes</span></div><div class="sp"></div>
+      <div class="vrow field" style="width:220px;padding:6px 10px;color:var(--sub)">${ic("search","sm")}Search paints, pigments</div>
+      <div class="btn fill" style="height:36px">Import saved page</div><div class="btn fill" style="height:36px">${ic("plus","sm")}Add paint</div>
+      <div class="btn primary" style="height:36px">Done</div></div>
+    <div style="display:flex;height:calc(100% - 56px)">
+      <div class="list" style="width:200px;border-right:1px solid var(--stroke);padding-top:8px">
+        <div style="background:rgba(52,99,168,.3);border-radius:8px;margin:0 8px;padding:0 8px">Oil<span class="sp"></span><span class="v">42</span></div>
+        <div>Watercolor<span class="sp"></span><span class="v">28</span></div><div>Acrylic<span class="sp"></span><span class="v">9</span></div>
+        <div>Gouache<span class="sp"></span><span class="v">6</span></div><div class="v" style="color:var(--sub)">★ Favorites<span class="sp"></span><span class="v">14</span></div>
+        <div style="height:auto;border:0;padding-top:16px;font-size:12px;color:var(--sub);display:block">Stored in iCloud Drive / Canvas Transfer / Paint Library</div>
+      </div>
+      <div style="flex:1;overflow:hidden;padding:4px 8px">
+        <table class="lib"><tr><th></th><th>Name</th><th>Brand</th><th>Pigments</th><th>Series</th><th>Lightfast</th><th>★</th></tr>
+        ${paints.map((p, i) => `<tr class="${i === 3 ? "sel" : ""}"><td><div class="chip" style="background:${p[0]}"></div></td><td>${p[1]}</td><td style="color:var(--sub)">${p[2]}</td><td>${p[3]}</td><td>${p[4]}</td><td>${p[5]}</td><td class="star">${p[7] ? "★" : "<span style='color:#555'>☆</span>"}</td></tr>`).join("")}
+        </table>
+      </div>
+      <div class="col" style="width:280px;border-left:1px solid var(--stroke);padding:16px;gap:10px">
+        <div style="height:90px;border-radius:10px;background:#B5432F"></div>
+        <b style="font-size:16px">Vermilion (hue)</b><span style="color:var(--sub)">Michael Harding · Series 2</span>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Pigments</span><span>PR255, PY65</span></div>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Hex</span><span>#B5432F</span></div>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">L*a*b*</span><span>48.2  52.0  38.1</span></div>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Opacity</span><span>Opaque</span></div>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Drying</span><span>Medium</span></div>
+        <div class="vrow" style="justify-content:space-between"><span style="color:var(--sub)">Source</span><span style="color:var(--accent-hi)">artistpigments.org ↗</span></div>
+        <div style="flex:1"></div>
+        <div class="vrow"><div class="btn fill" style="flex:1">Edit</div><div class="btn fill" style="flex:1">Revert to site</div></div>
+      </div>
+    </div>
+  </div>
+  ${mark(16, 8, 56)}${mark(17, 486, 57)}${mark(18, 846, 120)}
+`, `
+  <h3><span class="n">16</span>Full-screen sheet</h3>
+  <p>Opened from Paints &amp; mixes, or Settings. Paints | Palettes tabs. Medium list on the left with counts; Favorites as a filter.</p>
+  <h3><span class="n">17</span>Adding paints</h3>
+  <p><b>Import saved page</b>: pick an artistpigments.org page saved to Files; the paint and its measured color come in, and your edits are kept on re-import (prototype behaviour). <b>Add paint</b>: by hand (name, brand, pigments, L*a*b* or hex).</p>
+  <h3><span class="n">18</span>Detail</h3>
+  <p>Selected paint with its color (hex and L*a*b*), data and source link. <b>Edit</b> opens Edit paint (next screen); Revert to site data undoes your changes to imported fields.</p>
+  <h3>Palettes tab (not drawn)</h3>
+  <p>Your palettes and classic ones (Zorn, etc.), with roles filled from your paints and gaps marked. New palette, Duplicate as my palette.</p>
+  <h3>Every device</h3>
+  <p>Full-featured on iPad, iPhone and Mac (one shared library in iCloud Drive).</p>
+`);
+
+// ---------- 6b · Edit paint ----------
+const formRow = (label, control, note = "") => `<div class="vrow" style="min-height:48px;border-bottom:1px solid #2A2A2D;gap:12px">
+  <span style="width:110px;color:var(--sub);flex:none">${label}</span><div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${control}</div>${note}</div>`;
+const edited = `<span title="Changed by you" style="color:#E8C35A;font-size:11px;white-space:nowrap">● edited</span>`;
+S("edit-paint", "Edit paint", `
+  ${topBar("Color")}
+  <div class="dim"></div>
+  <div class="sheet" style="left:40px;top:40px;right:40px;bottom:0;border-radius:16px 16px 0 0;z-index:25;opacity:.35"></div>
+  <div class="sheet" style="left:190px;top:56px;width:800px;bottom:0;border-radius:16px 16px 0 0">
+    <div class="hd"><span class="btn quiet" style="padding:0;height:auto">Cancel</span><span class="sp" style="text-align:center">Edit paint</span><span class="btn primary" style="height:36px">Save</span></div>
+    <div style="display:flex;gap:24px;padding:16px 24px">
+      <div class="col" style="flex:1;min-width:0">
+        ${formRow("Medium", `<div class="seg small"><span class="on">Oil</span><span>Watercolor</span><span>Acrylic</span><span>Gouache</span><span>Other…</span></div>`)}
+        ${formRow("Name", `<div class="field" style="flex:1">Vermilion (hue)</div>`)}
+        ${formRow("Brand", `<div class="field" style="flex:1">Michael Harding</div><div class="field" style="width:96px;color:var(--sub);white-space:nowrap">Series 2</div>`)}
+        ${formRow("Pigments", `<span class="btn fill" style="height:32px;padding:0 10px">PR255 ✕</span><span class="btn fill" style="height:32px;padding:0 10px">PY65 ✕</span><span class="btn" style="height:32px;padding:0 6px;color:var(--accent-hi)">＋ Add</span>`)}
+        ${formRow("Opacity", `<div class="seg small"><span>Transparent</span><span>Semi-transp.</span><span>Semi-opaque</span><span class="on">Opaque</span></div>`)}
+        ${formRow("Lightfastness", `<div class="field" style="padding:7px 12px">ASTM I ▾</div>`)}
+        ${formRow("Drying", `<div class="field" style="flex:1">medium, 3–4 days</div>`, edited)}
+        ${formRow("Source", `<div class="field" style="flex:1;color:var(--accent-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">artistpigments.org/…/michael-harding-vermilion</div>`)}
+        ${formRow("", `<span style="color:var(--sub);font-size:12px">Measured on a color chart · imported Oct 3 · 1 field edited by you</span><span style="flex:1"></span><span class="btn quiet" style="height:30px;padding:0">Revert to site</span>`)}
+      </div>
+      <div class="col" style="width:250px;gap:12px">
+        <div style="height:140px;border-radius:12px;background:#B5432F"></div>
+        <div class="col" style="gap:6px"><span class="lbl">Hex</span><div class="field">#B5432F</div></div>
+        <div class="col" style="gap:6px"><span class="lbl">L*a*b* (D50)</span><div class="vrow"><div class="field" style="flex:1">48.2</div><div class="field" style="flex:1">52.0</div><div class="field" style="flex:1">38.1</div></div></div>
+        <div style="color:var(--sub);font-size:12px;line-height:1.35">Type either one; the other follows. L*a*b* from artistpigments.org is the measured color and more exact than hex. Or paste the site's color text.</div>
+        <div class="vrow" style="height:44px;border-top:1px solid #2A2A2D"><span style="flex:1">Favorite</span><div class="switch on"></div></div>
+        <div class="vrow" style="height:44px;border-top:1px solid #2A2A2D"><span style="flex:1">Use in mixes</span><div class="switch on"></div></div>
+        <div class="vrow" style="height:44px;border-top:1px solid #2A2A2D"><span style="flex:1">Stand-in</span><span style="color:var(--sub)">Automatic ▾</span></div>
+        <div class="btn" style="color:#FF6B6B;justify-content:flex-start;padding:0">Delete paint</div>
+      </div>
+    </div>
+  </div>
+  ${mark(24, 160, 140)}${mark(25, 1000, 260)}${mark(26, 160, 548)}
+`, `
+  <h3><span class="n">24</span>Medium</h3>
+  <p>Oil, Watercolor, Acrylic, Gouache, or Other… (your own group). Changing it moves the paint to that list in the library; its mixes then use that medium's whites and water.</p>
+  <h3>Fields</h3>
+  <p>Name, brand, series, pigments (as chips: PR255, PY65 — typed or picked from a list), opacity, lightfastness (ASTM I–III, or the maker's stars), drying (your own words: “fast”, “3–4 days”), source link.</p>
+  <h3><span class="n">25</span>Color</h3>
+  <p>Hex or L*a*b* — type either and the other is calculated; or paste the color text from the paint's artistpigments.org page. The swatch above updates as you type.</p>
+  <p>Favorite (filter in the library and mixes), Use in mixes (off = kept in the library but never suggested), Stand-in (the paint whose color is used for mixing when this one's is unknown or outside what a screen can show).</p>
+  <h3><span class="n">26</span>Your edits are kept</h3>
+  <p>For an imported paint, fields you change are marked ● edited and survive a re-import; Revert to site puts back the site's values. A paint added by hand has no source line.</p>
+  <h3>Add paint</h3>
+  <p>The same sheet, empty, titled “New paint”.</p>
+`);
+
+// ---------- 7 · Gallery ----------
+const projects = [
+  ["Portrait of Ana", "16 × 20 in", "Today", "art-paint", 0.8],
+  ["Harbor at dusk", "24 × 18 in", "Oct 20", "art-paint-early", 1.333],
+  ["Still life, pears", "12 × 16 in", "Oct 12", "art-paper", 0.75],
+  ["Self portrait", "11 × 14 in", "Sep 30", "art-values", 0.786],
+  ["Market street", "36 × 24 in", "Sep 2", "art-paint-early", 1.5],
+  ["Study, hands", "8 × 10 in", "Aug 18", "art-paper", 0.8],
+];
+S("gallery", "Gallery", `
+  <div class="abs" style="inset:0;background:#1C1C1E"></div>
+  <div class="abs vrow" style="left:32px;right:32px;top:24px;height:56px;gap:12px">
+    <b style="font-size:28px;flex:1">Canvas Transfer</b>
+    <div class="vrow" style="color:var(--sub);gap:6px">${ic("cloud","sm")}iCloud Drive</div>
+    <div class="iconbtn">${ic("gear")}</div>
+    <div class="btn fill">${ic("folder")}Open from Files</div>
+    <div class="btn primary">${ic("plus")}New project</div>
+  </div>
+  ${[["October", projects.slice(0, 3), 96], ["September", projects.slice(3, 5), 386], ["August", projects.slice(5), 676]].map(([g, list, top]) => `
+  <div class="abs" style="left:32px;top:${top}px;font-size:17px;font-weight:600">${g}</div>
+  <div class="abs" style="left:32px;right:32px;top:${top + 34}px;display:grid;grid-template-columns:repeat(4,1fr);gap:24px">
+    ${list.map(p => `<div class="col" style="gap:8px">
+      <div style="height:200px;border-radius:12px;background:#2A2A2D;display:grid;place-items:center;${p[0] === "Portrait of Ana" ? "outline:3px solid var(--accent);outline-offset:3px" : ""}">
+        <div style="height:${p[4] >= 1 ? 200 / p[4] * 0.85 : 176}px;width:${p[4] >= 1 ? 220 : 176 * p[4]}px;max-width:236px;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.4)">${art(p[3], 'style="position:absolute;inset:0;width:100%;height:100%"')}</div></div>
+      <div><b style="font-size:15px">${p[0]}</b><div style="color:var(--sub)">${p[1]} · ${p[2]}</div></div></div>`).join("")}
+  </div>`).join("")}
+  ${mark(19, 608, 40)}${mark(20, 4, 96)}
+`, `
+  <h3><span class="n">19</span>Start screen</h3>
+  <p>Recent projects, newest first, as thumbnails of the composited canvas at its real proportions. <b>New project</b> (blue), <b>Open from Files</b> (a .ctproj from anywhere), Settings. Where projects live is shown, not chosen, here.</p>
+  <h3><span class="n">20</span>Grouped by time</h3>
+  <p>Projects grouped by the month they were last edited, newest first. Scroll for older ones.</p>
+  <h3>Cards</h3>
+  <p>Tap opens the project. Long-press: Rename, Duplicate, Share project, Delete. Same screen on iPhone (2 columns) and Mac (window).</p>
+`);
+
+// ---------- 8 · New project ----------
+const sizes = ["8 × 10", "9 × 12", "11 × 14", "12 × 16", "16 × 20", "18 × 24", "24 × 30", "24 × 36", "30 × 40", "36 × 48", "Custom"];
+S("new-project", "New project", `
+  <div class="abs" style="inset:0;background:#1C1C1E"></div>
+  <div class="dim" style="background:rgba(0,0,0,.6)"></div>
+  <div class="sheet" style="left:290px;top:80px;width:600px">
+    <div class="hd"><span class="btn quiet" style="padding:0;height:auto">Cancel</span><span class="sp" style="text-align:center">New project</span><span class="btn primary" style="height:36px">Create</span></div>
+    <div class="col" style="padding:20px;gap:16px">
+      <div class="col" style="gap:6px"><span class="lbl">Name</span><div class="field" style="font-size:16px">Portrait of Ana</div></div>
+      <div class="col" style="gap:8px"><div class="vrow"><span class="lbl" style="flex:1">Canvas size</span><div class="seg small"><span class="on">in</span><span>cm</span></div></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${sizes.map(s => `<span class="btn ${s === "16 × 20" ? "primary" : "fill"}" style="height:38px;min-width:76px">${s}</span>`).join("")}</div></div>
+      <div class="vrow" style="gap:20px;align-items:flex-start">
+        <div class="col" style="gap:8px"><span class="lbl">Orientation</span><div class="seg"><span class="on">Portrait</span><span>Landscape</span></div></div>
+        <div style="flex:1"></div>
+        <div style="width:120px;height:150px;background:#E7E1D6;border-radius:3px;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.4)"><span style="position:absolute;bottom:6px;width:100%;text-align:center;color:#555;font-size:12px">16 × 20 in</span></div>
+      </div>
+      <div style="color:var(--sub);font-size:12px">Saved at once to iCloud Drive / Canvas Transfer / Portrait of Ana.ctproj</div>
+    </div>
+  </div>
+  ${mark(21, 260, 200)}
+`, `
+  <h3><span class="n">21</span>Three choices</h3>
+  <p>Name, size and orientation; everything else is set later. Common stretched-canvas sizes as one-tap chips, plus Custom (two number boxes). in | cm. A to-scale preview shows the shape. <b>Create</b> saves immediately and opens Camera with <b>Canvas</b> chosen, for workflow step 1.</p>
+`);
+
+// ---------- 9 · Share ----------
+S("share", "Share", `
+  ${topBar()}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, overlay())}
+  ${toolStrip(TRANSFER_TOOLS, null)}
+  ${layerBar(LAYERS, 0)}
+  <div class="abs panel col" style="right:14px;top:58px;width:320px;padding:8px;gap:2px;z-index:10;background:#232325">
+    <div class="list" style="font-size:15px">
+      <div style="height:64px"><div class="chip" style="width:36px;height:44px;background:#D7CFC2"></div><div class="col" style="flex:1"><b>Canvas view</b><span style="color:var(--sub);font-size:12px">Full resolution, as shown, no panels</span></div>${ic("chev","sm")}</div>
+      <div style="height:64px"><div class="chip" style="width:36px;height:44px;background:linear-gradient(#4A3426 0 20%,#D9A58A 20% 40%,#B97E66 40% 60%,#3F5A6E 60% 80%,#9AA3AB 80%)"></div><div class="col" style="flex:1"><b>Swatch sheet</b><span style="color:var(--sub);font-size:12px">Swatches with values and mixes, PDF</span></div>${ic("chev","sm")}</div>
+      <div style="height:64px;border:0"><div class="chip" style="width:36px;height:44px;background:#2E2E31;display:grid;place-items:center">${ic("folder","sm")}</div><div class="col" style="flex:1"><b>Project file</b><span style="color:var(--sub);font-size:12px">The .ctproj, to open on another device</span></div>${ic("chev","sm")}</div>
+    </div>
+    <div class="vrow" style="padding:8px 8px 4px;gap:10px"><span style="flex:1;color:var(--sub)">Include grid</span><div class="switch"></div></div>
+  </div>
+  ${mark(22, 830, 64)}
+`, `
+  <h3><span class="n">22</span>Share</h3>
+  <p>Pick what to share, then the iOS share sheet (AirDrop to the Mac, Messages, Files, Save image). <b>Canvas view</b> replaces screenshots: the composited canvas at full resolution with the current layers, looks and compare state, no UI. <b>Swatch sheet</b> for the paint table. <b>Project file</b> for the rare case iCloud isn't shared.</p>
+`);
+
+// ---------- 10 · Settings ----------
+S("settings", "Settings", `
+  <div class="abs" style="inset:0;background:#1C1C1E"></div>
+  <div class="dim" style="background:rgba(0,0,0,.6)"></div>
+  <div class="sheet" style="left:240px;top:60px;width:700px;bottom:60px">
+    <div class="hd"><span class="sp">Settings</span><span class="btn primary" style="height:36px">Done</span></div>
+    <div style="padding:8px 8px">
+      <div class="lbl" style="padding:12px 16px 4px">Storage</div>
+      <div class="list">
+        <div>Projects folder<span class="sp"></span><span class="v">iCloud Drive / Canvas Transfer</span>${ic("chev","sm")}</div>
+        <div>Paint library<span class="sp"></span><span class="v">iCloud Drive / Canvas Transfer</span>${ic("chev","sm")}</div>
+      </div>
+      <div class="lbl" style="padding:16px 16px 4px">Defaults</div>
+      <div class="list">
+        <div>Units<span class="sp"></span><div class="seg small"><span class="on">in</span><span>cm</span></div></div>
+        <div>New reference layer<span class="sp"></span><span class="v">Multiply · 60 %</span>${ic("chev","sm")}</div>
+        <div>Auto levels on photos<span class="sp"></span><span class="v" style="margin-right:8px">References only (never canvas photos)</span>${ic("chev","sm")}</div>
+        <div>Grid<span class="sp"></span><span class="v">4 × 5 · white · thin</span>${ic("chev","sm")}</div>
+        <div>Blink speed<span class="sp"></span><span class="v">0.6 s</span>${ic("chev","sm")}</div>
+      </div>
+      <div class="lbl" style="padding:16px 16px 4px">Help</div>
+      <div class="list"><div>Gestures<span class="sp"></span><span class="v">2-finger tap undo · 3-finger redo · 4-finger full screen</span></div></div>
+    </div>
+  </div>
+  ${mark(23, 210, 120)}
+`, `
+  <h3><span class="n">23</span>Settings</h3>
+  <p>Where things are stored (iCloud Drive by default, decision A), and the defaults that came up while designing: units, the look of a new reference layer, auto levels, grid, blink speed. A gestures cheat sheet, since several actions have no button.</p>
+`);
+
+// ---------- Transfer workspace (first drawn in Figma) ----------
+const handles = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid var(--accent)">
+  ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 7px);top:calc(${b}% - 7px);width:14px;height:14px;background:#fff;border:2px solid var(--accent);border-radius:3px"></i>`).join("")}</div>`;
+const transformBar = () => `<div class="abs panel ctx">
+    <div class="seg"><span class="on">Proportional</span><span>Free</span><span>Skew</span><span>Distort</span></div><div class="div"></div>
+    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="btn">${ic("crop")}Crop</div><div class="div"></div>
+    <div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>`;
+// the reference placed small, in the upper left of the canvas (workflow step 4)
+const REF = { x: TF.x + 40, y: TF.y + 40, w: 250, h: 312 };
+const placedRef = `<div class="abs" style="left:${REF.x - TF.x}px;top:${REF.y - TF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
+const transferCanvas = () => canvas(TF.x, TF.y, TF.w, TF.h, art("art-toned") + placedRef);
+
+S("transfer-transform", "Transfer — Transform", `
+  ${topBar()}
+  ${transferCanvas()}
+  ${handles(REF.x, REF.y, REF.w, REF.h)}
+  ${toolStrip(TRANSFER_TOOLS, "transform")}
+  ${layerBar(LAYERS, 0)}
+  ${transformBar()}
+  ${mark(1, 730, 14)}${mark(2, 74, 68)}${mark(3, 816, 90)}${mark(4, 1076, 68)}${mark(5, 112, 772)}
+`, `
+  <h3><span class="n">1</span>Top bar</h3>
+  <p>Gallery, project name, the <b>Transfer | Color</b> switch, undo, redo, Full screen, Share. Two-finger tap = undo, three-finger tap = redo (Procreate), so the buttons are a backup.</p>
+  <h3><span class="n">2</span>Tool strip</h3>
+  <p>Camera, Transform, Perspective, Grid, Compare. 44 pt targets; the active tool is filled blue.</p>
+  <h3><span class="n">3</span>The view</h3>
+  <p>By default the canvas is sized to the space between the strips, the top bar and the context bar, so nothing covers it — and it keeps that size whether or not a bar is showing (no jumping). Pinch to zoom and rotate, two-finger drag to pan, quick pinch to fit. Here the canvas photo is the toned, still-empty canvas (workflow steps 1–2) and the reference has been scaled down into the upper left: a reference does not have to fill the canvas.</p>
+  <h3><span class="n">4</span>Layer bar</h3>
+  <p>Collapsed to a thin icon bar: thumbnails only, the selected one ringed in blue. ‹ expands it. Tap a layer to select it; tap it again for Look.</p>
+  <h3><span class="n">5</span>Context bar</h3>
+  <p>Only while a tool is active. Transform: Proportional / Free / Skew / Distort, Flip H / V, Fit, <b>Crop</b> (next screen), Cancel, <b>Done</b>. Handles work with Pencil or finger.</p>
+`);
+
+// ---------- Transfer — Crop ----------
+const CROP = { l: .06, t: .08, r: .12, b: .09 };  // the part of the reference photo that is kept
+const cropFrame = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);z-index:4">
+  <i class="abs" style="left:33.3%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="left:66.6%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i>
+  <i class="abs" style="top:33.3%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="top:66.6%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i>
+  ${[["left:-4px;top:-4px", "border-left", "border-top"], ["right:-4px;top:-4px", "border-right", "border-top"], ["left:-4px;bottom:-4px", "border-left", "border-bottom"], ["right:-4px;bottom:-4px", "border-right", "border-bottom"]]
+    .map(([pos, a, b]) => `<i class="abs" style="${pos};width:24px;height:24px;${a}:5px solid #fff;${b}:5px solid #fff"></i>`).join("")}
+  ${["left:calc(50% - 14px);top:-4px;width:28px;height:5px", "left:calc(50% - 14px);bottom:-4px;width:28px;height:5px", "top:calc(50% - 14px);left:-4px;width:5px;height:28px", "top:calc(50% - 14px);right:-4px;width:5px;height:28px"]
+    .map(pos => `<i class="abs" style="${pos};background:#fff"></i>`).join("")}</div>`;
+const croppedRef = (w, h) => `<div class="abs" style="inset:0;opacity:.25">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>
+  <div class="abs" style="inset:0;clip-path:inset(${CROP.t * 100}% ${CROP.r * 100}% ${CROP.b * 100}% ${CROP.l * 100}%)">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
+S("transfer-crop", "Transfer — Crop", `
+  ${topBar()}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-toned") + `<div class="abs" style="left:${REF.x - TF.x}px;top:${REF.y - TF.y}px;width:${REF.w}px;height:${REF.h}px">${croppedRef()}</div>`)}
+  ${cropFrame(REF.x + REF.w * CROP.l, REF.y + REF.h * CROP.t, REF.w * (1 - CROP.l - CROP.r), REF.h * (1 - CROP.t - CROP.b))}
+  ${toolStrip(TRANSFER_TOOLS, "transform")}
+  ${layerBar(LAYERS, 0)}
+  <div class="abs panel ctx">
+    <span class="vrow" style="padding:0 8px;font-weight:600;font-size:14px">${ic("crop")}Crop</span><div class="div"></div>
+    <div class="seg"><span class="on">Free</span><span>Original</span><span>Square</span></div>
+    <div class="btn">Reset</div><div class="div"></div>
+    <div class="btn quiet">Cancel</div><div class="btn primary">Done</div>
+  </div>
+  ${mark(1, 600, 150)}${mark(2, 343, 380)}${mark(3, 270, 772)}
+`, `
+  <h3><span class="n">1</span>Crop a reference</h3>
+  <p><b>Crop</b> in the Transform bar (or Look → Crop) trims what you don't want from a reference: tape, the table edge, the corner of another sketch. Drag the corners or the middle of an edge with Pencil or finger; the frame stays inside the photo.</p>
+  <h3><span class="n">2</span>What's cut off</h3>
+  <p>Shown faintly while cropping so you can see what you're removing, hidden after Done. Nothing is deleted: Crop again any time and drag the edges back out, or Reset to bring back the whole photo.</p>
+  <h3><span class="n">3</span>Crop bar</h3>
+  <p>Free (default), Original (keeps the photo's proportions) or Square; Reset; Cancel; <b>Done</b>. Pinch and two-finger pan still move the view.</p>
+  <h3>How it fits with Transform</h3>
+  <p>The crop belongs to the reference, not to the canvas, so it moves, scales, skews and flips with the reference afterwards. Typical order: Transform to size and place, notice the leftovers, Crop, Done.</p>
+  <h3>Canvas photos</h3>
+  <p>Not offered: a canvas photo's four corners already decide what's kept.</p>
+`);
+
+const cslider = (v) => `<div class="slider" style="--v:${v}%;flex:1"><i class="abs" style="top:11px;height:6px;left:${Math.min(v, 50)}%;width:${Math.abs(v - 50)}%;background:var(--accent);border-radius:3px"></i></div>`;
+const hsRow = (label, v, val) => `<div class="vrow"><span style="width:72px">${label}</span><div style="flex:1;display:flex">${cslider(v)}</div><span style="width:34px;text-align:right;color:var(--sub)">${val}</span></div>`;
+const hr = `<div style="height:1px;background:var(--stroke)"></div>`;
+S("transfer-look", "Transfer — Look", `
+  ${topBar()}
+  ${transferCanvas()}
+  ${toolStrip(TRANSFER_TOOLS, null)}
+  ${layerBar(LAYERS, 0)}
+  <div class="abs panel col" style="left:772px;top:64px;width:320px;padding:16px;gap:11px;background:#232325;z-index:10">
+    <div class="vrow"><b style="font-size:15px;flex:1">Opacity</b><b style="font-size:15px">60%</b><span style="color:var(--sub);margin-left:14px">Reset</span></div>
+    <div class="slider" style="--v:60%"></div>
+    <div class="seg fill small"><span>Normal</span><span class="on">Multiply</span><span>Screen</span><span>Lin. Light</span></div>
+    ${hr}<span class="lbl">Levels</span>
+    <svg width="288" height="56" viewBox="0 0 288 56"><rect width="288" height="56" rx="6" fill="#2E2E31"/><path d="M0 56 L0 52 C30 50 40 18 70 26 S110 9 140 23 S190 44 220 35 S260 47 288 50 L288 56Z" fill="#6A6A6E"/><path d="M24 0v56M150 0v56M262 0v56" stroke="#7FA8EC" stroke-width="1.5" stroke-dasharray="3 3"/></svg>
+    <div class="vrow">${[["Black","12"],["Gamma","1.20"],["White","236"]].map(([l,v]) => `<div class="col" style="flex:1;gap:4px"><span style="color:var(--sub);font-size:11px">${l}</span><div class="field" style="padding:6px 10px">${v}</div></div>`).join("")}</div>
+    ${hr}<span class="lbl">Hue / Saturation</span>
+    ${hsRow("Hue", 50, "0")}${hsRow("Saturation", 20, "−60")}${hsRow("Lightness", 50, "0")}
+    <div class="vrow"><span style="flex:1">Colorize</span><div class="switch"></div></div>
+    ${hr}
+    <div class="vrow"><span style="flex:1">Invert</span><div class="switch"></div></div>
+    <div class="vrow"><span style="flex:1">Crop</span><span style="color:var(--sub)">Edit crop ›</span></div>
+    <div class="vrow"><span style="flex:1">Perspective</span><span style="color:var(--sub)">Edit corners ›</span></div>
+  </div>
+  <div class="abs" style="left:1092px;top:134px;width:0;height:0;border:10px solid transparent;border-left-color:#232325;z-index:11"></div>
+  ${mark(6, 742, 70)}
+`, `
+  <h3><span class="n">6</span>Look</h3>
+  <p>Tap the selected layer again. No title — the pointer shows which layer it belongs to. <b>Opacity</b> first and largest (the most-used control), then blend mode (Normal / Multiply / Screen / Linear Light), Levels (histogram with black / gray / white points, plus number boxes), Hue / Saturation / Lightness, Colorize, Invert, Crop (references only), Perspective → Edit corners. Live on the canvas; tap outside to close. Reset clears this layer only.</p>
+  <h3>Defaults</h3>
+  <p>A new reference — photo or drawing — starts at <b>Multiply 60 %</b>: white paper disappears and the lines sit on the canvas photo. A canvas photo starts at <b>Normal 100 %</b>.</p>
+  <h3>Not drawn</h3>
+  <p>Colorize, when on, shows its own hue and saturation sliders.</p>
+`);
+
+const card = (color, name, sum, sel, eye = true) => `<div class="col" style="width:142px;padding:8px;gap:4px;border-radius:10px;${sel ? "background:#2C2C30;border:2px solid var(--accent);padding:6px" : ""}">
+  <div style="height:72px;border-radius:6px;background:${color}"></div>
+  <div class="vrow" style="gap:4px"><b style="flex:1;font-size:12px">${name}</b><span style="opacity:${eye ? 1 : .35}">${ic("eye","sm")}</span></div>
+  <span style="color:var(--sub);font-size:11px">${sum}</span></div>`;
+S("transfer-layers", "Transfer — Layer bar expanded", `
+  ${topBar()}
+  ${transferCanvas()}
+  ${toolStrip(TRANSFER_TOOLS, null)}
+  <div class="abs panel col" style="right:12px;top:64px;padding:6px;gap:6px">
+    <div class="vrow" style="padding-left:8px"><span style="flex:1;color:var(--sub);font-weight:600">Layers</span><div class="iconbtn" style="width:36px;height:36px">${ic("chev")}</div></div>
+    ${card("#F4F2EE", "Reference", "Multiply · 60%", true)}
+    ${card("#B7977E", "Canvas · Oct 22", "Normal · 100%", false)}
+    ${card("#A9A196", "Canvas · Oct 15", "Normal · 100%", false, false)}
+    <div class="btn fill" style="height:44px">${ic("plus")}Layer</div>
+  </div>
+  ${mark(7, 990, 70)}
+`, `
+  <h3><span class="n">7</span>Layer bar, expanded</h3>
+  <p>Thumbnail, name, eye (show / hide), and a one-line summary of blend mode and opacity. Tap › or swipe right to collapse back to the icon bar. It overlaps the edge of the view slightly — it is for setting layers up, not for working. ＋ Layer goes to Camera or Photos.</p>
+  <p>Order: references on top, canvas photos below, newest canvas photo first. Older canvas photos keep whatever you set; here Oct 15 has been hidden by hand.</p>
+`);
+
+S("transfer-full", "Transfer — Full screen", `
+  <div class="abs" style="inset:0;background:#161617"></div>
+  ${canvas(262, 0, 656, 820, art("art-toned") + `<div class="abs" style="left:51px;top:51px;width:320px;height:400px">${art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply"')}</div>`)}
+  <div class="abs" style="left:16px;top:16px;width:40px;height:40px;border-radius:20px;background:rgba(0,0,0,.35);opacity:.6;display:grid;place-items:center">${ic("exitfull")}</div>
+  ${mark(8, 64, 24)}
+`, `
+  <h3><span class="n">8</span>Full screen</h3>
+  <p>All UI hidden; the canvas fills the screen (height in landscape, width in portrait). For working at the easel once the layers are set. Gestures still zoom and pan. Leave with the faint button (it fades after a few seconds and comes back on a tap) or a four-finger tap (Procreate).</p>
+  <p>If Compare is on, it keeps running here, and a tap pauses / resumes the blink.</p>
+  <h3>Portrait iPad</h3>
+  <p>Same layout, rotated: the layer bar collapses and full screen hides everything, so nothing needs redesigning.</p>
+`);
+
+// ---------- Camera (first drawn in Figma) ----------
+const Q = [[330,150],[860,120],[900,700],[300,690]];
+const qpts = (k = 1, dx = 0, dy = 0) => Q.map(([x, y]) => `${dx + x * k},${dy + y * k}`).join(" ");
+S("camera-capture", "Camera — Capture", `
+  <svg class="abs" style="inset:0" width="1180" height="820" viewBox="0 0 1180 820"><use href="#scene"/>
+    <polygon points="${qpts()}" fill="#3463A8" fill-opacity=".12" stroke="#5B8FE0" stroke-width="3" stroke-linejoin="round"/>
+    ${Q.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="#5B8FE0"/>`).join("")}</svg>
+  <div class="pill" style="left:16px;top:16px">Cancel</div>
+  <div class="pill" style="left:535px;transform:translateX(-50%);top:16px;color:var(--sub);font-size:13px">Adding to Portrait of Ana</div>
+  <div class="pill" style="left:595px;transform:translateX(-50%);top:72px;height:32px;background:var(--accent);color:#fff;font-size:13px">Rectangle found · hold steady</div>
+  <div class="pill" style="left:680px;top:325px;height:32px;background:rgba(0,0,0,.6);color:#F2D27A;font-size:13px">Glare on the paper — tilt slightly</div>
+  <div class="abs" style="right:0;top:0;width:110px;height:820px;background:rgba(0,0,0,.55)">
+    <svg class="abs" style="left:15px;top:370px" width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="37" fill="none" stroke="#fff" stroke-width="4"/><circle cx="40" cy="40" r="31" fill="#fff"/></svg>
+    <div class="abs" style="left:31px;top:712px;width:48px;height:48px;border-radius:8px;background:#8F8577;border:1.5px solid #fff"></div>
+    <div class="abs" style="left:0;width:110px;top:764px;text-align:center;font-size:11px">Photos</div>
+  </div>
+  <div class="abs seg" style="left:535px;transform:translateX(-50%);bottom:16px;border-radius:21px;padding:3px;background:rgba(34,34,36,.9)">
+    <span style="border-radius:18px;padding:0 20px">Canvas</span><span class="on" style="border-radius:18px;padding:0 20px">Reference</span></div>
+  ${mark(9, 405, 778)}${mark(10, 430, 76)}${mark(11, 1040, 398)}${mark(12, 1040, 724)}
+`, `
+  <h3>Entry</h3>
+  <p>Camera in the tool strip, ＋ in the layer bar, or <b>Create</b> on New project. Full screen over the workspace.</p>
+  <h3><span class="n">9</span>Canvas | Reference</h3>
+  <p>Chosen before the shot because it decides what happens next. <b>Canvas</b> → corrected to the canvas proportions, fills the canvas exactly, Normal 100 %. <b>Reference</b> → corrected, Multiply 60 %, then placed with Transform. Default: Canvas if the project has no canvas photo yet, then Reference if it has no reference yet, otherwise Canvas.</p>
+  <h3><span class="n">10</span>Live detection</h3>
+  <p>The rectangle is outlined as soon as it is found. Warnings sit on the image where the problem is: glare, too dark, angle too steep.</p>
+  <h3><span class="n">11</span>Shutter</h3>
+  <p>Right edge in landscape (iOS convention), 80 pt; Pencil or finger. No auto capture.</p>
+  <h3><span class="n">12</span>Photos</h3>
+  <p>Pick an existing photo instead; it goes to the same corner step.</p>
+`);
+
+const K = 0.72, PX = 8, PY = 141;
+S("camera-corners", "Camera — Adjust corners", `
+  <div class="abs" style="inset:0;background:#161617"></div>
+  <div class="topbar" style="padding:0 16px"><span style="font-size:15px">Retake</span><div class="sp"></div><span style="font-size:15px;color:var(--sub)">Cancel</span>
+    <b class="abs" style="left:50%;transform:translateX(-50%);font-size:15px">Adjust corners</b></div>
+  <svg class="abs" style="left:${PX}px;top:${PY}px" width="${1180 * K}" height="${820 * K}" viewBox="0 0 1180 820"><use href="#scene"/>
+    <path fill-rule="evenodd" d="M0 0H1180V820H0Z M${Q.map(p => p.join(" ")).join(" L")}Z" fill="#000" fill-opacity=".5"/>
+    <polygon points="${qpts()}" fill="none" stroke="#5B8FE0" stroke-width="3"/></svg>
+  ${Q.map(([x, y], i) => `<div class="abs" style="left:${PX + x * K - 15}px;top:${PY + y * K - 15}px;width:30px;height:30px;border-radius:15px;border:3px solid var(--accent);background:rgba(255,255,255,${i === 0 ? 1 : .25})"></div>`).join("")}
+  <div class="abs" style="left:${PX + Q[0][0] * K - 26}px;top:${PY + Q[0][1] * K - 176}px;width:132px;height:132px;border-radius:66px;overflow:hidden;border:3px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.5)">
+    <svg width="132" height="132" viewBox="0 0 132 132"><rect width="132" height="132" fill="#5E564E"/><polygon points="66,66 160,58 168,170 60,170" fill="#EEEAE2"/><path d="M66 6v120M6 66h120" stroke="#5B8FE0" stroke-width="1.5"/><circle cx="66" cy="66" r="9" fill="none" stroke="#5B8FE0" stroke-width="2"/></svg></div>
+  <div class="abs panel col" style="left:868px;top:64px;width:300px;height:744px;padding:16px;gap:12px;background:var(--panel-solid)">
+    <div style="height:200px;border-radius:8px;background:var(--ctl);display:grid;place-items:center"><div style="width:160px;height:200px;position:relative">${art("art-paper", 'style="position:absolute;inset:0;width:100%;height:100%"')}</div></div>
+    <span style="color:var(--sub);font-size:12px">3024 × 3780 px · ratio 4 : 5</span>
+    <span class="lbl">Use as</span>
+    <div class="seg fill" style="border-radius:20px;padding:3px"><span style="border-radius:17px;height:34px">Canvas</span><span class="on" style="border-radius:17px;height:34px">Reference</span></div>
+    <span class="lbl">Adjust</span>
+    <div class="vrow" style="height:36px"><span style="flex:1;font-size:14px">Auto levels</span><div class="switch on"></div></div>
+    <div class="vrow" style="height:36px"><span style="flex:1;font-size:14px">Rotate 90°</span><span style="font-size:18px">↻</span></div>
+    <div class="vrow" style="height:36px"><span style="flex:1;font-size:14px">Reset to detected</span><span style="font-size:18px;color:var(--sub)">↺</span></div>
+    <div style="flex:1"></div>
+    <div class="btn primary" style="height:52px;border-radius:12px;font-size:16px">Add layer</div>
+  </div>
+  ${mark(13, PX + Q[0][0] * K - 44, PY + Q[0][1] * K + 16)}${mark(14, PX + Q[0][0] * K + 112, PY + Q[0][1] * K - 168)}${mark(15, 838, 84)}${mark(16, 838, 420)}${mark(17, 838, 768)}
+`, `
+  <h3><span class="n">13</span>Corners</h3>
+  <p>The detected corners come in already placed; drag any of the four with Pencil or finger (30 pt handles, 44 pt hit area). Outside the four corners is dimmed. If nothing was detected, the corners start 10 % in from the photo's edges. The corners are the crop — there is no separate crop step.</p>
+  <h3><span class="n">14</span>Loupe</h3>
+  <p>While a corner is dragged, a magnified view with a crosshair sits above it, offset so your finger never hides it.</p>
+  <h3><span class="n">15</span>Preview</h3>
+  <p>The corrected image (no title), updated live as corners move, with pixel size and ratio. For Canvas the ratio is forced to the canvas (16 × 20).</p>
+  <h3><span class="n">16</span>Use as · Adjust</h3>
+  <p>Canvas / Reference can still be switched here. <b>Auto levels</b>: on for references (paper to white, lines to dark), off for canvas photos so the painting's values stay true. Rotate 90° for sideways shots. Reset puts the corners back where they were detected.</p>
+  <h3><span class="n">17</span>Add layer</h3>
+  <p>Adds the corrected photo as a new layer and returns to the workspace (next screen). Corners stay editable later: Look → Perspective → Edit corners.</p>
+`);
+
+// ---------- render ----------
+// workflow order; markers are numbered per screen, in the order the notes mention them
+const ORDER = ["gallery", "new-project", "camera-capture", "camera-corners", "camera-added", "transfer-transform", "transfer-crop", "transfer-look",
+  "transfer-layers", "transfer-full", "compare-split", "compare-blink", "color-pick", "color-simplify", "paint-library", "edit-paint", "share", "settings"];
+screens.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
+const main = document.getElementById("screens"), toc = document.getElementById("toc");
+screens.forEach((s, i) => {
+  toc.insertAdjacentHTML("beforeend", `<a href="#${s.id}">${i + 1} · ${s.title}</a>`);
+  main.insertAdjacentHTML("beforeend", `<section class="screen" id="${s.id}"><h2>${i + 1} · ${s.title}</h2>
+    <div class="row"><div class="stage"><div class="ipad">${s.html}</div></div><div class="notes">${s.notes}</div></div></section>`);
+  const sec = main.lastElementChild, map = {};
+  sec.querySelectorAll(".notes .n").forEach(n => { map[n.textContent] ??= String(Object.keys(map).length + 1); n.textContent = map[n.textContent]; });
+  sec.querySelectorAll(".ipad .mark").forEach(m => { m.textContent = map[m.textContent] ?? m.textContent; });
+});
+function fit() {
+  const w = Math.min(document.documentElement.clientWidth, 1700) - 32;
+  const beside = w >= 1180 * 0.7 + 24 + 360;
+  const avail = beside ? w - 24 - 380 : w;
+  document.documentElement.style.setProperty("--s", Math.min(1, avail / 1180).toFixed(4));
+}
+fit(); addEventListener("resize", fit);
+</script>
+</body>
+</html>

@@ -28,6 +28,20 @@ class BlendMode(str, Enum):
     LINEAR_LIGHT = "linear_light"
 
 
+class LayerKind(str, Enum):
+    CANVAS = "canvas"  # a photo of the real canvas, corrected to fill it exactly
+    REFERENCE = "reference"  # the photo or drawing being transferred
+
+
+# How a new layer of each kind starts: (opacity, blend mode, auto levels).
+# A reference at Multiply 60 % lets white paper disappear over the canvas
+# photo; a canvas photo shows the painting as it is, values untouched.
+DEFAULT_LOOK = {
+    LayerKind.CANVAS: (1.0, BlendMode.NORMAL, False),
+    LayerKind.REFERENCE: (0.6, BlendMode.MULTIPLY, True),
+}
+
+
 class CompareMode(str, Enum):
     OVERLAY = "overlay"
     BLINK = "blink"  # alternate between layer A alone and layer B alone
@@ -125,6 +139,10 @@ class Layer:
     # True for canvas photos: the corrected image fills the canvas exactly.
     perspective_fill_canvas: bool = False
     adjustments: Adjustments = field(default_factory=Adjustments)
+    kind: LayerKind = LayerKind.REFERENCE
+    # The part of the image that shows: (left, top, right, bottom) as fractions
+    # of the displayed image, so it moves with the layer. None = all of it.
+    crop: tuple[float, float, float, float] | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -140,6 +158,8 @@ class Layer:
             ),
             "perspective_fill_canvas": self.perspective_fill_canvas,
             "adjustments": self.adjustments.to_dict(),
+            "kind": self.kind.value,
+            "crop": list(self.crop) if self.crop else None,
         }
 
     @staticmethod
@@ -160,6 +180,10 @@ class Layer:
             ),
             perspective_fill_canvas=data.get("perspective_fill_canvas", False),
             adjustments=Adjustments.from_dict(data.get("adjustments")),
+            # projects saved before layers had a kind: a canvas photo is the one that fills the canvas
+            kind=LayerKind(data["kind"]) if "kind" in data else
+            (LayerKind.CANVAS if data.get("perspective_fill_canvas") else LayerKind.REFERENCE),
+            crop=tuple(data["crop"]) if data.get("crop") else None,
         )
 
 
@@ -263,7 +287,12 @@ class Project:
     simplify: SimplifySettings = field(default_factory=SimplifySettings)
 
     def add_layer(self, layer: Layer) -> None:
-        self.layers.append(layer)
+        """References go on top; a canvas photo goes just under the lowest
+        reference, so references always stay over the canvas photos."""
+        index = len(self.layers)
+        if layer.kind == LayerKind.CANVAS:
+            index = next((i for i, l in enumerate(self.layers) if l.kind == LayerKind.REFERENCE), index)
+        self.layers.insert(index, layer)
         self.active_layer_id = layer.id
 
     def remove_layer(self, layer_id: str) -> None:

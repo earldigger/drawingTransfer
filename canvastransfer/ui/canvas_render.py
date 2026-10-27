@@ -11,7 +11,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap, QPolygonF, QTransform
+from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QTransform
 
 from ..geometry import Quad
 from ..models import BlendMode, GridSettings
@@ -31,6 +31,23 @@ class RenderLayer:
     opacity: float
     blend: BlendMode
     clip: QRectF | None = None  # scene coords
+    crop: tuple[float, float, float, float] | None = None  # fractions of the pixmap: left, top, right, bottom
+
+
+def crop_rect(layer: RenderLayer) -> QRectF | None:
+    """The layer's crop in its own pixmap pixels (drawn under its quad transform)."""
+    if layer.crop is None:
+        return None
+    left, top, right, bottom = layer.crop
+    w, h = layer.pixmap.width(), layer.pixmap.height()
+    return QRectF(left * w, top * h, (right - left) * w, (bottom - top) * h)
+
+
+def _clip_crop(painter: QPainter, layer: RenderLayer) -> None:
+    """Call with the layer's own transform set: only the cropped part draws."""
+    rect = crop_rect(layer)
+    if rect is not None:
+        painter.setClipRect(rect, Qt.IntersectClip)
 
 
 def quad_transform(pixmap: QPixmap, quad: Quad) -> QTransform | None:
@@ -78,6 +95,7 @@ def _linear_light(target: QImage, scratch: QImage, layer: RenderLayer, layer_tf:
     _begin(p, scratch, smooth)
     _clip_to(p, scene_to_target, canvas, layer.clip)
     p.setTransform(layer_tf)
+    _clip_crop(p, layer)
     p.drawPixmap(0, 0, layer.pixmap)
     p.end()
 
@@ -102,19 +120,23 @@ def render_canvas(
     background: QColor = QColor(64, 64, 64),
     smooth: bool = True,
     scratch: QImage | None = None,
+    cropped_off: RenderLayer | None = None,
 ) -> None:
     """Draw everything into `target` (Format_ARGB32_Premultiplied).
-    `layers` are bottom-to-top; `scratch` is reused between frames when given."""
+    `layers` are bottom-to-top; `scratch` is reused between frames when given.
+    `cropped_off`, while cropping, is the layer whose cut-off part shows faintly."""
     target.fill(background)
     p = QPainter()
     _begin(p, target, smooth)
 
     if ghost is not None and (tf := quad_transform(ghost.pixmap, ghost.quad)) is not None:
         # Drawn under the opaque canvas, so only the part outside it shows.
+        p.save()
         p.setTransform(tf * scene_to_target)
+        _clip_crop(p, ghost)
         p.setOpacity(GHOST_OPACITY)
         p.drawPixmap(0, 0, ghost.pixmap)
-        p.setOpacity(1.0)
+        p.restore()
 
     p.setTransform(scene_to_target)
     p.fillRect(canvas, Qt.white)
@@ -134,10 +156,26 @@ def render_canvas(
         p.save()
         _clip_to(p, scene_to_target, canvas, layer.clip)
         p.setTransform(full_tf)
+        _clip_crop(p, layer)
         p.setCompositionMode(QT_MODES[layer.blend])
         p.setOpacity(layer.opacity)
         p.drawPixmap(0, 0, layer.pixmap)
         p.restore()
+
+    if cropped_off is not None and (tf := quad_transform(cropped_off.pixmap, cropped_off.quad)) is not None:
+        inside = crop_rect(cropped_off)
+        if inside is not None:
+            outside = QPainterPath()
+            outside.addRect(QRectF(0, 0, cropped_off.pixmap.width(), cropped_off.pixmap.height()))
+            cut = QPainterPath()
+            cut.addRect(inside)
+            p.save()
+            p.setClipping(False)
+            p.setTransform(tf * scene_to_target)
+            p.setClipPath(outside.subtracted(cut))
+            p.setOpacity(GHOST_OPACITY)
+            p.drawPixmap(0, 0, cropped_off.pixmap)
+            p.restore()
 
     if grid is not None and grid.enabled and grid.rows >= 1 and grid.columns >= 1:
         _clip_to(p, scene_to_target, canvas, None)

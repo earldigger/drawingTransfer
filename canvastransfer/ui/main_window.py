@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import time
 from pathlib import Path
 
@@ -32,7 +33,8 @@ from ..geometry import (
     normalize_quad,
 )
 from ..history import History, Snapshot
-from ..models import BlendMode, CompareMode, Layer, Project, Swatch, new_id
+from ..image_ops import default_look, has_default_look, layer_default_look
+from ..models import BlendMode, CompareMode, Layer, LayerKind, Project, Swatch, new_id
 from ..paints import PaintLibrary
 from ..project_io import ProjectDocument, autosave, load_image_rgba, load_project, save_project
 from .canvas_view import CanvasView, LayerEntry, Marker
@@ -97,6 +99,7 @@ class MainWindow(QMainWindow):
         self._thumbnail_time = 0.0
         self._on_start_screen = False
         self.canvas_view.quadCommitted.connect(self._on_quad_committed)
+        self.canvas_view.cropCommitted.connect(self._on_crop_committed)
         self.canvas_view.colorPicked.connect(self._on_color_picked)
         self.canvas_view.pickHover.connect(self._on_pick_hover)
         self.canvas_view.markerClicked.connect(self._select_swatch)
@@ -155,9 +158,10 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction("Projects Folder…", self.change_projects_folder)
         file_menu.addSeparator()
-        self.add_layer_action = file_menu.addAction("Add Image Layer…", self._import_image)
+        self.add_canvas_action = file_menu.addAction("Add Canvas Photo…", lambda: self._add_layer(LayerKind.CANVAS))
+        self.add_layer_action = file_menu.addAction("Add Reference…", lambda: self._add_layer(LayerKind.REFERENCE))
 
-        edit_menu = self.menuBar().addMenu("&Edit")
+        edit_menu = self.edit_menu = self.menuBar().addMenu("&Edit")
         self.undo_action = edit_menu.addAction("Undo", QKeySequence.Undo, self._undo)
         self.redo_action = edit_menu.addAction("Redo", QKeySequence.Redo, self._redo)
 
@@ -193,6 +197,20 @@ class MainWindow(QMainWindow):
         self.cancel_action.setToolTip("Undo everything since Transform was turned on (Esc)")
         bar.addSeparator()
 
+        self.crop_action = QAction("Crop", self)
+        self.crop_action.setCheckable(True)
+        self.crop_action.setShortcut("Alt+Ctrl+K")
+        self.crop_action.setToolTip("Trim the selected reference: drag the corners or edges (⌥⌘K). "
+                                    "Done keeps it, Cancel undoes it")
+        self.crop_action.toggled.connect(self._on_crop_toggled)
+        bar.addAction(self.crop_action)
+        self.reset_crop_action = bar.addAction("Reset Crop", self._reset_crop)
+        self.reset_crop_action.setToolTip("Show the whole reference again")
+        self.edit_menu.addSeparator()
+        self.edit_menu.addAction(self.crop_action)
+        self.edit_menu.addAction(self.reset_crop_action)
+        bar.addSeparator()
+
         self.pick_action = QAction("Pick Color", self)
         self.pick_action.setCheckable(True)
         self.pick_action.setShortcut("I")
@@ -220,6 +238,7 @@ class MainWindow(QMainWindow):
         self.fit_action = bar.addAction("Fit to Canvas", self._fit_active)
         self.fit_action.setToolTip("Reset the selected layer to fit inside the canvas")
 
+
     def _wire_panels(self) -> None:
         lp = self.layers_panel
         lp.layerSelected.connect(self._on_layer_selected)
@@ -231,12 +250,13 @@ class MainWindow(QMainWindow):
                 lid, "adjustments", adj, key=("adjust", slider, lid) if slider else None
             )
         )
-        lp.addLayerRequested.connect(self._import_image)
+        lp.addLayerRequested.connect(lambda kind: self._add_layer(LayerKind(kind)))
         lp.deleteLayerRequested.connect(self._on_delete_layer)
         lp.moveLayerUpRequested.connect(lambda lid: self._on_move_layer(lid, +1))
         lp.moveLayerDownRequested.connect(lambda lid: self._on_move_layer(lid, -1))
         lp.renameLayerRequested.connect(self._on_rename_layer)
         lp.perspectiveCorrectRequested.connect(self._on_perspective_correct)
+        lp.cropRequested.connect(self._crop_layer)
 
         self.grid_panel.gridChanged.connect(self._on_grid_changed)
         self.compare_panel.settingsChanged.connect(self._on_compare_changed)
@@ -259,7 +279,8 @@ class MainWindow(QMainWindow):
         self.grid_panel.setEnabled(has_project)
         self.compare_panel.setEnabled(has_project)
         self.color_panel.setEnabled(has_project)
-        for action in (self.close_action, self.save_action, self.save_as_action, self.add_layer_action):
+        for action in (self.close_action, self.save_action, self.save_as_action, self.add_canvas_action,
+                       self.add_layer_action):
             action.setEnabled(has_project)
         # no project: the start screen, without the editing toolbar and panels
         self.stack.setCurrentWidget(self.canvas_view if has_project else self.start_screen)
@@ -271,6 +292,10 @@ class MainWindow(QMainWindow):
         for action in [self.transform_action, self.flip_h_action, self.flip_v_action, self.fit_action,
                        self.pick_action, *self.mode_actions.values()]:
             action.setEnabled(has_layer)
+        layer = self._active_layer() if has_layer else None
+        croppable = layer is not None and layer.kind == LayerKind.REFERENCE  # a canvas photo's corners crop it
+        self.crop_action.setEnabled(croppable)
+        self.reset_crop_action.setEnabled(croppable and layer.crop is not None)
         self._update_history_actions()
 
     def _update_history_actions(self) -> None:
@@ -514,28 +539,37 @@ class MainWindow(QMainWindow):
         self.transform_action.setChecked(checked)
         self.transform_action.blockSignals(False)
         self.canvas_view.set_tool(checked, self._mode)
+        if not checked:  # crop is part of the transform session
+            self.crop_action.blockSignals(True)
+            self.crop_action.setChecked(False)
+            self.crop_action.blockSignals(False)
+            self.canvas_view.set_crop_mode(False)
 
     def _end_session(self, commit: bool) -> None:
         if not self.history.in_session:
             return
+        what = "Crop" if self.crop_action.isChecked() else "Transform"
         if commit:
             self.history.commit_session()
-            self.statusBar().showMessage("Transform applied. Undo (⌘Z) reverts it in one step.")
+            self.statusBar().showMessage(f"{what} applied. Undo (⌘Z) reverts it in one step.")
         else:
             start = self.history.cancel_session()
             if start is not None:
                 self._restore(start)
-            self.statusBar().showMessage("Transform cancelled.")
+            self.statusBar().showMessage(f"{what} cancelled.")
         self._set_tool_checked(False)
         self._update_history_actions()
 
     # -- image import -----------------------------------------------------
 
-    def _import_image(self) -> None:
+    def _add_layer(self, kind: LayerKind) -> None:
+        """Workflow steps 1 and 3: a canvas photo, or a reference on top of it.
+        Each kind starts with its own look (see DEFAULT_LOOK)."""
         if self.doc is None:
             QMessageBox.information(self, "No Project", "Create or open a project first.")
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Import Image", "", IMAGE_FILE_FILTER)
+        title = "Add Canvas Photo" if kind == LayerKind.CANVAS else "Add Reference"
+        path, _ = QFileDialog.getOpenFileName(self, title, "", IMAGE_FILE_FILTER)
         if not path:
             return
         try:
@@ -546,16 +580,33 @@ class MainWindow(QMainWindow):
 
         self._record()
         layer_id = new_id("layer")
-        layer = Layer(id=layer_id, name=Path(path).stem, image_filename=f"{layer_id}.png")
+        opacity, blend, adjustments = default_look(kind, image)
+        today = datetime.date.today()
+        layer = Layer(
+            id=layer_id,
+            # canvas photos are told apart by date, references by what they show
+            name=f"Canvas · {today:%b} {today.day}" if kind == LayerKind.CANVAS else Path(path).stem,
+            image_filename=f"{layer_id}.png",
+            opacity=opacity,
+            blend_mode=blend,
+            adjustments=adjustments,
+            kind=kind,
+            perspective_fill_canvas=kind == LayerKind.CANVAS,
+        )
         self.doc.set_layer_image(layer_id, image)
         self.doc.project.add_layer(layer)
         self._refresh_all()
-        self.transform_action.setChecked(True)
-        self.statusBar().showMessage(
-            "Image fitted to the canvas. Drag inside the box to move, drag handles to scale, "
-            "drag the blue dot to rotate. Return = Done, Esc = Cancel."
-        )
         self._schedule_autosave()
+        if kind == LayerKind.CANVAS:
+            # step 2: put the four corners on the canvas's corners
+            self._on_perspective_correct(layer_id)
+            self.statusBar().showMessage("Canvas photo added. It fills the canvas at Normal 100 %.")
+        else:
+            self.transform_action.setChecked(True)
+            self.statusBar().showMessage(
+                "Reference added at Multiply 60 %, fitted to the canvas. Drag inside the box to move, "
+                "drag handles to scale, drag the blue dot to rotate. Return = Done, Esc = Cancel."
+            )
 
     # -- layer handlers ------------------------------------------------------
 
@@ -570,6 +621,8 @@ class MainWindow(QMainWindow):
             self.history.commit_session()
             self.history.begin_session()
         self.doc.project.active_layer_id = layer_id
+        if self.crop_action.isChecked() and self._active_layer().kind != LayerKind.REFERENCE:
+            self.crop_action.setChecked(False)  # back to transform handles: canvas photos aren't cropped
         self.layers_panel.sync_appearance(self._active_layer())
         self.canvas_view.set_active_layer(layer_id)
         if self.doc.project.simplify.enabled:
@@ -624,10 +677,16 @@ class MainWindow(QMainWindow):
         dialog = PerspectiveDialog(raw, layer.perspective_corners, layer.perspective_fill_canvas, self)
         if dialog.exec() == PerspectiveDialog.Accepted:
             self._record()
+            untouched = has_default_look(layer, raw)  # judged before the new corners
             layer.perspective_corners = dialog.result_corners()
             layer.perspective_fill_canvas = dialog.result_fill_canvas()
+            layer.kind = LayerKind.CANVAS if layer.perspective_fill_canvas else LayerKind.REFERENCE
+            if untouched:
+                # the kind's look, with auto levels measured inside the new corners;
+                # a look changed by hand is kept
+                layer.opacity, layer.blend_mode, layer.adjustments = layer_default_look(layer, raw)
             layer.quad = None  # re-place the corrected image
-            self._refresh_canvas()
+            self._refresh_all()
             self._schedule_autosave()
 
     # -- transform tool ---------------------------------------------------------
@@ -642,6 +701,55 @@ class MainWindow(QMainWindow):
             self._update_history_actions()
         else:
             self._end_session(commit=True)
+
+    def _on_crop_toggled(self, enabled: bool) -> None:
+        """Crop runs inside a transform session: the same Done / Cancel, one undo step."""
+        if enabled:
+            layer = self._active_layer()
+            if layer is None or layer.kind != LayerKind.REFERENCE:
+                self.crop_action.blockSignals(True)
+                self.crop_action.setChecked(False)
+                self.crop_action.blockSignals(False)
+                self.statusBar().showMessage("Only references can be cropped; a canvas photo's corners crop it.")
+                return
+            if self.pick_action.isChecked():
+                self.pick_action.setChecked(False)
+            if not self.transform_action.isChecked():
+                self.transform_action.setChecked(True)
+            self.canvas_view.set_crop_mode(True)
+            self.statusBar().showMessage(
+                "Drag the corners or edges to trim the reference; drag inside to slide the crop. "
+                "Return = Done, Esc = Cancel.")
+        else:
+            self.canvas_view.set_crop_mode(False)
+
+    def _crop_layer(self, layer_id: str) -> None:
+        """Crop… in the Layers panel: crop that layer."""
+        if self.doc is None or self.doc.project.get_layer(layer_id) is None:
+            return
+        if layer_id != self.doc.project.active_layer_id:
+            self._on_layer_selected(layer_id)
+        self.crop_action.setChecked(True)
+
+    def _on_crop_committed(self, layer_id: str, crop) -> None:
+        layer = self.doc.project.get_layer(layer_id) if self.doc else None
+        if layer is None or layer.crop == crop:
+            return
+        self._record(transform=True)
+        layer.crop = crop
+        self._refresh_canvas()
+        self._update_enabled_state()
+        self._schedule_autosave()
+
+    def _reset_crop(self) -> None:
+        layer = self._active_layer()
+        if layer is None or layer.crop is None:
+            return
+        self._record(transform=self.history.in_session)
+        layer.crop = None
+        self._refresh_canvas()
+        self._update_enabled_state()
+        self._schedule_autosave()
 
     def _on_mode_chosen(self, mode: TransformMode) -> None:
         self._mode = mode
@@ -756,7 +864,7 @@ class MainWindow(QMainWindow):
             pixmap = self.cache.pixmap(self.doc, layer, self._canvas_size)
             if pixmap is None:
                 continue
-            entries.append(LayerEntry(layer.id, pixmap, self._placement(layer, pixmap), states[layer.id]))
+            entries.append(LayerEntry(layer.id, pixmap, self._placement(layer, pixmap), states[layer.id], layer.crop))
         split = project.split_position if uses_split_line(project) else None
         self.canvas_view.show_layers(entries, split, self._highlight_overlays())
         self._update_markers()
@@ -799,6 +907,10 @@ class MainWindow(QMainWindow):
         if image is None or point is None:
             return None
         h, w = image.shape[:2]
+        if layer.crop is not None:
+            left, top, right, bottom = layer.crop
+            if not (left <= point[0] / w <= right and top <= point[1] / h <= bottom):
+                return None  # cropped off: not part of what the canvas shows
         simplified = self._simplified(layer)
         if simplified is not None:  # pick what the canvas shows: one flat color
             flat = simplified[0].image
