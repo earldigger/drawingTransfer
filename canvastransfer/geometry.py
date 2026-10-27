@@ -258,3 +258,54 @@ def apply_drag(mode: TransformMode, handle: Handle, quad: Quad, start: Point, cu
     if result is None or not is_convex(result):
         return None
     return result
+
+
+# -- crop ---------------------------------------------------------------------
+# A crop is (left, top, right, bottom) as fractions (0..1) of the layer's own
+# image, so it travels with every move/scale/skew/flip of the layer's quad.
+# Crop handles: ("crop-move",), ("crop-corner", i) with i = 0 TL, 1 TR, 2 BR,
+# 3 BL, and ("crop-edge", i) with i = 0 top, 1 right, 2 bottom, 3 left.
+
+Crop = tuple[float, float, float, float]
+FULL_CROP: Crop = (0.0, 0.0, 1.0, 1.0)
+MIN_CROP = 0.02  # smallest crop side, as a fraction of the image
+
+
+def crop_corners(crop: Crop) -> list[Point]:
+    left, top, right, bottom = crop
+    return [(left, top), (right, top), (right, bottom), (left, bottom)]
+
+
+def crop_edge_midpoints(crop: Crop) -> list[Point]:
+    left, top, right, bottom = crop
+    cu, cv = (left + right) / 2, (top + bottom) / 2
+    return [(cu, top), (right, cv), (cu, bottom), (left, cv)]
+
+
+def drag_crop(crop: Crop, handle: Handle, start: Point, current: Point) -> Crop:
+    """New crop for dragging `handle` from `start` to `current` (image
+    fractions), starting from `crop`. The crop stays inside the image and
+    never gets smaller than MIN_CROP; moving it keeps its size."""
+    left, top, right, bottom = crop
+    du, dv = current[0] - start[0], current[1] - start[1]
+    kind = handle[0]
+    if kind == "crop-move":
+        du = min(max(du, -left), 1.0 - right)
+        dv = min(max(dv, -top), 1.0 - bottom)
+        return (left + du, top + dv, right + du, bottom + dv)
+
+    if kind == "crop-corner":
+        moves = {0: ("left", "top"), 1: ("right", "top"), 2: ("right", "bottom"), 3: ("left", "bottom")}[handle[1]]
+    elif kind == "crop-edge":
+        moves = ({0: "top", 1: "right", 2: "bottom", 3: "left"}[handle[1]],)
+    else:
+        raise ValueError(f"unknown crop handle {handle!r}")
+    if "left" in moves:
+        left = min(max(left + du, 0.0), right - MIN_CROP)
+    if "right" in moves:
+        right = max(min(right + du, 1.0), left + MIN_CROP)
+    if "top" in moves:
+        top = min(max(top + dv, 0.0), bottom - MIN_CROP)
+    if "bottom" in moves:
+        bottom = max(min(bottom + dv, 1.0), top + MIN_CROP)
+    return (left, top, right, bottom)

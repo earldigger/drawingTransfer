@@ -53,6 +53,15 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
   width/height), **Skew**, **Distort**; Flip Horizontal/Vertical; Fit to
   Canvas. Content pushed past the canvas edge is hidden, not lost, and
   shows faintly while the box is active
+- **Crop** a reference (toolbar, ⌥⌘K): drag the crop's corners or edges to
+  trim tape, a table edge or another sketch; drag inside to slide it. The
+  cut-off part shows faintly while cropping and is hidden after Done. The
+  crop is stored with the layer as fractions of its image, so it moves,
+  scales, skews and flips with it, applies to highlights, thumbnails and
+  exports, and never deletes pixels; Reset Crop shows the whole reference
+  again. Crop runs inside a Transform session (same Done / Cancel, one
+  undo step). Canvas photos aren't cropped: their corners do that. Color
+  picking ignores the cropped-off part
 - Transform sessions: turning Transform on (T) starts one; **Done**
   (Return) keeps it as a single undo step, **Cancel** (Esc) reverts
   everything since Transform was turned on. Any non-transform edit

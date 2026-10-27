@@ -140,6 +140,9 @@ class Layer:
     perspective_fill_canvas: bool = False
     adjustments: Adjustments = field(default_factory=Adjustments)
     kind: LayerKind = LayerKind.REFERENCE
+    # The part of the image that shows: (left, top, right, bottom) as fractions
+    # of the displayed image, so it moves with the layer. None = all of it.
+    crop: tuple[float, float, float, float] | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -156,6 +159,7 @@ class Layer:
             "perspective_fill_canvas": self.perspective_fill_canvas,
             "adjustments": self.adjustments.to_dict(),
             "kind": self.kind.value,
+            "crop": list(self.crop) if self.crop else None,
         }
 
     @staticmethod
@@ -179,6 +183,7 @@ class Layer:
             # projects saved before layers had a kind: a canvas photo is the one that fills the canvas
             kind=LayerKind(data["kind"]) if "kind" in data else
             (LayerKind.CANVAS if data.get("perspective_fill_canvas") else LayerKind.REFERENCE),
+            crop=tuple(data["crop"]) if data.get("crop") else None,
         )
 
 
