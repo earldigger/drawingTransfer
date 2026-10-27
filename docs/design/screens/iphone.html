@@ -108,6 +108,13 @@ section.screen > h2 { margin: 0 0 10px; font-size: 17px; }
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-flipH" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 7 4 17h5zM15 7l5 10h-5z"/></symbol>
     <symbol id="i-flipV" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 9 17 4v5zM7 15l10 5v-5z"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v16h16M2 6h16v16"/></symbol>
+    <symbol id="art-ref" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <use href="#art-lines" width="500" height="625"/>
+      <rect x="452" y="0" width="48" height="625" fill="#5A4636"/>
+      <rect x="6" y="10" width="78" height="26" fill="#CDBB8E" transform="rotate(-12 45 23)"/>
+      <path d="M14 590c25-22 60-24 92-4M24 612c20-12 44-12 66 0M70 560v30" fill="none" stroke="#2E2018" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
     <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
     <symbol id="i-pick" viewBox="0 0 24 24"><path d="M14 4l6 6-2 2-6-6z"/><path d="M13 7 5 15l-1 5 5-1 8-8"/></symbol>
     <symbol id="i-simplify" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h8V4M12 20v-8h8"/></symbol>
@@ -199,7 +206,7 @@ const canvas = (x, y, w, h, inner) => `<div class="canvas" style="left:${x}px;to
 // Workspace fit: between the nav bar (bottom 102) and the context bar (top ~706), 8 pt side margins.
 const WF = { x: 8, y: 150, w: 377, h: 471 };
 const REF = { x: 34, y: 34, w: 170, h: 212 };  // reference placed small, upper left (inside the canvas)
-const placedRef = `<div class="abs" style="left:${REF.x}px;top:${REF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-lines", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
+const placedRef = `<div class="abs" style="left:${REF.x}px;top:${REF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
 const workCanvas = () => canvas(WF.x, WF.y, WF.w, WF.h, art("art-toned") + placedRef);
 const handles = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid var(--accent);z-index:4">
   ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 8px);top:calc(${b}% - 8px);width:16px;height:16px;background:#fff;border:2px solid var(--accent);border-radius:4px"></i>`).join("")}</div>`;
@@ -321,7 +328,7 @@ S("camera-corners", "Camera — Adjust corners", `
 `);
 
 // ---------- Transfer — Transform ----------
-const transformBar = `<div class="panel ctx"><div class="btn fill" style="padding:0 10px">Proportional ${ic("down", "sm")}</div><div class="btn fill" style="width:44px;padding:0">⋯</div><div style="flex:1"></div><div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>`;
+const transformBar = `<div class="panel ctx"><div class="btn fill" style="padding:0 10px">Proportional ${ic("down", "sm")}</div><div class="btn fill" style="width:44px;padding:0">⋯</div><div class="btn fill" style="width:44px;padding:0">${ic("crop", "sm")}</div><div style="flex:1"></div><div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>`;
 S("transfer-transform", "Transfer — Transform", `
   ${chrome()}${nav()}
   ${workCanvas()}
@@ -335,9 +342,33 @@ S("transfer-transform", "Transfer — Transform", `
   <h3><span class="n">11</span>The view</h3>
   <p>The canvas fits the width, between the top bar and the context bar, and keeps that size whether a bar shows or not. Pinch and two-finger pan as on iPad. Here: a sketchbook page with a small reference in the upper left.</p>
   <h3><span class="n">12</span>Context bar</h3>
-  <p>One row: the mode as a menu (Proportional / Free / Skew / Distort), ⋯ for Flip H, Flip V and Fit, then Cancel and <b>Done</b>.</p>
+  <p>One row: the mode as a menu (Proportional / Free / Skew / Distort), ⋯ for Flip H, Flip V and Fit, <b>Crop</b> (next screen), then Cancel and <b>Done</b>.</p>
   <h3><span class="n">13</span>Toolbar</h3>
   <p>The tool strip becomes a bottom toolbar (thumb reach): Camera, Transform, Perspective, Grid, Compare, and <b>Layers</b> — there's no room for a layer bar on the side.</p>
+`);
+
+// ---------- Transfer — Crop ----------
+const CROP = { l: .06, t: .08, r: .12, b: .09 };
+const cropFrame = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);z-index:4">
+  <i class="abs" style="left:33.3%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="left:66.6%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i>
+  <i class="abs" style="top:33.3%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="top:66.6%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i>
+  ${[["left:-4px;top:-4px", "border-left", "border-top"], ["right:-4px;top:-4px", "border-right", "border-top"], ["left:-4px;bottom:-4px", "border-left", "border-bottom"], ["right:-4px;bottom:-4px", "border-right", "border-bottom"]]
+    .map(([pos, a, b]) => `<i class="abs" style="${pos};width:24px;height:24px;${a}:5px solid #fff;${b}:5px solid #fff"></i>`).join("")}</div>`;
+const refArt = art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"');
+S("transfer-crop", "Transfer — Crop", `
+  ${chrome()}${nav()}
+  ${canvas(WF.x, WF.y, WF.w, WF.h, art("art-toned") + `<div class="abs" style="left:${REF.x}px;top:${REF.y}px;width:${REF.w}px;height:${REF.h}px">
+    <div class="abs" style="inset:0;opacity:.25">${refArt}</div>
+    <div class="abs" style="inset:0;clip-path:inset(${CROP.t * 100}% ${CROP.r * 100}% ${CROP.b * 100}% ${CROP.l * 100}%)">${refArt}</div></div>`)}
+  ${cropFrame(WF.x + REF.x + REF.w * CROP.l, WF.y + REF.y + REF.h * CROP.t, REF.w * (1 - CROP.l - CROP.r), REF.h * (1 - CROP.t - CROP.b))}
+  <div class="panel ctx"><div class="btn fill" style="padding:0 10px">Free ${ic("down", "sm")}</div><div class="btn fill">Reset</div><div style="flex:1"></div><div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>
+  ${toolbar("Transfer", "transform")}
+  ${mark(1, 230, 200)}${mark(2, 150, 680)}
+`, `
+  <h3><span class="n">1</span>Crop a reference</h3>
+  <p>The crop button in the Transform bar (or Crop in the Layers &amp; Look sheet). Drag the corners to trim tape, the table edge or another sketch from the reference; 32 pt corner handles for fingers. What's cut off shows faintly while cropping and is hidden after Done — never deleted.</p>
+  <h3><span class="n">2</span>Crop bar</h3>
+  <p>Free / Original / Square as a menu, Reset, Cancel, <b>Done</b>. The crop moves, scales and flips with the reference afterwards. Canvas photos don't get Crop: their corners already decide what's kept.</p>
 `);
 
 // ---------- Transfer — Layers & Look sheet ----------
@@ -346,7 +377,7 @@ const row = (l, r) => `<div class="vrow" style="height:44px;border-bottom:1px so
 S("transfer-layers", "Transfer — Layers & Look", `
   ${chrome()}${nav()}
   ${workCanvas()}
-  <div class="sheet" style="height:440px;padding:0 16px">
+  <div class="sheet" style="height:484px;padding:0 16px">
     <div class="grab"></div>
     <div class="vrow" style="gap:6px;margin-top:12px;overflow:hidden">
       ${thumb("#F4F2EE", "Reference", true)}${thumb("#C9B79C", "Canvas ·<br>Oct 22", false)}${thumb("#B9A587", "Canvas ·<br>Oct 15", false)}
@@ -359,10 +390,11 @@ S("transfer-layers", "Transfer — Layers & Look", `
       ${row("Levels", `<span style="color:var(--sub)">12 · 1.20 · 236 ›</span>`)}
       ${row("Hue / Saturation", `<span style="color:var(--sub)">Sat −60 ›</span>`)}
       ${row("Invert", `<div class="switch"></div>`)}
+      ${row("Crop", `<span style="color:var(--sub)">Edit crop ›</span>`)}
       ${row("Perspective", `<span style="color:var(--sub)">Edit corners ›</span>`)}
     </div>
   </div>
-  ${mark(14, 352, 430)}${mark(15, 92, 542)}${mark(16, 84, 658)}
+  ${mark(14, 352, 386)}${mark(15, 92, 498)}${mark(16, 84, 614)}
 `, `
   <h3><span class="n">14</span>Layers and Look in one sheet</h3>
   <p>Layers in the toolbar opens this sheet. The top row is the layers (tap to select, ＋ to add, long-press to hide, rename, delete, reorder); everything below is the selected layer's Look. One sheet instead of two keeps the phone usable with one hand.</p>

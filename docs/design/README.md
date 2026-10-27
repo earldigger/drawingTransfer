@@ -23,8 +23,9 @@ names and decisions.
 1. **Add a canvas photo**: photograph the destination canvas.
 2. **Adjust its perspective**: four corners, so it fills the canvas exactly.
 3. **Add a reference** (a photo or a drawing) on top, at Multiply 60 %.
-4. **Fit the reference** with Transform where it belongs. It doesn't always
-   fill the canvas; it might be a small face in one corner.
+4. **Fit the reference** with Transform where it belongs, and **Crop** away
+   what you don't need. It doesn't always fill the canvas; it might be a
+   small face in one corner.
 
 Then, while painting: new canvas photos as the painting progresses, Compare,
 Look adjustments, and the Color tools. Steps 1–4 get the biggest,
@@ -43,8 +44,9 @@ something else, these win.
 | **Reference** | A layer: the photo or drawing you transfer from. Starts at Multiply 60 % (white paper disappears), with auto levels; placed with Transform, at any size. | drawing, source, overlay |
 | **Layer** | A canvas photo or a reference. Listed in the layer bar. | — |
 | **Layer bar** | The strip of layer thumbnails on the right; collapses to icons. | layer strip, layers panel |
-| **Look** | The popover for one layer: opacity, blend mode, levels, hue / saturation, colorize, invert, perspective. No title; it points at its layer. | Look · Drawing, adjustments |
+| **Look** | The popover for one layer: opacity, blend mode, levels, hue / saturation, colorize, invert, crop, perspective. No title; it points at its layer. | Look · Drawing, adjustments |
 | **Camera** | Taking a photo for a layer: Capture → Adjust corners → Add layer. You choose **Canvas \| Reference** before the shot. | — |
+| **Crop** | Trimming a reference to the part you want (no tape, table edge or other sketches). Kept with the layer, moves with it, never deletes anything. References only. | mask, trim |
 | **Transfer / Color** | The two workspaces, switched in the top bar. | modes, tabs |
 | **Tool** | One item of the left tool strip (Camera, Transform, Perspective, Grid, Compare; in Color: Pick, Simplify, Highlight, Grid). Its options appear in the **context bar** at the bottom. | — |
 | **Compare** | Viewing two layers against each other: Overlay, Blink reference, Blink A / B, Split. | — |
@@ -163,7 +165,8 @@ screen at 1180 × 820 with numbered notes beside it, in workflow order.
 | Camera — Capture | Canvas \| Reference; live detection and warnings; shutter, Photos. |
 | Camera — Adjust corners | Corners = crop, loupe, preview, Use as, Auto levels (references only), Add layer. |
 | Camera — Layer added | Reference → Multiply 60 %, Transform on; canvas photo → Normal 100 %, offers Compare. |
-| Transfer — Transform | Top bar, tool strip, view fitted clear of the UI, collapsed layer bar, Transform context bar. |
+| Transfer — Transform | Top bar, tool strip, view fitted clear of the UI, collapsed layer bar, Transform context bar (with Crop). |
+| Transfer — Crop | Crop frame with corner and edge handles; cut-off part shown faintly; Free / Original / Square, Reset, Done. References only. |
 | Transfer — Look | Opacity first, blend, levels, hue / saturation, colorize, invert, perspective. No title. |
 | Transfer — Layer bar expanded | Thumbnail, name, eye, blend · opacity summary; ＋ Layer. |
 | Transfer — Full screen | Canvas only; faint exit button or four-finger tap. |
@@ -194,7 +197,8 @@ canvas is the sketchbook page.
 | New project | Bottom sheet; same three choices; Create opens Camera with Canvas chosen. |
 | Camera — Capture | Project is a menu (shoot for any project, or New project…); Canvas \| Reference above the shutter; Photos. |
 | Camera — Adjust corners | Bigger handles, loupe beside the corner; compact sheet; **Add layer** or **Share photo instead**. |
-| Transfer — Transform | Top bar: back, undo, Transfer \| Color, Full screen, Share. One-row context bar (mode menu, ⋯ for flips and Fit). Bottom toolbar replaces the tool strip and adds **Layers**. |
+| Transfer — Transform | Top bar: back, undo, Transfer \| Color, Full screen, Share. One-row context bar (mode menu, ⋯ for flips and Fit, crop). Bottom toolbar replaces the tool strip and adds **Layers**. |
+| Transfer — Crop | Same crop frame with 32 pt corners; Free / Original / Square menu, Reset, Done. |
 | Transfer — Layers & Look | One half-height sheet: layer row on top, the selected layer's Look below (opacity first, blend; Levels and Hue / Saturation one level down). |
 | Transfer — Full screen | Canvas as wide as the phone; replaces the separate “Quick look”. |
 | Compare — Split | A / B chosen from the labels on the canvas; modes in one row. |
@@ -216,7 +220,7 @@ the common ones have keys.
 | Screen | Key points |
 |---|---|
 | Gallery | Window with search, Open… ⌘O, New Project ⌘N; grouped by month; projects open in their own windows. |
-| Transfer workspace | Docked tool column (key on each tool: T, P, G, C) with **Add** instead of Camera; docked inspector with Layers on top and the selected layer's Look always open below; context bar with ↩ Done / esc Cancel. |
+| Transfer workspace | Docked tool column (key on each tool: T, P, G, C) with **Add** instead of Camera; docked inspector with Layers on top and the selected layer's Look always open below; context bar with Crop, ↩ Done / esc Cancel. Crop is also ⌥⌘K and Edit Crop… in Look. |
 | Menus & keys | File, Edit, Layer, View, Window. Number keys set opacity (1 = 10 % … 0 = 100 %); ⌥⇧N / M / S / J blend modes; ⇥ hides panels; F full screen. |
 | Add images | Drag from Safari, Finder or Photos: drop on **Reference** (Multiply 60 %, Transform, no corner step) or **Canvas photo** (Adjust corners). ⌘V pastes a reference; Take Photo with iPhone (Continuity Camera). |
 | Color workspace | Swatches docked in the inspector, Details \| Paints & mixes as on the other devices; Pick shows the color under the pointer live. |

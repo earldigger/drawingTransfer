@@ -124,6 +124,13 @@ table.lib tr.sel td { background: rgba(52,99,168,.25); }
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="i-flipH" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 7 4 17h5zM15 7l5 10h-5z"/></symbol>
     <symbol id="i-flipV" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 9 17 4v5zM7 15l10 5v-5z"/></symbol>
+    <symbol id="i-crop" viewBox="0 0 24 24"><path d="M6 2v16h16M2 6h16v16"/></symbol>
+    <symbol id="art-ref" viewBox="0 0 500 625" preserveAspectRatio="none">
+      <use href="#art-lines" width="500" height="625"/>
+      <rect x="452" y="0" width="48" height="625" fill="#5A4636"/>
+      <rect x="6" y="10" width="78" height="26" fill="#CDBB8E" transform="rotate(-12 45 23)"/>
+      <path d="M14 590c25-22 60-24 92-4M24 612c20-12 44-12 66 0M70 560v30" fill="none" stroke="#2E2018" stroke-width="3" stroke-linecap="round"/>
+    </symbol>
     <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
     <symbol id="i-pick" viewBox="0 0 24 24"><path d="M14 4l6 6-2 2-6-6z"/><path d="M13 7 5 15l-1 5 5-1 8-8"/></symbol>
     <symbol id="i-simplify" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h8V4M12 20v-8h8"/></symbol>
@@ -248,7 +255,7 @@ S("camera-added", "Camera — Layer added", `
   <div class="pill" style="left:50%;transform:translateX(-50%);top:64px">Reference added — place it with Transform <b style="color:var(--accent-hi)">Undo</b></div>
   <div class="abs panel ctx">
     <div class="seg"><span class="on">Proportional</span><span>Free</span><span>Skew</span><span>Distort</span></div><div class="div"></div>
-    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="div"></div>
+    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="btn">${ic("crop")}Crop</div><div class="div"></div>
     <div class="btn quiet">Cancel</div><div class="btn primary">Done</div>
   </div>
   ${mark(1, 300, 72)}${mark(2, 1062, 118)}
@@ -649,11 +656,11 @@ const handles = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;
   ${[[0,0],[50,0],[100,0],[0,50],[100,50],[0,100],[50,100],[100,100]].map(([a,b]) => `<i class="abs" style="left:calc(${a}% - 7px);top:calc(${b}% - 7px);width:14px;height:14px;background:#fff;border:2px solid var(--accent);border-radius:3px"></i>`).join("")}</div>`;
 const transformBar = () => `<div class="abs panel ctx">
     <div class="seg"><span class="on">Proportional</span><span>Free</span><span>Skew</span><span>Distort</span></div><div class="div"></div>
-    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="div"></div>
+    <div class="btn">${ic("flipH")}Flip H</div><div class="btn">${ic("flipV")}Flip V</div><div class="btn">${ic("fit")}Fit</div><div class="btn">${ic("crop")}Crop</div><div class="div"></div>
     <div class="btn quiet">Cancel</div><div class="btn primary">Done</div></div>`;
 // the reference placed small, in the upper left of the canvas (workflow step 4)
 const REF = { x: TF.x + 40, y: TF.y + 40, w: 250, h: 312 };
-const placedRef = `<div class="abs" style="left:${REF.x - TF.x}px;top:${REF.y - TF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-lines", 'style="opacity:.6;mix-blend-mode:multiply"')}</div>`;
+const placedRef = `<div class="abs" style="left:${REF.x - TF.x}px;top:${REF.y - TF.y}px;width:${REF.w}px;height:${REF.h}px">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
 const transferCanvas = () => canvas(TF.x, TF.y, TF.w, TF.h, art("art-toned") + placedRef);
 
 S("transfer-transform", "Transfer — Transform", `
@@ -663,7 +670,7 @@ S("transfer-transform", "Transfer — Transform", `
   ${toolStrip(TRANSFER_TOOLS, "transform")}
   ${layerBar(LAYERS, 0)}
   ${transformBar()}
-  ${mark(1, 730, 14)}${mark(2, 74, 68)}${mark(3, 816, 90)}${mark(4, 1076, 68)}${mark(5, 160, 772)}
+  ${mark(1, 730, 14)}${mark(2, 74, 68)}${mark(3, 816, 90)}${mark(4, 1076, 68)}${mark(5, 112, 772)}
 `, `
   <h3><span class="n">1</span>Top bar</h3>
   <p>Gallery, project name, the <b>Transfer | Color</b> switch, undo, redo, Full screen, Share. Two-finger tap = undo, three-finger tap = redo (Procreate), so the buttons are a backup.</p>
@@ -674,7 +681,44 @@ S("transfer-transform", "Transfer — Transform", `
   <h3><span class="n">4</span>Layer bar</h3>
   <p>Collapsed to a thin icon bar: thumbnails only, the selected one ringed in blue. ‹ expands it. Tap a layer to select it; tap it again for Look.</p>
   <h3><span class="n">5</span>Context bar</h3>
-  <p>Only while a tool is active. Transform: Proportional / Free / Skew / Distort, Flip H / V, Fit, Cancel, <b>Done</b>. Handles work with Pencil or finger.</p>
+  <p>Only while a tool is active. Transform: Proportional / Free / Skew / Distort, Flip H / V, Fit, <b>Crop</b> (next screen), Cancel, <b>Done</b>. Handles work with Pencil or finger.</p>
+`);
+
+// ---------- Transfer — Crop ----------
+const CROP = { l: .06, t: .08, r: .12, b: .09 };  // the part of the reference photo that is kept
+const cropFrame = (x, y, w, h) => `<div class="abs" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);z-index:4">
+  <i class="abs" style="left:33.3%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="left:66.6%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.35)"></i>
+  <i class="abs" style="top:33.3%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i><i class="abs" style="top:66.6%;left:0;right:0;border-top:1px solid rgba(255,255,255,.35)"></i>
+  ${[["left:-4px;top:-4px", "border-left", "border-top"], ["right:-4px;top:-4px", "border-right", "border-top"], ["left:-4px;bottom:-4px", "border-left", "border-bottom"], ["right:-4px;bottom:-4px", "border-right", "border-bottom"]]
+    .map(([pos, a, b]) => `<i class="abs" style="${pos};width:24px;height:24px;${a}:5px solid #fff;${b}:5px solid #fff"></i>`).join("")}
+  ${["left:calc(50% - 14px);top:-4px;width:28px;height:5px", "left:calc(50% - 14px);bottom:-4px;width:28px;height:5px", "top:calc(50% - 14px);left:-4px;width:5px;height:28px", "top:calc(50% - 14px);right:-4px;width:5px;height:28px"]
+    .map(pos => `<i class="abs" style="${pos};background:#fff"></i>`).join("")}</div>`;
+const croppedRef = (w, h) => `<div class="abs" style="inset:0;opacity:.25">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>
+  <div class="abs" style="inset:0;clip-path:inset(${CROP.t * 100}% ${CROP.r * 100}% ${CROP.b * 100}% ${CROP.l * 100}%)">${art("art-ref", 'style="position:absolute;inset:0;width:100%;height:100%;opacity:.6;mix-blend-mode:multiply"')}</div>`;
+S("transfer-crop", "Transfer — Crop", `
+  ${topBar()}
+  ${canvas(TF.x, TF.y, TF.w, TF.h, art("art-toned") + `<div class="abs" style="left:${REF.x - TF.x}px;top:${REF.y - TF.y}px;width:${REF.w}px;height:${REF.h}px">${croppedRef()}</div>`)}
+  ${cropFrame(REF.x + REF.w * CROP.l, REF.y + REF.h * CROP.t, REF.w * (1 - CROP.l - CROP.r), REF.h * (1 - CROP.t - CROP.b))}
+  ${toolStrip(TRANSFER_TOOLS, "transform")}
+  ${layerBar(LAYERS, 0)}
+  <div class="abs panel ctx">
+    <span class="vrow" style="padding:0 8px;font-weight:600;font-size:14px">${ic("crop")}Crop</span><div class="div"></div>
+    <div class="seg"><span class="on">Free</span><span>Original</span><span>Square</span></div>
+    <div class="btn">Reset</div><div class="div"></div>
+    <div class="btn quiet">Cancel</div><div class="btn primary">Done</div>
+  </div>
+  ${mark(1, 600, 150)}${mark(2, 343, 380)}${mark(3, 270, 772)}
+`, `
+  <h3><span class="n">1</span>Crop a reference</h3>
+  <p><b>Crop</b> in the Transform bar (or Look → Crop) trims what you don't want from a reference: tape, the table edge, the corner of another sketch. Drag the corners or the middle of an edge with Pencil or finger; the frame stays inside the photo.</p>
+  <h3><span class="n">2</span>What's cut off</h3>
+  <p>Shown faintly while cropping so you can see what you're removing, hidden after Done. Nothing is deleted: Crop again any time and drag the edges back out, or Reset to bring back the whole photo.</p>
+  <h3><span class="n">3</span>Crop bar</h3>
+  <p>Free (default), Original (keeps the photo's proportions) or Square; Reset; Cancel; <b>Done</b>. Pinch and two-finger pan still move the view.</p>
+  <h3>How it fits with Transform</h3>
+  <p>The crop belongs to the reference, not to the canvas, so it moves, scales, skews and flips with the reference afterwards. Typical order: Transform to size and place, notice the leftovers, Crop, Done.</p>
+  <h3>Canvas photos</h3>
+  <p>Not offered: a canvas photo's four corners already decide what's kept.</p>
 `);
 
 const cslider = (v) => `<div class="slider" style="--v:${v}%;flex:1"><i class="abs" style="top:11px;height:6px;left:${Math.min(v, 50)}%;width:${Math.abs(v - 50)}%;background:var(--accent);border-radius:3px"></i></div>`;
@@ -697,13 +741,14 @@ S("transfer-look", "Transfer — Look", `
     <div class="vrow"><span style="flex:1">Colorize</span><div class="switch"></div></div>
     ${hr}
     <div class="vrow"><span style="flex:1">Invert</span><div class="switch"></div></div>
+    <div class="vrow"><span style="flex:1">Crop</span><span style="color:var(--sub)">Edit crop ›</span></div>
     <div class="vrow"><span style="flex:1">Perspective</span><span style="color:var(--sub)">Edit corners ›</span></div>
   </div>
   <div class="abs" style="left:1092px;top:134px;width:0;height:0;border:10px solid transparent;border-left-color:#232325;z-index:11"></div>
   ${mark(6, 742, 70)}
 `, `
   <h3><span class="n">6</span>Look</h3>
-  <p>Tap the selected layer again. No title — the pointer shows which layer it belongs to. <b>Opacity</b> first and largest (the most-used control), then blend mode (Normal / Multiply / Screen / Linear Light), Levels (histogram with black / gray / white points, plus number boxes), Hue / Saturation / Lightness, Colorize, Invert, Perspective → Edit corners. Live on the canvas; tap outside to close. Reset clears this layer only.</p>
+  <p>Tap the selected layer again. No title — the pointer shows which layer it belongs to. <b>Opacity</b> first and largest (the most-used control), then blend mode (Normal / Multiply / Screen / Linear Light), Levels (histogram with black / gray / white points, plus number boxes), Hue / Saturation / Lightness, Colorize, Invert, Crop (references only), Perspective → Edit corners. Live on the canvas; tap outside to close. Reset clears this layer only.</p>
   <h3>Defaults</h3>
   <p>A new reference — photo or drawing — starts at <b>Multiply 60 %</b>: white paper disappears and the lines sit on the canvas photo. A canvas photo starts at <b>Normal 100 %</b>.</p>
   <h3>Not drawn</h3>
@@ -816,7 +861,7 @@ S("camera-corners", "Camera — Adjust corners", `
 
 // ---------- render ----------
 // workflow order; markers are numbered per screen, in the order the notes mention them
-const ORDER = ["gallery", "new-project", "camera-capture", "camera-corners", "camera-added", "transfer-transform", "transfer-look",
+const ORDER = ["gallery", "new-project", "camera-capture", "camera-corners", "camera-added", "transfer-transform", "transfer-crop", "transfer-look",
   "transfer-layers", "transfer-full", "compare-split", "compare-blink", "color-pick", "color-simplify", "paint-library", "edit-paint", "share", "settings"];
 screens.sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
 const main = document.getElementById("screens"), toc = document.getElementById("toc");
