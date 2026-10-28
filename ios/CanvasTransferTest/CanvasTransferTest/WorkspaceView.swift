@@ -27,6 +27,8 @@ struct WorkspaceView: View {
     @State private var cropping: (id: UUID, before: CGRect, wasTransforming: Bool)? = nil
     @State private var cropShape: CropShape = .free
     @State private var gridBarShown = false
+    @State private var compare: CompareState? = nil  // nil = not comparing
+    @State private var blinkOn = true  // Compare: which half of the blink is showing
     @State private var exporting = false  // rendering the image to share
     @State private var shareFile: ShareFile? = nil
     @State private var shareFailed = false
@@ -88,11 +90,20 @@ struct WorkspaceView: View {
         .onChange(of: session.selectedID) { _, id in
             if let cropping, cropping.id != id { finishCrop(keep: true) }  // another layer: keep this crop
         }
+        // Compare's blink: restarts when the mode, speed or pause changes.
+        .task(id: compare.map { "\($0.mode)\($0.interval)\($0.paused)" }) {
+            guard let compare, compare.mode.blinks, !compare.paused else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(compare.interval))
+                if !Task.isCancelled { blinkOn.toggle() }
+            }
+        }
     }
 
     // MARK: crop
 
     private func startCrop(_ layer: Layer) {
+        compare = nil
         cropping = (layer.id, layer.crop, transformOn)
         cropShape = .free
         transformOn = false  // one finger and pinch move the view while cropping
@@ -114,13 +125,13 @@ struct WorkspaceView: View {
     // MARK: canvas
 
     private func canvas(size: CGSize) -> some View {
-        CanvasContent(layers: session.layers, size: size, grid: session.grid.isOn ? session.grid : nil,
-                      gridLineWidth: 1.5 / viewScale,  // the same thickness on screen at any zoom
-                      faintFullImageOf: cropping?.id)
+        canvasContent(size: size)
         .allowsHitTesting(false)  // touches go to the gesture view underneath
         .overlay {
             if let cropping, let layer = session.selected, layer.id == cropping.id {
                 CropFrame(layer: layer, canvas: size, shape: cropShape)
+            } else if compare?.mode == .split {
+                SplitHandle(split: Binding(get: { compare?.split ?? 0.5 }, set: { compare?.split = $0 }), canvas: size)
             } else if transformOn, let layer = session.selected {
                 // Outlines what shows: the crop, turned and placed with the layer.
                 let w = layer.width * size.width, h = w / layer.aspect, c = layer.crop
@@ -135,6 +146,29 @@ struct WorkspaceView: View {
             }
         }
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+    }
+
+    /// The layers, or while comparing, the layers Compare shows: in Split, A
+    /// left of the line over B on the right.
+    @ViewBuilder
+    private func canvasContent(size: CGSize) -> some View {
+        let grid = session.grid.isOn ? session.grid : nil
+        let lineWidth = 1.5 / viewScale  // the same thickness on screen at any zoom
+        if let compare {
+            let shown = compare.shown(in: session.layers, blinkOn: blinkOn)
+            ZStack {
+                CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
+                              only: shown.right)
+                if compare.mode == .split {
+                    CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
+                                  only: shown.left)
+                        .clipShape(LeftPart(fraction: compare.split))
+                }
+            }
+        } else {
+            CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
+                          faintFullImageOf: cropping?.id)
+        }
     }
 
     /// Transform on: one or two fingers move the selected image, pinch scales,
@@ -192,6 +226,9 @@ struct WorkspaceView: View {
                 if let cropping, let layer = session.selected, layer.id == cropping.id {
                     CropBar(layer: layer, shape: $cropShape,
                             onCancel: { finishCrop(keep: false) }, onDone: { finishCrop(keep: true) })
+                } else if compare != nil {
+                    CompareBar(state: Binding(get: { compare ?? CompareState(session: session) }, set: { compare = $0 }),
+                               layers: session.layers, blinkOn: blinkOn) { compare = nil }
                 } else if gridBarShown {
                     GridBar(session: session) { gridBarShown = false }
                 } else if let layer = session.selected {
@@ -276,6 +313,7 @@ struct WorkspaceView: View {
             .disabled(session.selected == nil || cropping != nil)
             toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
                 finishCrop(keep: true)
+                compare = nil
                 if gridBarShown {
                     gridBarShown = false
                 } else {
@@ -283,6 +321,13 @@ struct WorkspaceView: View {
                     session.grid.isOn = true  // opening Grid shows it
                 }
             }
+            toolButton("rectangle.split.2x1", "Compare", on: compare != nil) {
+                finishCrop(keep: true)
+                gridBarShown = false
+                blinkOn = true
+                compare = compare == nil ? CompareState(session: session) : nil
+            }
+            .disabled(session.layers.isEmpty)
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
@@ -306,7 +351,7 @@ struct WorkspaceView: View {
                 Button {
                     session.selectedID = layer.id
                 } label: {
-                    Image(uiImage: layer.image)
+                    Image(uiImage: layer.shownImage)
                         .resizable()
                         .scaledToFill()
                         .frame(width: 48, height: 48)
@@ -314,6 +359,7 @@ struct WorkspaceView: View {
                         .opacity(layer.isVisible ? 1 : 0.35)
                         .overlay(RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.blue, lineWidth: session.selectedID == layer.id ? 3 : 0))
+                        .overlay(alignment: .bottomLeading) { compareBadge(layer) }
                 }
                 .contextMenu {
                     Button(layer.isVisible ? "Hide" : "Show") { layer.isVisible.toggle() }
@@ -327,6 +373,20 @@ struct WorkspaceView: View {
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+
+    /// While comparing: the layer's number (as in the A and B menus), and A or B.
+    @ViewBuilder
+    private func compareBadge(_ layer: Layer) -> some View {
+        if let compare, let index = session.layers.firstIndex(where: { $0.id == layer.id }) {
+            let role = layer.id == compare.a ? "A" : (compare.mode.needsB && layer.id == compare.b ? "B" : nil)
+            Text(role.map { "\(index + 1) \($0)" } ?? "\(index + 1)")
+                .font(.caption2.weight(.bold))
+                .padding(.horizontal, 4)
+                .background(RoundedRectangle(cornerRadius: 4).fill(role == nil ? Color.black.opacity(0.6) : Color.blue))
+                .foregroundStyle(.white)
+                .padding(2)
+        }
     }
 
     private var exitFullScreenButton: some View {
@@ -350,7 +410,7 @@ struct WorkspaceView: View {
 }
 
 /// The selected layer's Look, cut down: opacity first and largest, blend,
-/// Transform, Fit and Crop.
+/// Adjust (levels, hue / saturation, colorize, invert), Transform, Fit and Crop.
 struct LookBar: View {
     @Bindable var layer: Layer
     @Binding var transformOn: Bool
@@ -358,21 +418,33 @@ struct LookBar: View {
     var onCrop: () -> Void
 
     @Environment(History.self) private var history
+    @State private var adjusting = false
 
     var body: some View {
-        HStack(spacing: 16) {
-            Text(layer.name).font(.subheadline.weight(.semibold)).lineLimit(1).frame(maxWidth: 140, alignment: .leading)
+        HStack(spacing: 14) {
+            Text(layer.name).font(.subheadline.weight(.semibold)).lineLimit(1).frame(maxWidth: 110, alignment: .leading)
             Text("Opacity")
             Slider(value: $layer.opacity, in: 0...1) { editing in
                 if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
             }
-            .frame(width: 240)
+            .frame(width: 200)
             Text("\(Int((layer.opacity * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
             Picker("Blend", selection: $layer.blend) {
                 ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 200)
+            .frame(width: 250)
+            Button {
+                adjusting = true
+            } label: {
+                Label("Adjust", systemImage: "slider.horizontal.3")
+                    .overlay(alignment: .topTrailing) {
+                        if !layer.adjustments.isIdentity {  // this layer has adjustments
+                            Circle().fill(Color.blue).frame(width: 8, height: 8).offset(x: 5, y: -3)
+                        }
+                    }
+            }
+            .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
             Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
             Button("Fit") { layer.fit(canvasAspect: canvasAspect) }
             Button("Crop", systemImage: "crop", action: onCrop)

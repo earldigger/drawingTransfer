@@ -4,10 +4,17 @@ import UIKit
 
 enum Blend: String, CaseIterable, Identifiable, Codable {
     case normal = "Normal"
-    case multiply = "Multiply"
+    case multiply = "Multiply"  // white disappears: for drawings on paper
+    case screen = "Screen"  // black disappears: for light lines on a dark ground
 
     var id: String { rawValue }
-    var mode: BlendMode { self == .multiply ? .multiply : .normal }
+    var mode: BlendMode {
+        switch self {
+        case .normal: .normal
+        case .multiply: .multiply
+        case .screen: .screen
+        }
+    }
 }
 
 /// Four corners in a photo's pixels (origin top-left), in the order
@@ -38,6 +45,14 @@ final class Layer: Identifiable {
     var width: CGFloat = 1
     var rotation: Angle = .zero
     var crop = Crop.full  // the part of the image that shows, in fractions of it
+    var adjustments = Adjustments() {
+        didSet { if adjustments != oldValue { refreshShownImage() } }
+    }
+    /// `image` with the adjustments applied; what the canvas draws. Made on the
+    /// GPU in the background, so it can trail a slider by a frame or two.
+    private(set) var shownImage: UIImage
+    @ObservationIgnored private var rendering = false
+    @ObservationIgnored private var renderAgain = false
 
     /// Largest width, in canvas widths: room to zoom into a small part of a
     /// reference, while keeping the image a size the iPad can draw.
@@ -47,7 +62,32 @@ final class Layer: Identifiable {
         self.id = id
         self.name = name
         self.image = image
+        shownImage = image
         fit(canvasAspect: canvasAspect)
+    }
+
+    /// One render at a time, always of the latest adjustments: while a
+    /// slider moves, changes that arrive during a render are folded into the next.
+    private func refreshShownImage() {
+        guard !adjustments.isIdentity else {
+            shownImage = image
+            return
+        }
+        guard !rendering else {
+            renderAgain = true
+            return
+        }
+        rendering = true
+        let image = self.image, wanted = adjustments
+        Task { @MainActor in
+            let adjusted = await Task.detached(priority: .userInitiated) { Look.adjusted(image, wanted) }.value
+            rendering = false
+            if adjustments == wanted { shownImage = adjusted ?? image }
+            if renderAgain {
+                renderAgain = false
+                refreshShownImage()
+            }
+        }
     }
 
     var aspect: CGFloat { image.size.width / max(image.size.height, 1) }

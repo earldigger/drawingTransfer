@@ -17,6 +17,7 @@ struct SessionSnapshot: Codable, Equatable {
         var width: CGFloat
         var rotation: Double  // radians
         var crop: CGRect
+        var adjustments: Adjustments?  // optional, so sessions saved before Look still open
     }
 
     var version = 1
@@ -32,7 +33,8 @@ extension TransferSession {
             canvasSize: canvasSize,
             layers: layers.map {
                 .init(id: $0.id, name: $0.name, opacity: $0.opacity, blend: $0.blend, isVisible: $0.isVisible,
-                      center: $0.center, width: $0.width, rotation: $0.rotation.radians, crop: $0.crop)
+                      center: $0.center, width: $0.width, rotation: $0.rotation.radians, crop: $0.crop,
+                      adjustments: $0.adjustments)
             },
             selectedID: selectedID,
             grid: grid)
@@ -57,6 +59,7 @@ extension TransferSession {
             layer.width = state.width
             layer.rotation = .radians(state.rotation)
             layer.crop = state.crop
+            layer.adjustments = state.adjustments ?? Adjustments()
             return layer
         }
         selectedID = snapshot.selectedID.flatMap { id in layers.contains { $0.id == id } ? id : nil }

@@ -10,12 +10,13 @@ struct CanvasContent: View {
     var grid: GridSettings? = nil  // nil = no grid
     var gridLineWidth: CGFloat = 1.5
     var faintFullImageOf: UUID? = nil  // the layer being cropped: its whole image shows faintly too
+    var only: Set<UUID>? = nil  // Compare: exactly these layers, hidden or not; nil = the visible ones
 
     var body: some View {
         ZStack {
             Rectangle().fill(Color.white)
             ForEach(layers) { layer in
-                if layer.isVisible { layerView(layer) }
+                if only?.contains(layer.id) ?? layer.isVisible { layerView(layer) }
             }
             if let grid { GridLines(grid: grid, lineWidth: gridLineWidth) }
         }
@@ -29,7 +30,7 @@ struct CanvasContent: View {
     @ViewBuilder
     private func layerView(_ layer: Layer) -> some View {
         let w = layer.width * size.width, h = w / layer.aspect, c = layer.crop
-        let image = Image(uiImage: layer.image).resizable().frame(width: w, height: h)
+        let image = Image(uiImage: layer.shownImage).resizable().frame(width: w, height: h)
         if faintFullImageOf == layer.id {
             placed(image, layer, opacity: layer.opacity * 0.3)
         }

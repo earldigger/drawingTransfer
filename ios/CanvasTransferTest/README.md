@@ -9,7 +9,7 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: there are no projects or iCloud, Color tools or Compare. The current session is saved on the iPad as you work and reopens at
+It is not the app: there are no projects or iCloud, and no Color tools. The current session is saved on the iPad as you work and reopens at
 launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
@@ -54,6 +54,12 @@ automatically.
 - **Undo / redo**: the top-bar buttons, a two-finger tap to undo, a
   three-finger tap to redo, or ⌘Z / ⇧⌘Z. A gesture, an opacity drag or a
   whole crop is one step; selecting a layer isn't.
+- **Adjust** (bottom bar): invert, levels, hue / saturation or colorize,
+  lightness, as in the prototype; live, saved and undoable. Blend has Normal,
+  Multiply and Screen.
+- **Compare** (left strip): Blink A, Blink A / B, or Split with a draggable
+  line; A and B, swap, speed, pause. The layer bar numbers the layers and
+  marks A and B.
 - **Grid** (left strip): rows and columns, Square cells, color and opacity.
   It's saved with the session but isn't an undo step.
 - **Share** (top right): the canvas as a full-resolution JPEG, with or
@@ -70,6 +76,7 @@ automatically.
 | `CanvasTransferTestApp.swift` | App entry |
 | `Autosave.swift` | Saves the session (session.json and a PNG per layer) and opens it at launch |
 | `History.swift` | Undo and redo: a step per settled change, holds for gestures, drags and crops |
+| `Look.swift` | Adjustments (prototype's order and ranges) with Core Image; the Adjust popover |
 | `Model.swift` | Layer (look, placement), the session, canvas sizes |
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
@@ -77,4 +84,5 @@ automatically.
 | `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
 | `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |
 | `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |
+| `Compare.swift` | Compare modes, which layers show, the Split line, Compare bar |
 | `Crop.swift` | Crop math (same as the prototype), crop frame and handles, Crop bar |
