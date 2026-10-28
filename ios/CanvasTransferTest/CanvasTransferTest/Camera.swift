@@ -103,6 +103,8 @@ final class CameraController: UIViewController {
     }
 
     private func show(_ observation: VNRectangleObservation?) {
+        let finds = UserDefaults.standard.object(forKey: findRectangleKey) as? Bool ?? true
+        let observation = finds ? observation : nil
         onRectangleFound?(observation != nil)
         guard let r = observation else {
             quadLayer.path = nil
@@ -142,6 +144,7 @@ struct CameraScreen: View {
     var onPhoto: (UIImage) -> Void
     var onCancel: () -> Void
 
+    @AppStorage(findRectangleKey) private var findRectangle = true
     @State private var controller = CameraController()
     @State private var found = false
     @State private var capturing = false
@@ -160,6 +163,10 @@ struct CameraScreen: View {
                             .background(Capsule().fill(Color.blue)).foregroundStyle(.white)
                     }
                     Spacer()
+                    Toggle("Find rectangle", systemImage: "viewfinder", isOn: $findRectangle)
+                        .toggleStyle(.button)
+                        .buttonStyle(.borderedProminent)
+                        .tint(findRectangle ? .blue : Color(white: 0.15))
                 }
                 Spacer()
             }

@@ -9,8 +9,8 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: nothing is saved, there is no iCloud, Color tools, Compare,
-crop or undo. Names and defaults follow `docs/design/README.md`.
+It is not the app: nothing is saved, there is no iCloud, Color tools, Compare
+or undo. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
 
@@ -42,8 +42,15 @@ automatically.
   Note when it fails.
 - Take the photo: are the corners already right? Drag them — is the loupe
   where you need it, with finger and with Pencil?
+- **Whole photo** puts the corners at the photo's edges; **Detected outline**
+  brings back what Vision found. **Find rectangle** (on the camera, and in
+  Adjust corners) turns detection off; it's remembered.
 - **Add layer**: every image lands at Multiply 60 % with auto levels and
   Transform on: one finger moves it, pinch scales, twist rotates.
+- **Crop** (bottom bar): drag the corners or edge middles, or inside the frame
+  to slide it; what's cut off shows faintly. Free, Original or Square; Reset;
+  Cancel or Done. The crop moves, scales and turns with the image, and Crop
+  again brings back what you cut.
 - Compare the colors with the Mac prototype and with the real canvas.
 - **Full screen** (top right) for working at the easel; the faint button
   top-left comes back.
@@ -59,3 +66,5 @@ automatically.
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
 | `WorkspaceView.swift` | Canvas, layers, Look bar, transform gestures, full screen |
+| `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |
+| `Crop.swift` | Crop math (same as the prototype), crop frame and handles, Crop bar |
