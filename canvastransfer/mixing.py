@@ -88,22 +88,27 @@ def mix_latents(latents: np.ndarray) -> np.ndarray:
 @dataclass(frozen=True)
 class MixModel:
     """A way of predicting paint mixes. A paint is encoded as a vector;
-    shares times those vectors add up to the mix, which decode turns into
-    sRGB floats (N, 3)."""
+    shares (raised to share_power) times those vectors add up to the mix,
+    which decode turns into sRGB floats (N, 3)."""
     id: str
     name: str
     size: int
     encode: Callable[[RGB], np.ndarray]
     decode: Callable[[np.ndarray], np.ndarray]
+    share_power: float = 1.0
+
+    def weight(self, shares):
+        return np.asarray(shares, dtype=float) ** self.share_power
 
 
 MIXBOX = MixModel("mixbox", "Mixbox", mixbox.LATENT_SIZE, _latent, mix_latents)
-KUBELKA_MUNK = MixModel("km", "Kubelka-Munk", km_mixing.SIZE, km_mixing.encode, km_mixing.decode)
+KUBELKA_MUNK = MixModel("km", "Kubelka-Munk", km_mixing.SIZE, km_mixing.encode, km_mixing.decode,
+                        km_mixing.SHARE_POWER)
 MODELS = (MIXBOX, KUBELKA_MUNK)
 
 
 def mix(paint_rgbs: list[RGB], shares: list[float], model: MixModel = MIXBOX) -> RGB:
-    z = sum(s * model.encode(c) for c, s in zip(paint_rgbs, shares))
+    z = sum(w * model.encode(c) for c, w in zip(paint_rgbs, model.weight(shares)))
     return tuple(int(round(v * 255)) for v in model.decode(z[None, :])[0])
 
 
@@ -176,7 +181,8 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
 
     # one paint (+ white)
     shares = np.linspace(0.01, 1.0, 100) if has_white else np.array([1.0])
-    lat = (shares[None, :, None] * Z[:, None, :] + (1 - shares)[None, :, None] * zw).reshape(-1, model.size)
+    lat = (model.weight(shares)[None, :, None] * Z[:, None, :]
+           + model.weight(1 - shares)[None, :, None] * zw).reshape(-1, model.size)
     de, rgb = _score(model, lat, target_lab)
     de, rgb = de.reshape(n, -1), rgb.reshape(n, -1, 3)
     best = de.argmin(axis=1)
@@ -196,8 +202,9 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
                          if (i + j <= steps if has_white else i + j == steps)]) / steps
         a, b = grid[:, 0], grid[:, 1]
         w = 1 - a - b
-        lat = (a[None, :, None] * Z[pair_idx[:, 0]][:, None, :] + b[None, :, None] * Z[pair_idx[:, 1]][:, None, :]
-               + w[None, :, None] * zw).reshape(-1, model.size)
+        wa, wb, ww = model.weight(a), model.weight(b), model.weight(np.maximum(w, 0.0))
+        lat = (wa[None, :, None] * Z[pair_idx[:, 0]][:, None, :] + wb[None, :, None] * Z[pair_idx[:, 1]][:, None, :]
+               + ww[None, :, None] * zw).reshape(-1, model.size)
         de, _ = _score(model, lat, target_lab)
         de = de.reshape(len(pair_idx), -1)
         coarse_best = de.argmin(axis=1)
@@ -210,7 +217,8 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
                              and (x + y <= 1.0 + 1e-9 if has_white else abs(x + y - 1.0) < 1e-9)])
             i, j = pair_idx[k]
             fw = 1 - fine[:, 0] - fine[:, 1]
-            lat = fine[:, :1] * Z[i] + fine[:, 1:2] * Z[j] + fw[:, None] * zw
+            fine_w = model.weight(fine)
+            lat = fine_w[:, :1] * Z[i] + fine_w[:, 1:2] * Z[j] + model.weight(np.maximum(fw, 0.0))[:, None] * zw
             fde, frgb = _score(model, lat, target_lab)
             m = int(fde.argmin())
             idx, sh = [i, j], [fine[m, 0], fine[m, 1]]

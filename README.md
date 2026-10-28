@@ -161,7 +161,8 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - **Mixing: Mixbox | Kubelka-Munk** on the Paints tab. Kubelka-Munk is the
   published paint physics (free for a paid app; Mixbox is not), run on the
   smoothest spectrum that matches each paint's color, with each paint
-  weighted by its lightness as spectral.js does. Every recipe also shows
+  weighted by its share squared times its lightness, as spectral.js does
+  (checked against the artistpigments.org Spectral.js mode). Every recipe also shows
   what the other model says the same amounts make (the strip at the right
   of its swatch): where they agree, trust it more; where they don't, mix a
   test swatch. Kubelka-Munk is weakest on near-black paints, whose color
