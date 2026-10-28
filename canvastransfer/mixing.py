@@ -1,10 +1,13 @@
 """Matching a color to your paints, and mixing recipes.
 
-Mixing uses Mixbox (CC BY-NC 4.0, personal use only), the same model the
-artistpigments.org mixer uses. Mixbox treats every color as if it had the
-same tinting strength, so a recipe names sensible paints, but its amounts
-are only a starting point: a strong pigment such as phthalo blue needs far
-less than it says, a weak earth more.
+Two mixing models, to compare:
+  * Mixbox (CC BY-NC 4.0, personal use only), the same model the
+    artistpigments.org mixer uses;
+  * Kubelka-Munk (km_mixing), the published paint physics, free for a paid
+    app.
+Both treat every color as if it had the same tinting strength, so a recipe
+names sensible paints, but its amounts are only a starting point: a strong
+pigment such as phthalo blue needs far less than it says, a weak earth more.
 
 Two searches run for a target color:
   * one paint, lightened with the chosen white (or water) in 1% steps;
@@ -21,10 +24,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 
+from typing import Callable
+
 import mixbox
 import numpy as np
 
 from . import color_study as cs
+from . import km_mixing
 from .paints import Paint, PaintLibrary
 
 RGB = tuple[int, int, int]
@@ -79,17 +85,34 @@ def mix_latents(latents: np.ndarray) -> np.ndarray:
     return np.clip(np.stack([r, g, b], axis=1) + latents[:, 4:7], 0.0, 1.0)
 
 
-def mix(paint_rgbs: list[RGB], shares: list[float]) -> RGB:
-    z = sum(s * _latent(c) for c, s in zip(paint_rgbs, shares))
-    return tuple(int(round(v * 255)) for v in mix_latents(z[None, :])[0])
+@dataclass(frozen=True)
+class MixModel:
+    """A way of predicting paint mixes. A paint is encoded as a vector;
+    shares times those vectors add up to the mix, which decode turns into
+    sRGB floats (N, 3)."""
+    id: str
+    name: str
+    size: int
+    encode: Callable[[RGB], np.ndarray]
+    decode: Callable[[np.ndarray], np.ndarray]
+
+
+MIXBOX = MixModel("mixbox", "Mixbox", mixbox.LATENT_SIZE, _latent, mix_latents)
+KUBELKA_MUNK = MixModel("km", "Kubelka-Munk", km_mixing.SIZE, km_mixing.encode, km_mixing.decode)
+MODELS = (MIXBOX, KUBELKA_MUNK)
+
+
+def mix(paint_rgbs: list[RGB], shares: list[float], model: MixModel = MIXBOX) -> RGB:
+    z = sum(s * model.encode(c) for c, s in zip(paint_rgbs, shares))
+    return tuple(int(round(v * 255)) for v in model.decode(z[None, :])[0])
 
 
 class _Palette:
-    """Screen colors and Mixbox latents for the paints being searched.
+    """Screen colors and encoded colors for the paints being searched.
     Paints sharing the same color data (a stand-in and the paint it borrows
     from) are searched once; the measured paint represents them."""
 
-    def __init__(self, library: PaintLibrary, paints: list[Paint]):
+    def __init__(self, library: PaintLibrary, paints: list[Paint], model: MixModel):
         self.paints: list[Paint] = []
         self.rgbs: list[RGB] = []
         self.off_screen: list[bool] = []
@@ -110,15 +133,15 @@ class _Palette:
             self.rgbs.append(rgb)
             self.off_screen.append(not in_gamut)
             self.stand_in.append(paint.lab is None)
-        self.latents = np.array([_latent(c) for c in self.rgbs]).reshape(-1, mixbox.LATENT_SIZE)
+        self.latents = np.array([model.encode(c) for c in self.rgbs]).reshape(-1, model.size)
 
     def flags(self, indices) -> tuple[list[Paint], list[Paint]]:
         return ([self.paints[i] for i in indices if self.off_screen[i]],
                 [self.paints[i] for i in indices if self.stand_in[i]])
 
 
-def _score(latents: np.ndarray, target_lab: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    rgb = mix_latents(latents)
+def _score(model: MixModel, latents: np.ndarray, target_lab: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    rgb = model.decode(latents)
     return cs.delta_e(cs.srgb_to_lab_d50(rgb), target_lab), rgb
 
 
@@ -132,14 +155,14 @@ def _recipe(palette: _Palette, indices: list[int], shares: list[float], rgb, del
 
 
 def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
-                 lightener: Paint | None) -> MatchResult:
+                 lightener: Paint | None, model: MixModel = MIXBOX) -> MatchResult:
     """Best single-paint and two-paint recipes for target_rgb from `paints`,
     each lightened with `lightener` (a white paint, WATER, or None)."""
     colors = [p for p in paints if p is not lightener and not (lightener is not None and p.is_white)]
-    palette = _Palette(library, colors)
+    palette = _Palette(library, colors, model)
     n = len(palette.paints)
     if lightener is not None:
-        white = _Palette(library, [lightener])
+        white = _Palette(library, [lightener], model)
         if white.paints:
             for name in ("paints", "rgbs", "off_screen", "stand_in"):
                 getattr(palette, name).extend(getattr(white, name))
@@ -149,12 +172,12 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
         return MatchResult([], [])
     target_lab = cs.srgb_to_lab_d50(np.asarray(target_rgb, dtype=float) / 255.0)
     Z = palette.latents[:n]
-    zw = palette.latents[n] if has_white else np.zeros(mixbox.LATENT_SIZE)
+    zw = palette.latents[n] if has_white else np.zeros(model.size)
 
     # one paint (+ white)
     shares = np.linspace(0.01, 1.0, 100) if has_white else np.array([1.0])
-    lat = (shares[None, :, None] * Z[:, None, :] + (1 - shares)[None, :, None] * zw).reshape(-1, mixbox.LATENT_SIZE)
-    de, rgb = _score(lat, target_lab)
+    lat = (shares[None, :, None] * Z[:, None, :] + (1 - shares)[None, :, None] * zw).reshape(-1, model.size)
+    de, rgb = _score(model, lat, target_lab)
     de, rgb = de.reshape(n, -1), rgb.reshape(n, -1, 3)
     best = de.argmin(axis=1)
     alone = de[np.arange(n), best]  # how close each paint gets on its own (+ white)
@@ -174,8 +197,8 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
         a, b = grid[:, 0], grid[:, 1]
         w = 1 - a - b
         lat = (a[None, :, None] * Z[pair_idx[:, 0]][:, None, :] + b[None, :, None] * Z[pair_idx[:, 1]][:, None, :]
-               + w[None, :, None] * zw).reshape(-1, mixbox.LATENT_SIZE)
-        de, _ = _score(lat, target_lab)
+               + w[None, :, None] * zw).reshape(-1, model.size)
+        de, _ = _score(model, lat, target_lab)
         de = de.reshape(len(pair_idx), -1)
         coarse_best = de.argmin(axis=1)
         refined = []
@@ -188,7 +211,7 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
             i, j = pair_idx[k]
             fw = 1 - fine[:, 0] - fine[:, 1]
             lat = fine[:, :1] * Z[i] + fine[:, 1:2] * Z[j] + fw[:, None] * zw
-            fde, frgb = _score(lat, target_lab)
+            fde, frgb = _score(model, lat, target_lab)
             m = int(fde.argmin())
             idx, sh = [i, j], [fine[m, 0], fine[m, 1]]
             if has_white:
@@ -200,3 +223,11 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
             colored = sorted([pt for pt in r.parts if pt[0] is not lightener], key=lambda pt: -pt[1])
             r.parts = colored + [pt for pt in r.parts if pt[0] is lightener]
     return MatchResult(singles, pairs)
+
+
+def predict(recipe: Recipe, target_rgb: RGB, model: MixModel) -> tuple[RGB, float]:
+    """What `model` says a recipe's amounts make, and how far that is from
+    the target: the other model's view of the same recipe."""
+    rgb = mix([recipe.paint_rgbs[p.id] for p, _ in recipe.parts], [s for _, s in recipe.parts], model)
+    target_lab = cs.srgb_to_lab_d50(np.asarray(target_rgb, dtype=float) / 255.0)
+    return rgb, float(cs.delta_e(cs.srgb_to_lab_d50(np.asarray(rgb, dtype=float) / 255.0), target_lab))

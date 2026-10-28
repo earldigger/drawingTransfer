@@ -9,8 +9,9 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: nothing is saved, there is no iCloud, Color tools, Compare
-or undo. Names and defaults follow `docs/design/README.md`.
+It is not the app: there are no projects or iCloud, Color tools, Compare or
+undo. The current session is saved on the iPad as you work and reopens at
+launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
 
@@ -61,6 +62,7 @@ automatically.
 | File | What it does |
 |---|---|
 | `CanvasTransferTestApp.swift` | App entry |
+| `Autosave.swift` | Saves the session (session.json and a PNG per layer) and opens it at launch |
 | `Model.swift` | Layer (look, placement), the session, canvas sizes |
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
