@@ -18,9 +18,13 @@ measured spectrum would be more faithful; this is the free stand-in.
 
 Plain Kubelka-Munk with one color per paint lets dark paints swamp light
 ones: half red, half white comes out nearly pure red. As in spectral.js,
-each paint is weighted by its lightness (Y) as well as its share, which
+each paint is weighted by its lightness (Y) times its share squared, which
 stands in for the scattering that a single color can't tell us. So white
-and yellow count for more than their share, black and dark blues for less.
+and yellow count for more than their share, black and dark blues for less,
+and a small share counts for little. Checked against the artistpigments.org
+mixer's Spectral.js mode: brown ochre to lemon yellow in 13 steps is within
+ΔE 1 on the yellow half and ΔE 5 on the dark end, where the two guess the
+brown's spectrum differently.
 
 Weakest on near-black paints: their color says little about their spectrum,
 so their tints are a guess (e.g. a dark indanthrone blue tints to lavender
@@ -35,6 +39,7 @@ import numpy as np
 
 RGB = tuple[int, int, int]
 
+SHARE_POWER = 2  # spectral.js weights each paint by share² × lightness
 R_MIN = 1e-4  # a reflectance of exactly 0 would make K/S infinite
 WAVELENGTHS = (380, 730, 10)  # nm: 36 bands, enough for smooth paint spectra
 
@@ -120,8 +125,9 @@ def lightness(r: np.ndarray) -> float:
 
 def encode(rgb: RGB) -> np.ndarray:
     """A paint as what gets added up when mixing: its K/S curve weighted by
-    its lightness, then the lightness itself (bands + 1,). Shares times these
-    add up linearly, like Mixbox latents; decode divides the two back out."""
+    its lightness, then the lightness itself (bands + 1,). Shares squared
+    times these add up linearly, like Mixbox latents; decode divides the two
+    back out."""
     r = reflectance(rgb)
     y = max(lightness(r), R_MIN)
     return np.append(y * ks(r), y)
@@ -141,5 +147,5 @@ SIZE = BANDS + 1  # what encode returns: a K/S value per band, then lightness
 
 
 def mix(paint_rgbs: list[RGB], shares: list[float]) -> RGB:
-    curve = sum(s * encode(c) for c, s in zip(paint_rgbs, shares))
+    curve = sum(s ** SHARE_POWER * encode(c) for c, s in zip(paint_rgbs, shares))
     return tuple(int(round(v * 255)) for v in decode(curve[None, :])[0])

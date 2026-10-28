@@ -79,3 +79,19 @@ def test_comparison_page(tmp_path):
     compare_mixing.main([str(out)])
     page = out.read_text()
     assert "Ultramarine Blue + Cadmium Yellow Medium" in page and "Kubelka-Munk's recipe" in page
+
+
+# Old Holland Brown Ochre Deep to Cadmium Yellow Lemon in 13 steps, read
+# from the artistpigments.org mixer in its Spectral.js mode.
+SPECTRAL_JS = [(84, 53, 38), (88, 55, 37), (101, 64, 40), (119, 80, 41), (142, 102, 43), (164, 125, 42),
+               (181, 146, 39), (199, 166, 34), (215, 183, 29), (225, 197, 22), (235, 205, 13), (239, 211, 4),
+               (241, 212, 1)]
+
+
+def test_matches_spectral_js():
+    a, b = SPECTRAL_JS[0], SPECTRAL_JS[-1]
+    for k, expected in enumerate(SPECTRAL_JS):
+        t = k / 12
+        de = compare_mixing.delta_e(km.mix([a, b], [1 - t, t]), expected)
+        # the dark end differs: spectral.js builds the brown's spectrum its own way
+        assert de < (1.5 if t >= 1 / 3 else 6), (t, de)
