@@ -2,7 +2,7 @@ import Observation
 import SwiftUI
 import UIKit
 
-enum Blend: String, CaseIterable, Identifiable {
+enum Blend: String, CaseIterable, Identifiable, Codable {
     case normal = "Normal"
     case multiply = "Multiply"
 
@@ -26,7 +26,7 @@ struct Corners: Equatable {
 
 @Observable
 final class Layer: Identifiable {
-    let id = UUID()
+    let id: UUID
     var name: String
     let image: UIImage  // corrected and ready to show
     var opacity = 0.6
@@ -43,7 +43,8 @@ final class Layer: Identifiable {
     /// reference, while keeping the image a size the iPad can draw.
     static let maxWidth: CGFloat = 12
 
-    init(name: String, image: UIImage, canvasAspect: CGFloat) {
+    init(id: UUID = UUID(), name: String, image: UIImage, canvasAspect: CGFloat) {
+        self.id = id
         self.name = name
         self.image = image
         fit(canvasAspect: canvasAspect)
