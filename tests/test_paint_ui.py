@@ -212,3 +212,18 @@ def test_damaged_library_is_set_aside(qapp, data_dir):
     assert (tmp / "paints.damaged.json").exists()
     assert "set aside" in messages[-1]
     w.deleteLater()
+
+
+def test_mixing_model_choice_and_cross_check(window, qapp):
+    imported(window)
+    add_swatch(window, qapp)
+    window.side_tabs.setCurrentIndex(2)
+    qapp.processEvents()
+    panel = window.paint_panel
+    assert panel.model.currentText() == "Mixbox"
+    assert "Kubelka-Munk: ΔE" in panel.pairs.item(0).text()
+    panel.model.setCurrentIndex(panel.model.findData("km"))
+    qapp.processEvents()
+    assert panel.mix_model().name == "Kubelka-Munk"
+    assert panel.result().pairs  # no closeness check: tints of near-black paints are where the models differ
+    assert "Mixbox: ΔE" in panel.pairs.item(0).text()

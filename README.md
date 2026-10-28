@@ -158,6 +158,17 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Mixbox treats every paint as equally strong, so the recipes are good at
   naming paints and weak on amounts: strong pigments (phthalos) need much
   less than they say, weak ones more
+- **Mixing: Mixbox | Kubelka-Munk** on the Paints tab. Kubelka-Munk is the
+  published paint physics (free for a paid app; Mixbox is not), run on the
+  smoothest spectrum that matches each paint's color, with each paint
+  weighted by its lightness as spectral.js does. Every recipe also shows
+  what the other model says the same amounts make (the strip at the right
+  of its swatch): where they agree, trust it more; where they don't, mix a
+  test swatch. Kubelka-Munk is weakest on near-black paints, whose color
+  says little about their tints
+- `python -m canvastransfer.compare_mixing [--library paints.json] out.html`
+  writes a page comparing the two: paint pairs in 10% steps and recipes
+  for sample colors under each model
 - ⚠ marks paints whose color can't be shown on screen (many cadmiums); they
   are clipped to the nearest screen color before mixing. * marks paints
   mixed with a stand-in's color
@@ -191,7 +202,7 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Zoom/pan of the canvas view
 - Everything in the spec's "Future Features" list
 - Suggestions for paints you don't own (planned as Color Study phase 3)
-- Spectral (Kubelka-Munk) mixing from measured curves
+- Kubelka-Munk from measured spectra and tinting strengths (only colors are used)
 
 ## Running it
 

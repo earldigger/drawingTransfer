@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 
 from .. import color_study as cs
 from .. import palettes
-from ..mixing import WATER, MatchResult, Recipe, closeness, find_recipes
+from ..mixing import MIXBOX, MODELS, WATER, MatchResult, MixModel, Recipe, closeness, find_recipes, predict
 from ..paints import Paint, PaintLibrary, medium_label
 from .paint_dialog import chip_style
 
@@ -30,15 +30,18 @@ ICON_SIZE = QSize(64, 40)
 NO_LIGHTENER = "none"
 
 
-def recipe_icon(target, recipe: Recipe) -> QIcon:
+def recipe_icon(target, recipe: Recipe, other_rgb=None) -> QIcon:
     """Target (left) next to the predicted mix (right), with the paints
-    used as small chips along the bottom."""
+    used as small chips along the bottom. With `other_rgb`, the other
+    mixing model's prediction for the same amounts is a strip on the right."""
     w, h = ICON_SIZE.width(), ICON_SIZE.height()
     pm = QPixmap(w, h)
     pm.fill(Qt.transparent)
     p = QPainter(pm)
     p.fillRect(QRectF(0, 0, w / 2, h - 10), QColor(*target))
     p.fillRect(QRectF(w / 2, 0, w / 2, h - 10), QColor(*recipe.rgb))
+    if other_rgb is not None:
+        p.fillRect(QRectF(w - 10, 0, 10, h - 10), QColor(*other_rgb))
     chip_w = w / max(1, len(recipe.parts))
     for i, (paint, _share) in enumerate(recipe.parts):
         p.fillRect(QRectF(i * chip_w, h - 9, chip_w - 1, 9), QColor(*recipe.paint_rgbs[paint.id]))
@@ -83,6 +86,13 @@ class PaintMatchPanel(QWidget):
         self.lightener.setToolTip("What lightens the mixes: one of your whites, or water for watercolor")
         self.lightener.currentIndexChanged.connect(self._on_setting_changed)
         form.addRow("Lighten with", self.lightener)
+        self.model = QComboBox()
+        for m in MODELS:
+            self.model.addItem(m.name, m.id)
+        self.model.setToolTip("How mixes are predicted. Each recipe also shows what the other model says the "
+                              "same amounts make (the strip on the right of its swatch).")
+        self.model.currentIndexChanged.connect(self._on_setting_changed)
+        form.addRow("Mixing", self.model)
         tv.addLayout(form)
         self.palette_label = QLabel()
         self.palette_label.setWordWrap(True)
@@ -114,11 +124,13 @@ class PaintMatchPanel(QWidget):
             layout.addWidget(box)
 
         self.note = QLabel(
-            "Left: your swatch. Right: the predicted mix (Mixbox, the same model the artistpigments.org mixer "
-            "uses). ΔE is the difference between them; under 2 is hard to see. Two paints plus white can match "
-            "almost anything, so mixes within ΔE 1 are listed starting from paints already near your color. "
-            "Mixbox treats every paint as "
-            "equally strong, so trust which paints it names more than the amounts: phthalos and other strong "
+            "Left: your swatch. Right: the predicted mix; the strip at the far right is what the other mixing "
+            "model predicts for the same amounts. Mixbox is the model the artistpigments.org mixer uses; "
+            "Kubelka-Munk is the published paint physics, run on a smooth spectrum guessed from each paint's "
+            "color. ΔE is the difference from your swatch; under 2 is hard to see. Two paints plus white can "
+            "match almost anything, so mixes within ΔE 1 are listed starting from paints already near your "
+            "color. Both models treat every paint as "
+            "equally strong, so trust which paints they name more than the amounts: phthalos and other strong "
             "pigments need much less than it says, earths more. ⚠ marks paints whose color is outside what a "
             "screen can show (clipped before mixing); * marks paints mixed with a stand-in's color.")
         self.note.setWordWrap(True)
@@ -172,6 +184,12 @@ class PaintMatchPanel(QWidget):
 
     def result(self) -> MatchResult | None:
         return self._result
+
+    def mix_model(self) -> MixModel:
+        return next((m for m in MODELS if m.id == self.model.currentData()), MIXBOX)
+
+    def other_model(self) -> MixModel:
+        return next(m for m in MODELS if m is not self.mix_model())
 
     def select_source(self, key: str) -> None:
         """Choose what to mix from by its key, e.g. "medium:oil", "palette:<id>"
@@ -284,7 +302,7 @@ class PaintMatchPanel(QWidget):
         _, paints, _ = self.selection()
         choice = self.lightener.currentData()
         lightener = WATER if choice == WATER.id else (None if choice == NO_LIGHTENER else self.library.get(choice))
-        self._result = find_recipes(rgb, self.library, paints, lightener)
+        self._result = find_recipes(rgb, self.library, paints, lightener, self.mix_model())
         self._show(self.singles, self._result.singles)
         self._show(self.pairs, self._result.pairs)
 
@@ -302,9 +320,13 @@ class PaintMatchPanel(QWidget):
                 alt = r.also.get(paint.id, [])
                 alt_text = f"  (or {', '.join(a.name + ('*' if a.lab is None else '') for a in alt)})" if alt else ""
                 lines.append(f"{round(share * 100)}%  {paint.name}{mark}{alt_text}")
-            text = f"ΔE {r.delta_e:.1f} — {closeness(r.delta_e)}\n" + "\n".join(lines)
-            item = QListWidgetItem(recipe_icon(self._target, r), text)
-            tip = [f"Predicted mix {cs.hex_code(r.rgb)}"]
+            other = self.other_model()
+            other_rgb, other_de = predict(r, self._target, other)
+            text = (f"ΔE {r.delta_e:.1f} — {closeness(r.delta_e)}\n" + "\n".join(lines)
+                    + f"\n{other.name}: ΔE {other_de:.1f} for these amounts")
+            item = QListWidgetItem(recipe_icon(self._target, r, other_rgb), text)
+            tip = [f"Predicted mix {cs.hex_code(r.rgb)} ({self.mix_model().name}); "
+                   f"{other.name} predicts {cs.hex_code(other_rgb)}"]
             for paint, _share in r.parts:
                 tip.append(f"{paint.label()}" + (f" — also: {'; '.join(a.label() for a in r.also[paint.id])}"
                                                   if paint.id in r.also else ""))
