@@ -37,6 +37,11 @@ final class Layer: Identifiable {
     var center = CGPoint(x: 0.5, y: 0.5)
     var width: CGFloat = 1
     var rotation: Angle = .zero
+    var crop = Crop.full  // the part of the image that shows, in fractions of it
+
+    /// Largest width, in canvas widths: room to zoom into a small part of a
+    /// reference, while keeping the image a size the iPad can draw.
+    static let maxWidth: CGFloat = 12
 
     init(name: String, image: UIImage, canvasAspect: CGFloat) {
         self.name = name
@@ -45,6 +50,10 @@ final class Layer: Identifiable {
     }
 
     var aspect: CGFloat { image.size.width / max(image.size.height, 1) }
+
+    var placementDescription: String {
+        String(format: "center %.3f, %.3f  width %.3f  rotation %.1f°", center.x, center.y, width, rotation.degrees)
+    }
 
     /// Largest placement inside the canvas, centered, never cropped.
     func fit(canvasAspect: CGFloat) {

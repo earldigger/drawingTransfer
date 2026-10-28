@@ -1,6 +1,10 @@
 import SwiftUI
 import UIKit
 
+/// Whether Camera and Adjust corners look for the canvas or paper. Remembered
+/// between launches; off starts every photo with its whole frame.
+let findRectangleKey = "findRectangle"
+
 /// Adjust corners: drag the four corners onto the canvas or paper. Outside
 /// is dimmed, and a loupe shows the corner being dragged.
 struct CornersScreen: View {
@@ -9,19 +13,27 @@ struct CornersScreen: View {
     var onRetake: (() -> Void)?
     var onCancel: () -> Void
 
+    @AppStorage(findRectangleKey) private var findRectangle = true
     @State private var corners: Corners
-    private let detected: Corners
+    private let detected: Corners?  // nil = no rectangle found
+    private let notFound: Corners  // where the corners start when nothing was found
     @State private var dragging: Int? = nil
 
-    init(image: UIImage, corners: Corners, onAdd: @escaping (Corners) -> Void,
+    /// `notFoundInset`: how far in from the edges the corners start when no
+    /// rectangle is found (a camera shot rarely fills the frame exactly).
+    init(image: UIImage, detected: Corners?, notFoundInset: CGFloat, onAdd: @escaping (Corners) -> Void,
          onRetake: (() -> Void)?, onCancel: @escaping () -> Void) {
         self.image = image
         self.onAdd = onAdd
         self.onRetake = onRetake
         self.onCancel = onCancel
-        _corners = State(initialValue: corners)
-        detected = corners
+        self.detected = detected
+        notFound = Corners.inset(image.size, by: notFoundInset)
+        let find = UserDefaults.standard.object(forKey: findRectangleKey) as? Bool ?? true
+        _corners = State(initialValue: find ? detected ?? notFound : Corners.inset(image.size, by: 0))
     }
+
+    private var wholePhoto: Corners { Corners.inset(image.size, by: 0) }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -109,7 +121,17 @@ struct CornersScreen: View {
             Text("Adjust corners").font(.headline)
             Text("Keeps its proportions, at Multiply 60 % with auto levels.")
                 .font(.footnote).foregroundStyle(.secondary)
-            Button("Reset to detected") { corners = detected }
+            Button("Whole photo", systemImage: "arrow.up.left.and.arrow.down.right") { corners = wholePhoto }
+            Button("Detected outline", systemImage: "viewfinder") { corners = detected ?? notFound }
+                .disabled(detected == nil)
+            if findRectangle && detected == nil {
+                Text("No rectangle found in this photo.").font(.footnote).foregroundStyle(.secondary)
+            }
+            Divider()
+            Toggle("Find rectangle automatically", isOn: $findRectangle)
+                .onChange(of: findRectangle) { _, on in corners = on ? detected ?? notFound : wholePhoto }
+            Text("Off: every photo starts with the whole frame, and Camera shows no outline.")
+                .font(.footnote).foregroundStyle(.secondary)
             Spacer()
             Button {
                 onAdd(corners)
@@ -132,21 +154,21 @@ struct CaptureFlow: View {
     var onDone: (Layer?) -> Void
 
     @State private var photo: UIImage? = nil
-    @State private var corners: Corners? = nil
+    @State private var detected: Corners? = nil
 
     private var fromPhotos: Bool { picked != nil }
 
     var body: some View {
         Group {
-            if let photo, let corners {
-                CornersScreen(image: photo, corners: corners, onAdd: add,
-                              onRetake: fromPhotos ? nil : { self.photo = nil; self.corners = nil },
+            if let photo {
+                // A picked photo is often already flat, so with nothing found it
+                // starts whole; a camera shot starts 10 % in from the edges.
+                CornersScreen(image: photo, detected: detected, notFoundInset: fromPhotos ? 0 : 0.1, onAdd: add,
+                              onRetake: fromPhotos ? nil : { self.photo = nil; self.detected = nil },
                               onCancel: { onDone(nil) })
             } else if !fromPhotos {
                 CameraScreen(onPhoto: { taken in
-                    let (image, found) = Self.prepare(taken, fromPhotos: false)
-                    photo = image
-                    corners = found
+                    (photo, detected) = Self.prepare(taken)
                 }, onCancel: { onDone(nil) })
             } else {
                 Color.black
@@ -154,21 +176,16 @@ struct CaptureFlow: View {
         }
         .onAppear {
             if let picked, photo == nil {
-                let (image, found) = Self.prepare(picked, fromPhotos: true)
-                photo = image
-                corners = found
+                (photo, detected) = Self.prepare(picked)
             }
         }
     }
 
-    /// Upright pixels and starting corners: the detected rectangle if there is
-    /// one; otherwise the whole image for a picked photo (often already flat),
-    /// or 10 % in from the edges for a camera shot.
-    private static func prepare(_ image: UIImage, fromPhotos: Bool) -> (UIImage, Corners) {
+    /// Upright pixels, and the rectangle found in them, if any. Detection always
+    /// runs, so turning it on in Adjust corners has an outline to show.
+    private static func prepare(_ image: UIImage) -> (UIImage, Corners?) {
         let upright = ImageOps.prepared(image)
-        let corners = ImageOps.detectRectangle(in: upright)
-            ?? Corners.inset(upright.size, by: fromPhotos ? 0 : 0.1)
-        return (upright, corners)
+        return (upright, ImageOps.detectRectangle(in: upright))
     }
 
     private func add(_ corners: Corners) {
