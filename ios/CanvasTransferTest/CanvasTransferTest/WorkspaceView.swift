@@ -13,6 +13,7 @@ struct Capture: Identifiable {
 /// canvas fitted between them.
 struct WorkspaceView: View {
     @Environment(TransferSession.self) private var session
+    @Environment(History.self) private var history
 
     @State private var capture: Capture? = nil
     @State private var showPhotos = false
@@ -80,6 +81,7 @@ struct WorkspaceView: View {
         cropping = (layer.id, layer.crop, transformOn)
         cropShape = .free
         transformOn = false  // one finger and pinch move the view while cropping
+        history.hold("crop")  // the whole crop, to Done, is one undo step
     }
 
     private func finishCrop(keep: Bool) {
@@ -87,7 +89,12 @@ struct WorkspaceView: View {
         if !keep, let layer = session.layers.first(where: { $0.id == c.id }) { layer.crop = c.before }
         transformOn = c.wasTransforming
         cropping = nil
+        history.release("crop")
     }
+
+    /// Off while cropping, which has its own Cancel.
+    private var canUndo: Bool { cropping == nil && history.canUndo }
+    private var canRedo: Bool { cropping == nil && history.canRedo }
 
     // MARK: canvas
 
@@ -173,7 +180,11 @@ struct WorkspaceView: View {
             },
             rotate: { r in transformTarget?.rotation += r },
             doubleTap: { withAnimation { viewScale = 1; viewOffset = .zero } },
+            undo: { if canUndo { history.undo() } },
+            redo: { if canRedo { history.redo() } },
+            began: { history.hold("gesture") },
             ended: {
+                history.release("gesture")
                 if let layer = transformTarget {
                     gestureLog.notice("Transform ended: \(layer.placementDescription)")
                 } else {
@@ -214,6 +225,15 @@ struct WorkspaceView: View {
         HStack {
             Text("Transfer test").font(.headline)
             Spacer()
+            Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward") }
+                .accessibilityLabel("Undo")
+                .keyboardShortcut("z", modifiers: .command)
+                .disabled(!canUndo)
+            Button { history.redo() } label: { Image(systemName: "arrow.uturn.forward") }
+                .accessibilityLabel("Redo")
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(!canRedo)
+                .padding(.trailing, 12)
             Menu {
                 ForEach(TransferSession.canvasSizes.indices, id: \.self) { i in
                     let size = TransferSession.canvasSizes[i]
@@ -320,11 +340,16 @@ struct LookBar: View {
     let canvasAspect: CGFloat
     var onCrop: () -> Void
 
+    @Environment(History.self) private var history
+
     var body: some View {
         HStack(spacing: 16) {
             Text(layer.name).font(.subheadline.weight(.semibold)).lineLimit(1).frame(maxWidth: 140, alignment: .leading)
             Text("Opacity")
-            Slider(value: $layer.opacity, in: 0...1).frame(width: 240)
+            Slider(value: $layer.opacity, in: 0...1) { editing in
+                if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+            }
+            .frame(width: 240)
             Text("\(Int((layer.opacity * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
             Picker("Blend", selection: $layer.blend) {
                 ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }

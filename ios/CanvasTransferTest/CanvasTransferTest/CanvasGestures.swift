@@ -12,6 +12,9 @@ struct CanvasGestureHandlers {
     var pinch: (CGFloat) -> Void  // scale factor
     var rotate: (Angle) -> Void
     var doubleTap: () -> Void
+    var undo: () -> Void  // two-finger tap
+    var redo: () -> Void  // three-finger tap
+    var began: () -> Void  // the first of pan, pinch and twist started
     var ended: () -> Void  // the last finger lifted, or iPadOS cancelled the gesture
 }
 
@@ -35,7 +38,13 @@ struct CanvasGestureView: UIViewRepresentable {
         let rotate = UIRotationGestureRecognizer(target: c, action: #selector(Coordinator.rotate(_:)))
         let doubleTap = UITapGestureRecognizer(target: c, action: #selector(Coordinator.doubleTap(_:)))
         doubleTap.numberOfTapsRequired = 2
-        for recognizer in [pan, pinch, rotate, doubleTap] {
+        // Undo and redo as in Procreate.
+        let undoTap = UITapGestureRecognizer(target: c, action: #selector(Coordinator.undoTap(_:)))
+        undoTap.numberOfTouchesRequired = 2
+        let redoTap = UITapGestureRecognizer(target: c, action: #selector(Coordinator.redoTap(_:)))
+        redoTap.numberOfTouchesRequired = 3
+        c.continuous = Set([pan, pinch, rotate].map(ObjectIdentifier.init))
+        for recognizer in [pan, pinch, rotate, doubleTap, undoTap, redoTap] {
             recognizer.delegate = c
             view.addGestureRecognizer(recognizer)
         }
@@ -48,6 +57,7 @@ struct CanvasGestureView: UIViewRepresentable {
 
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var handlers: CanvasGestureHandlers
+        var continuous: Set<ObjectIdentifier> = []  // pan, pinch and twist
         private var active: Set<ObjectIdentifier> = []  // recognizers between began and ended
 
         init(handlers: CanvasGestureHandlers) { self.handlers = handlers }
@@ -89,11 +99,22 @@ struct CanvasGestureView: UIViewRepresentable {
             if g.state == .ended { handlers.doubleTap() }
         }
 
+        @objc func undoTap(_ g: UITapGestureRecognizer) {
+            if g.state == .ended { handlers.undo() }
+        }
+
+        @objc func redoTap(_ g: UITapGestureRecognizer) {
+            if g.state == .ended { handlers.redo() }
+        }
+
         private func track(_ g: UIGestureRecognizer, _ name: String) {
             let id = ObjectIdentifier(g)
             switch g.state {
             case .began:
-                if active.isEmpty { gestureLog.notice("Gesture began (\(name))") }
+                if active.isEmpty {
+                    gestureLog.notice("Gesture began (\(name))")
+                    handlers.began()
+                }
                 active.insert(id)
             case .ended, .cancelled, .failed:
                 active.remove(id)
@@ -104,8 +125,12 @@ struct CanvasGestureView: UIViewRepresentable {
             }
         }
 
-        // Move, pinch and twist together, as in Procreate.
+        // Move, pinch and twist together, as in Procreate. Taps don't run
+        // alongside them: a pinch that has started can't also end as a
+        // two-finger tap and undo itself.
         func gestureRecognizer(_ g: UIGestureRecognizer,
-                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+            continuous.contains(ObjectIdentifier(g)) && continuous.contains(ObjectIdentifier(other))
+        }
     }
 }

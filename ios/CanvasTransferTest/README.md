@@ -9,8 +9,7 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: there are no projects or iCloud, Color tools, Compare or
-undo. The current session is saved on the iPad as you work and reopens at
+It is not the app: there are no projects or iCloud, Color tools or Compare. The current session is saved on the iPad as you work and reopens at
 launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
@@ -52,6 +51,9 @@ automatically.
   to slide it; what's cut off shows faintly. Free, Original or Square; Reset;
   Cancel or Done. The crop moves, scales and turns with the image, and Crop
   again brings back what you cut.
+- **Undo / redo**: the top-bar buttons, a two-finger tap to undo, a
+  three-finger tap to redo, or ⌘Z / ⇧⌘Z. A gesture, an opacity drag or a
+  whole crop is one step; selecting a layer isn't.
 - Compare the colors with the Mac prototype and with the real canvas.
 - **Full screen** (top right) for working at the easel; the faint button
   top-left comes back.
@@ -63,6 +65,7 @@ automatically.
 |---|---|
 | `CanvasTransferTestApp.swift` | App entry |
 | `Autosave.swift` | Saves the session (session.json and a PNG per layer) and opens it at launch |
+| `History.swift` | Undo and redo: a step per settled change, holds for gestures, drags and crops |
 | `Model.swift` | Layer (look, placement), the session, canvas sizes |
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |

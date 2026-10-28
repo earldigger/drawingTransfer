@@ -35,6 +35,30 @@ extension TransferSession {
             },
             selectedID: selectedID)
     }
+
+    /// Makes the session match `snapshot`. Layers that are already here are
+    /// updated in place; others are made from `images` (a layer without one
+    /// is skipped).
+    func apply(_ snapshot: SessionSnapshot, images: (UUID) -> UIImage?) {
+        canvasSize = snapshot.canvasSize
+        let existing = Dictionary(uniqueKeysWithValues: layers.map { ($0.id, $0) })
+        layers = snapshot.layers.compactMap { state in
+            guard let layer = existing[state.id]
+                ?? images(state.id).map({ Layer(id: state.id, name: state.name, image: $0, canvasAspect: canvasAspect) })
+            else { return nil }
+            layer.name = state.name
+            layer.opacity = state.opacity
+            layer.blend = state.blend
+            layer.isVisible = state.isVisible
+            layer.center = state.center
+            layer.width = state.width
+            layer.rotation = .radians(state.rotation)
+            layer.crop = state.crop
+            return layer
+        }
+        selectedID = snapshot.selectedID.flatMap { id in layers.contains { $0.id == id } ? id : nil }
+            ?? layers.last?.id
+    }
 }
 
 /// The current session, kept on the iPad in Application Support/Session:
@@ -52,23 +76,11 @@ enum SessionStore {
         guard let data = try? Data(contentsOf: file) else { return session }
         do {
             let saved = try JSONDecoder().decode(SessionSnapshot.self, from: data)
-            session.canvasSize = saved.canvasSize
-            for state in saved.layers {
-                guard let image = UIImage(contentsOfFile: imageURL(state.id).path) else {
-                    saveLog.error("No image for layer \(state.id), skipped it")
-                    continue
-                }
-                let layer = Layer(id: state.id, name: state.name, image: image, canvasAspect: session.canvasAspect)
-                layer.opacity = state.opacity
-                layer.blend = state.blend
-                layer.isVisible = state.isVisible
-                layer.center = state.center
-                layer.width = state.width
-                layer.rotation = .radians(state.rotation)
-                layer.crop = state.crop
-                session.layers.append(layer)
+            session.apply(saved) { id in
+                let image = UIImage(contentsOfFile: imageURL(id).path)
+                if image == nil { saveLog.error("No image for layer \(id), skipped it") }
+                return image
             }
-            session.selectedID = saved.selectedID.flatMap { id in session.layers.contains { $0.id == id } ? id : nil }
             saveLog.notice("Opened the saved session: \(session.layers.count) layers")
         } catch {
             saveLog.error("Couldn't read session.json, starting empty: \(error)")
