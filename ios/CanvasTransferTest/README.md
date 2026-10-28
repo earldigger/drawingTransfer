@@ -6,8 +6,8 @@ A small iPad app that tests the three things the Python prototype can't:
    the camera view, and finds the corners again on the photo you take.
 2. **Pencil and touch** — dragging corners with a loupe, and moving, pinching
    and twisting a reference into place.
-3. **Color on the iPad** — a canvas photo with a reference at Multiply 60 %
-   (with auto levels) on top, opacity, and full screen.
+3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
+   stacked as layers, opacity, and full screen.
 
 It is not the app: nothing is saved, there is no iCloud, Color tools, Compare,
 crop or undo. Names and defaults follow `docs/design/README.md`.
@@ -42,21 +42,20 @@ automatically.
   Note when it fails.
 - Take the photo: are the corners already right? Drag them — is the loupe
   where you need it, with finger and with Pencil?
-- **Add layer** as Canvas, then Camera again for a drawing as Reference (the
-  camera offers them in that order). The reference lands at Multiply 60 %
-  with Transform on: one finger moves it, pinch scales, twist rotates.
+- **Add layer**: every image lands at Multiply 60 % with auto levels and
+  Transform on: one finger moves it, pinch scales, twist rotates.
 - Compare the colors with the Mac prototype and with the real canvas.
 - **Full screen** (top right) for working at the easel; the faint button
   top-left comes back.
-- Photos (left strip) adds a canvas photo or reference from your library.
+- Photos (left strip) adds an image from your library.
 
 ## Files
 
 | File | What it does |
 |---|---|
 | `CanvasTransferTestApp.swift` | App entry |
-| `Model.swift` | Layer (kind, look, placement), the session, canvas sizes |
+| `Model.swift` | Layer (look, placement), the session, canvas sizes |
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
-| `CornersScreen.swift` | Adjust corners (handles, loupe, Canvas \| Reference); the capture flow |
+| `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
 | `WorkspaceView.swift` | Canvas, layers, Look bar, transform gestures, full screen |

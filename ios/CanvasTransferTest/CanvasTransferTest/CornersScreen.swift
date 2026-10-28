@@ -5,7 +5,6 @@ import UIKit
 /// is dimmed, and a loupe shows the corner being dragged.
 struct CornersScreen: View {
     let image: UIImage
-    @Binding var kind: LayerKind
     var onAdd: (Corners) -> Void
     var onRetake: (() -> Void)?
     var onCancel: () -> Void
@@ -14,10 +13,9 @@ struct CornersScreen: View {
     private let detected: Corners
     @State private var dragging: Int? = nil
 
-    init(image: UIImage, corners: Corners, kind: Binding<LayerKind>, onAdd: @escaping (Corners) -> Void,
+    init(image: UIImage, corners: Corners, onAdd: @escaping (Corners) -> Void,
          onRetake: (() -> Void)?, onCancel: @escaping () -> Void) {
         self.image = image
-        _kind = kind
         self.onAdd = onAdd
         self.onRetake = onRetake
         self.onCancel = onCancel
@@ -109,14 +107,7 @@ struct CornersScreen: View {
                 Button("Cancel", action: onCancel).foregroundStyle(.secondary)
             }
             Text("Adjust corners").font(.headline)
-            Text("Use as").font(.caption).foregroundStyle(.secondary)
-            Picker("Use as", selection: $kind) {
-                ForEach(LayerKind.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            Text(kind == .canvas
-                 ? "Fills the canvas exactly, at Normal 100 %. No auto levels."
-                 : "Keeps its proportions, at Multiply 60 % with auto levels.")
+            Text("Keeps its proportions, at Multiply 60 % with auto levels.")
                 .font(.footnote).foregroundStyle(.secondary)
             Button("Reset to detected") { corners = detected }
             Spacer()
@@ -140,27 +131,19 @@ struct CaptureFlow: View {
     let picked: UIImage?  // from Photos; nil = take one with the camera
     var onDone: (Layer?) -> Void
 
-    @State private var kind: LayerKind
     @State private var photo: UIImage? = nil
     @State private var corners: Corners? = nil
-
-    init(kind: LayerKind, picked: UIImage?, canvasAspect: CGFloat, onDone: @escaping (Layer?) -> Void) {
-        self.canvasAspect = canvasAspect
-        self.picked = picked
-        self.onDone = onDone
-        _kind = State(initialValue: kind)
-    }
 
     private var fromPhotos: Bool { picked != nil }
 
     var body: some View {
         Group {
             if let photo, let corners {
-                CornersScreen(image: photo, corners: corners, kind: $kind, onAdd: add,
+                CornersScreen(image: photo, corners: corners, onAdd: add,
                               onRetake: fromPhotos ? nil : { self.photo = nil; self.corners = nil },
                               onCancel: { onDone(nil) })
             } else if !fromPhotos {
-                CameraScreen(kind: $kind, onPhoto: { taken in
+                CameraScreen(onPhoto: { taken in
                     let (image, found) = Self.prepare(taken, fromPhotos: false)
                     photo = image
                     corners = found
@@ -190,8 +173,7 @@ struct CaptureFlow: View {
 
     private func add(_ corners: Corners) {
         guard let photo else { return }
-        let image = ImageOps.layerImage(from: photo, corners: corners, kind: kind)
-        let name = kind == .canvas ? "Canvas · \(Date().formatted(.dateTime.month(.abbreviated).day()))" : "Reference"
-        onDone(Layer(kind: kind, name: name, image: image, canvasAspect: canvasAspect))
+        let image = ImageOps.layerImage(from: photo, corners: corners)
+        onDone(Layer(name: "Image", image: image, canvasAspect: canvasAspect))
     }
 }

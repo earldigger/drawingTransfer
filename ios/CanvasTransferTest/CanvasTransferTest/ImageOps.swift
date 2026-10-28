@@ -113,10 +113,9 @@ enum ImageOps {
         return Corners(points: [pixel(r.topLeft), pixel(r.topRight), pixel(r.bottomRight), pixel(r.bottomLeft)])
     }
 
-    /// The finished layer image: corrected, and for a reference, auto levels.
-    static func layerImage(from photo: UIImage, corners: Corners, kind: LayerKind) -> UIImage {
+    /// The finished layer image: corrected, then auto levels.
+    static func layerImage(from photo: UIImage, corners: Corners) -> UIImage {
         let corrected = perspectiveCorrect(photo, corners: corners)
-        guard kind == .reference else { return corrected }  // a canvas photo's values stay true
         let levels = autoLevels(corrected)
         return applyLevels(corrected, black: levels.black, white: levels.white)
     }

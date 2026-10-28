@@ -2,14 +2,6 @@ import Observation
 import SwiftUI
 import UIKit
 
-/// What a layer is for. Names follow docs/design/README.md.
-enum LayerKind: String, CaseIterable, Identifiable {
-    case canvas = "Canvas"  // a photo of the real canvas, corrected to fill it exactly
-    case reference = "Reference"  // the photo or drawing being transferred
-
-    var id: String { rawValue }
-}
-
 enum Blend: String, CaseIterable, Identifiable {
     case normal = "Normal"
     case multiply = "Multiply"
@@ -35,26 +27,20 @@ struct Corners: Equatable {
 @Observable
 final class Layer: Identifiable {
     let id = UUID()
-    let kind: LayerKind
     var name: String
     let image: UIImage  // corrected and ready to show
-    var opacity: Double
-    var blend: Blend
+    var opacity = 0.6
+    var blend = Blend.multiply  // white paper disappears
     var isVisible = true
-    // Where a reference sits, in fractions of the canvas: its center, its
-    // width, and its rotation. A canvas photo always fills the canvas.
+    // Where the image sits, in fractions of the canvas: its center, its
+    // width, and its rotation.
     var center = CGPoint(x: 0.5, y: 0.5)
     var width: CGFloat = 1
     var rotation: Angle = .zero
 
-    /// A new layer starts with its kind's look: a reference at Multiply 60 %
-    /// (white paper disappears), a canvas photo at Normal 100 %.
-    init(kind: LayerKind, name: String, image: UIImage, canvasAspect: CGFloat) {
-        self.kind = kind
+    init(name: String, image: UIImage, canvasAspect: CGFloat) {
         self.name = name
         self.image = image
-        opacity = kind == .canvas ? 1 : 0.6
-        blend = kind == .canvas ? .normal : .multiply
         fit(canvasAspect: canvasAspect)
     }
 
@@ -84,21 +70,9 @@ final class TransferSession {
     var canvasAspect: CGFloat { canvasSize.width / canvasSize.height }
     var selected: Layer? { layers.first { $0.id == selectedID } }
 
-    /// What Camera offers first: a canvas photo until there is one, then a
-    /// reference until there is one, then canvas photos as the painting goes on.
-    var nextKind: LayerKind {
-        if !layers.contains(where: { $0.kind == .canvas }) { return .canvas }
-        if !layers.contains(where: { $0.kind == .reference }) { return .reference }
-        return .canvas
-    }
-
-    /// References go on top; a canvas photo goes just under the lowest reference.
+    /// New images go on top.
     func add(_ layer: Layer) {
-        if layer.kind == .canvas, let index = layers.firstIndex(where: { $0.kind == .reference }) {
-            layers.insert(layer, at: index)
-        } else {
-            layers.append(layer)
-        }
+        layers.append(layer)
         selectedID = layer.id
     }
 

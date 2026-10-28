@@ -87,7 +87,8 @@ final class CameraController: UIViewController {
         session.commitConfiguration()
         session.startRunning()
 
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
             // Keeps the preview and the photo level however the iPad is held.
             let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: self.previewLayer)
             self.rotation = coordinator
@@ -136,9 +137,8 @@ struct CameraPreview: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: CameraController, context: Context) {}
 }
 
-/// Capture: full screen, Canvas | Reference chosen before the shot, shutter on the right.
+/// Capture: full screen, shutter on the right.
 struct CameraScreen: View {
-    @Binding var kind: LayerKind
     var onPhoto: (UIImage) -> Void
     var onCancel: () -> Void
 
@@ -162,13 +162,6 @@ struct CameraScreen: View {
                     Spacer()
                 }
                 Spacer()
-                Picker("Use as", selection: $kind) {
-                    ForEach(LayerKind.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 260)
-                .padding(6)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.black.opacity(0.6)))
             }
             .padding()
             .padding(.trailing, 110)

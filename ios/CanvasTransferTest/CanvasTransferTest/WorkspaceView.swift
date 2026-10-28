@@ -5,7 +5,6 @@ import UIKit
 /// One photo on its way in, from Camera (`picked == nil`) or Photos.
 struct Capture: Identifiable {
     let id = UUID()
-    let kind: LayerKind
     let picked: UIImage?
 }
 
@@ -18,7 +17,6 @@ struct WorkspaceView: View {
     @State private var capture: Capture? = nil
     @State private var showPhotos = false
     @State private var photoItem: PhotosPickerItem? = nil
-    @State private var photosKind: LayerKind = .reference
     @State private var transformOn = false
     @State private var fullScreen = false
     @State private var viewScale: CGFloat = 1
@@ -51,11 +49,11 @@ struct WorkspaceView: View {
         .environment(\.colorScheme, .dark)
         .statusBarHidden(fullScreen)
         .fullScreenCover(item: $capture) { c in
-            CaptureFlow(kind: c.kind, picked: c.picked, canvasAspect: session.canvasAspect) { layer in
+            CaptureFlow(canvasAspect: session.canvasAspect, picked: c.picked) { layer in
                 capture = nil
                 if let layer {
                     session.add(layer)
-                    transformOn = layer.kind == .reference  // place a new reference straight away
+                    transformOn = true  // place a new image straight away
                 }
             }
         }
@@ -64,7 +62,7 @@ struct WorkspaceView: View {
             guard let item else { return }
             Task {
                 if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
-                    capture = Capture(kind: photosKind, picked: image)
+                    capture = Capture(picked: image)
                 }
                 photoItem = nil
             }
@@ -84,7 +82,7 @@ struct WorkspaceView: View {
         .compositingGroup()  // so Multiply blends with the layers below, not the background
         .clipped()
         .overlay {
-            if transformOn, let layer = session.selected, layer.kind == .reference {
+            if transformOn, let layer = session.selected {
                 let w = layer.width * size.width
                 Rectangle()
                     .stroke(Color.blue, lineWidth: 2)
@@ -97,33 +95,24 @@ struct WorkspaceView: View {
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
     }
 
-    @ViewBuilder
     private func layerView(_ layer: Layer, canvas: CGSize) -> some View {
-        if layer.kind == .canvas {
-            Image(uiImage: layer.image)
-                .resizable()
-                .frame(width: canvas.width, height: canvas.height)
-                .opacity(layer.opacity)
-                .blendMode(layer.blend.mode)
-        } else {
-            let w = layer.width * canvas.width
-            Image(uiImage: layer.image)
-                .resizable()
-                .frame(width: w, height: w / layer.aspect)
-                .rotationEffect(layer.rotation)
-                .position(x: layer.center.x * canvas.width, y: layer.center.y * canvas.height)
-                .opacity(layer.opacity)
-                .blendMode(layer.blend.mode)
-        }
+        let w = layer.width * canvas.width
+        return Image(uiImage: layer.image)
+            .resizable()
+            .frame(width: w, height: w / layer.aspect)
+            .rotationEffect(layer.rotation)
+            .position(x: layer.center.x * canvas.width, y: layer.center.y * canvas.height)
+            .opacity(layer.opacity)
+            .blendMode(layer.blend.mode)
     }
 
-    /// Transform on: one finger moves the reference, pinch scales, twist rotates.
+    /// Transform on: one finger moves the selected image, pinch scales, twist rotates.
     /// Transform off: the same gestures pan and zoom the view; double-tap fits.
     private func canvasGesture(canvas: CGSize) -> some Gesture {
         SimultaneousGesture(SimultaneousGesture(DragGesture(), MagnifyGesture()), RotateGesture())
             .onChanged { value in
                 let drag = value.first?.first, magnify = value.first?.second, rotate = value.second
-                if let layer = session.selected, transformOn, layer.kind == .reference {
+                if let layer = session.selected, transformOn {
                     if gestureStart == nil {
                         gestureStart = (layer.center, layer.width, layer.rotation, viewScale, viewOffset)
                     }
@@ -196,18 +185,12 @@ struct WorkspaceView: View {
 
     private var toolStrip: some View {
         VStack(spacing: 6) {
-            toolButton("camera", "Camera") { capture = Capture(kind: session.nextKind, picked: nil) }
-            Menu {
-                Button("Reference from Photos") { photosKind = .reference; showPhotos = true }
-                Button("Canvas photo from Photos") { photosKind = .canvas; showPhotos = true }
-            } label: {
-                toolIcon("photo.on.rectangle", on: false)
-            }
-            .accessibilityLabel("Photos")
+            toolButton("camera", "Camera") { capture = Capture(picked: nil) }
+            toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
             toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn) {
                 transformOn.toggle()
             }
-            .disabled(session.selected?.kind != .reference)
+            .disabled(session.selected == nil)
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
@@ -230,7 +213,6 @@ struct WorkspaceView: View {
             ForEach(session.layers.reversed()) { layer in  // top layer first
                 Button {
                     session.selectedID = layer.id
-                    if layer.kind != .reference { transformOn = false }
                 } label: {
                     Image(uiImage: layer.image)
                         .resizable()
@@ -275,8 +257,8 @@ struct WorkspaceView: View {
     }
 }
 
-/// The selected layer's Look, cut down: opacity first and largest, blend, and
-/// for a reference, Transform and Fit.
+/// The selected layer's Look, cut down: opacity first and largest, blend,
+/// Transform and Fit.
 struct LookBar: View {
     @Bindable var layer: Layer
     @Binding var transformOn: Bool
@@ -293,10 +275,8 @@ struct LookBar: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 200)
-            if layer.kind == .reference {
-                Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
-                Button("Fit") { layer.fit(canvasAspect: canvasAspect) }
-            }
+            Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
+            Button("Fit") { layer.fit(canvasAspect: canvasAspect) }
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
