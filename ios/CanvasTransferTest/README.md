@@ -54,6 +54,10 @@ automatically.
 - **Undo / redo**: the top-bar buttons, a two-finger tap to undo, a
   three-finger tap to redo, or ⌘Z / ⇧⌘Z. A gesture, an opacity drag or a
   whole crop is one step; selecting a layer isn't.
+- **Grid** (left strip): rows and columns, Square cells, color and opacity.
+  It's saved with the session but isn't an undo step.
+- **Share** (top right): the canvas as a full-resolution JPEG, with or
+  without the grid, through the share sheet (AirDrop to the Mac, Files).
 - Compare the colors with the Mac prototype and with the real canvas.
 - **Full screen** (top right) for working at the easel; the faint button
   top-left comes back.
@@ -70,6 +74,7 @@ automatically.
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
-| `WorkspaceView.swift` | Canvas, layers, Look bar, transform gestures, full screen |
+| `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
+| `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |
 | `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |
 | `Crop.swift` | Crop math (same as the prototype), crop frame and handles, Crop bar |

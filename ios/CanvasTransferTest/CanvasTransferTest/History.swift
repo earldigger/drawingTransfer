@@ -8,8 +8,8 @@ import UIKit
 /// so a deleted layer can come back). A step is recorded once the session
 /// settles after a change, so a gesture, a slider drag or a whole crop is
 /// one step: views `hold` the history while one of those is under way, and
-/// nothing is recorded until every hold is released. Selecting a layer
-/// isn't a step.
+/// nothing is recorded until every hold is released. Selecting a layer and
+/// changing the grid aren't steps.
 @Observable
 final class History {
     struct Step {
@@ -81,7 +81,7 @@ final class History {
         pending = nil
         guard holds.isEmpty else { return }
         let now = Step(session)
-        if now.snapshot.ignoringSelection != committed.snapshot.ignoringSelection {
+        if now.snapshot.edits != committed.snapshot.edits {
             undoStack.append(committed)
             if undoStack.count > Self.limit { undoStack.removeFirst() }
             redoStack.removeAll()
@@ -91,14 +91,19 @@ final class History {
 
     private func restore(_ step: Step) {
         committed = step
-        session.apply(step.snapshot) { step.images[$0] }
+        var snapshot = step.snapshot
+        snapshot.grid = session.grid  // the grid stays as it is
+        session.apply(snapshot) { step.images[$0] }
     }
 }
 
 extension SessionSnapshot {
-    var ignoringSelection: SessionSnapshot {
+    /// What undo cares about: not the selection, and not the grid, which is
+    /// a way of looking rather than an edit.
+    var edits: SessionSnapshot {
         var copy = self
         copy.selectedID = nil
+        copy.grid = nil
         return copy
     }
 }

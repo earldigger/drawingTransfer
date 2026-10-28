@@ -26,6 +26,10 @@ struct WorkspaceView: View {
     // Transform was on (it comes back after Done).
     @State private var cropping: (id: UUID, before: CGRect, wasTransforming: Bool)? = nil
     @State private var cropShape: CropShape = .free
+    @State private var gridBarShown = false
+    @State private var exporting = false  // rendering the image to share
+    @State private var shareFile: ShareFile? = nil
+    @State private var shareFailed = false
 
     var body: some View {
         GeometryReader { geo in
@@ -47,10 +51,21 @@ struct WorkspaceView: View {
                 } else {
                     chrome
                 }
+                if exporting {
+                    ProgressView("Preparing image…")
+                        .padding(24)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+                }
             }
         }
         .environment(\.colorScheme, .dark)
         .statusBarHidden(fullScreen)
+        .sheet(item: $shareFile) { file in
+            ShareSheet(items: [file.url]) { shareFile = nil }
+        }
+        .alert("Couldn't make the image", isPresented: $shareFailed) {
+            Button("OK", role: .cancel) {}
+        }
         .fullScreenCover(item: $capture) { c in
             CaptureFlow(canvasAspect: session.canvasAspect, picked: c.picked) { layer in
                 capture = nil
@@ -99,15 +114,9 @@ struct WorkspaceView: View {
     // MARK: canvas
 
     private func canvas(size: CGSize) -> some View {
-        ZStack {
-            Rectangle().fill(Color.white)
-            ForEach(session.layers) { layer in
-                if layer.isVisible { layerView(layer, canvas: size) }
-            }
-        }
-        .frame(width: size.width, height: size.height)
-        .clipped()  // first, so the group below is only ever canvas-sized
-        .compositingGroup()  // so Multiply blends with the layers below, not the background
+        CanvasContent(layers: session.layers, size: size, grid: session.grid.isOn ? session.grid : nil,
+                      gridLineWidth: 1.5 / viewScale,  // the same thickness on screen at any zoom
+                      faintFullImageOf: cropping?.id)
         .allowsHitTesting(false)  // touches go to the gesture view underneath
         .overlay {
             if let cropping, let layer = session.selected, layer.id == cropping.id {
@@ -126,34 +135,6 @@ struct WorkspaceView: View {
             }
         }
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
-    }
-
-    /// The layer's image, clipped to its crop. While it is being cropped, the
-    /// whole image also shows faintly underneath, so you see what's cut off.
-    @ViewBuilder
-    private func layerView(_ layer: Layer, canvas: CGSize) -> some View {
-        let w = layer.width * canvas.width, h = w / layer.aspect, c = layer.crop
-        let image = Image(uiImage: layer.image).resizable().frame(width: w, height: h)
-        if cropping?.id == layer.id {
-            placed(image, layer, canvas: canvas, opacity: layer.opacity * 0.3)
-        }
-        // Clipped, not masked: a mask is drawn offscreen at the image's full
-        // size, and past the iPad's texture limit a large image vanished.
-        let cropped = image
-            .offset(x: -c.minX * w, y: -c.minY * h)
-            .frame(width: c.width * w, height: c.height * h, alignment: .topLeading)
-            .clipped()
-            .offset(x: c.minX * w, y: c.minY * h)
-            .frame(width: w, height: h, alignment: .topLeading)
-        placed(cropped, layer, canvas: canvas, opacity: layer.opacity)
-    }
-
-    private func placed(_ content: some View, _ layer: Layer, canvas: CGSize, opacity: Double) -> some View {
-        content
-            .rotationEffect(layer.rotation)
-            .position(x: layer.center.x * canvas.width, y: layer.center.y * canvas.height)
-            .opacity(opacity)
-            .blendMode(layer.blend.mode)
     }
 
     /// Transform on: one or two fingers move the selected image, pinch scales,
@@ -207,17 +188,32 @@ struct WorkspaceView: View {
                 layerBar.padding(12)
             }
             Spacer()
-            if let layer = session.selected {
-                if cropping?.id == layer.id {
+            Group {
+                if let cropping, let layer = session.selected, layer.id == cropping.id {
                     CropBar(layer: layer, shape: $cropShape,
                             onCancel: { finishCrop(keep: false) }, onDone: { finishCrop(keep: true) })
-                        .padding(.bottom, 12)
-                } else {
+                } else if gridBarShown {
+                    GridBar(session: session) { gridBarShown = false }
+                } else if let layer = session.selected {
                     LookBar(layer: layer, transformOn: $transformOn, canvasAspect: session.canvasAspect,
                             onCrop: { startCrop(layer) })
-                        .padding(.bottom, 12)
                 }
             }
+            .padding(.bottom, 12)
+        }
+    }
+
+    // MARK: share
+
+    /// Renders the canvas at full resolution, then opens the share sheet.
+    private func share(withGrid: Bool) {
+        finishCrop(keep: true)
+        exporting = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))  // let "Preparing image…" show before the render
+            let url = CanvasExport.render(session, withGrid: withGrid)
+            exporting = false
+            if let url { shareFile = ShareFile(url: url) } else { shareFailed = true }
         }
     }
 
@@ -252,6 +248,18 @@ struct WorkspaceView: View {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
             }
             .accessibilityLabel("Full screen")
+            .padding(.leading, 12)
+            Menu {
+                Button("Share image", systemImage: "photo") { share(withGrid: false) }
+                if session.grid.isOn {
+                    Button("Share image with grid", systemImage: "square.grid.3x3") { share(withGrid: true) }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Share")
+            .disabled(exporting)
+            .padding(.leading, 12)
         }
         .padding(.horizontal, 16)
         .frame(height: 52)
@@ -266,6 +274,15 @@ struct WorkspaceView: View {
                 transformOn.toggle()
             }
             .disabled(session.selected == nil || cropping != nil)
+            toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
+                finishCrop(keep: true)
+                if gridBarShown {
+                    gridBarShown = false
+                } else {
+                    gridBarShown = true
+                    session.grid.isOn = true  // opening Grid shows it
+                }
+            }
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
@@ -359,6 +376,53 @@ struct LookBar: View {
             Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
             Button("Fit") { layer.fit(canvasAspect: canvasAspect) }
             Button("Crop", systemImage: "crop", action: onCrop)
+        }
+        .padding(.horizontal, 16)
+        .frame(height: 56)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+}
+
+/// One rendered image on its way to the share sheet.
+struct ShareFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// The Grid tool's options: shown, rows and columns, square cells, color and opacity.
+struct GridBar: View {
+    @Bindable var session: TransferSession
+    var onDone: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Toggle("Grid", systemImage: "square.grid.3x3", isOn: $session.grid.isOn)
+                .toggleStyle(.button)
+            Stepper("Rows \(session.grid.rows)", value: $session.grid.rows, in: GridSettings.range)
+                .fixedSize()
+            Stepper("Columns \(session.grid.columns)", value: $session.grid.columns, in: GridSettings.range)
+                .fixedSize()
+            Button("Square cells") { session.grid.squareCells(canvasAspect: session.canvasAspect) }
+            HStack(spacing: 8) {
+                ForEach(GridColor.allCases) { color in
+                    Button {
+                        session.grid.color = color
+                    } label: {
+                        Circle()
+                            .fill(color.color)
+                            .frame(width: 26, height: 26)
+                            .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
+                            .padding(3)
+                            .overlay(Circle().stroke(Color.blue, lineWidth: session.grid.color == color ? 3 : 0))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(color.rawValue.capitalized)
+                    .accessibilityAddTraits(session.grid.color == color ? .isSelected : [])
+                }
+            }
+            Text("Opacity")
+            Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
+            Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)

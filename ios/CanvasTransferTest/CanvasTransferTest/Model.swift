@@ -76,6 +76,7 @@ final class TransferSession {
     var canvasSize = CGSize(width: 16, height: 20)  // inches, portrait
     var layers: [Layer] = []  // bottom to top
     var selectedID: UUID?
+    var grid = GridSettings()
 
     var canvasAspect: CGFloat { canvasSize.width / canvasSize.height }
     var selected: Layer? { layers.first { $0.id == selectedID } }
@@ -89,6 +90,38 @@ final class TransferSession {
     func delete(_ layer: Layer) {
         layers.removeAll { $0.id == layer.id }
         if selectedID == layer.id { selectedID = layers.last?.id }
+    }
+}
+
+/// A grid over the canvas for transferring by eye: evenly spaced rows and
+/// columns, as in the prototype (`GridSettings` in canvastransfer/models.py).
+struct GridSettings: Codable, Equatable {
+    static let range = 1...40
+
+    var isOn = false
+    var rows = 4
+    var columns = 4
+    var color = GridColor.red
+    var opacity = 0.6
+
+    /// Columns that make the cells as close to square as the rows allow.
+    mutating func squareCells(canvasAspect: CGFloat) {
+        columns = min(max(Int((CGFloat(rows) * canvasAspect).rounded()), GridSettings.range.lowerBound),
+                      GridSettings.range.upperBound)
+    }
+}
+
+enum GridColor: String, CaseIterable, Codable, Identifiable {
+    case red, black, white, blue
+
+    var id: String { rawValue }
+    var color: Color {
+        switch self {
+        case .red: Color(red: 1, green: 40 / 255, blue: 40 / 255)  // the prototype's default
+        case .black: .black
+        case .white: .white
+        case .blue: .blue
+        }
     }
 }
 
