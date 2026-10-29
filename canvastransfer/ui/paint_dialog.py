@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -92,6 +93,17 @@ class PaintDialog(QDialog):
         self.drying = QLineEdit(paint.drying if paint else "")
         self.drying.setPlaceholderText("e.g. fast, medium, 3-5 days")
         form.addRow("Drying time", self.drying)
+        self.strength = QDoubleSpinBox()
+        self.strength.setRange(0.1, 10.0)
+        self.strength.setDecimals(2)
+        self.strength.setSingleStep(0.1)
+        self.strength.setPrefix("×")
+        self.strength.setValue(paint.strength if paint else 1.0)
+        self.strength.setToolTip(
+            "Tinting strength, from your own tints with white. 1 = as the mixing model expects. "
+            "3 = one part does what three parts would: if 1 part paint to 3 white looks like the app's "
+            "1:1 mix, set 3. Recipes then ask for less of it.")
+        form.addRow("Strength", self.strength)
 
         color_row = QHBoxLayout()
         self.color_text = QLineEdit()
@@ -204,6 +216,7 @@ class PaintDialog(QDialog):
         p.opacity = self.opacity.currentData()
         p.lightfastness = self.lightfastness.currentText().strip()
         p.drying = self.drying.text().strip()
+        p.strength = round(self.strength.value(), 2)
         p.stand_in = self.stand_in.currentData() if p.lab is None else None
         p.note_edits(before)
         return p
