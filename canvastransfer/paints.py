@@ -65,6 +65,7 @@ class Paint:
     url: str = ""
     # yours, kept when the collection is imported again
     drying: str = ""  # drying time, as you write it ("fast", "2-3 days")
+    strength: float = 1.0  # tinting strength: 3 = one part does what three parts of an average paint do
     favorite: bool = False
     enabled: bool = True  # offered in matches and mixes
     stand_in: str | None = None  # None: automatic, "": no stand-in, else a paint id

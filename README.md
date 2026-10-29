@@ -158,6 +158,12 @@ workflow can be tried and iterated on quickly. See "Porting to Swift" below.
 - Mixbox treats every paint as equally strong, so the recipes are good at
   naming paints and weak on amounts: strong pigments (phthalos) need much
   less than they say, weak ones more
+- **Strength** in Edit Paint: how strong a paint is compared with what the
+  mixing model expects (1 = as expected). If 1 part paint to 3 parts white
+  looks like the app's 1:1 mix, set ×3; recipes then ask for a third as
+  much of it, and the paint is marked "(strength ×3)" in recipes. Your own
+  tints are the only source: e.g. Old Holland Old Delft Blue measured ×3
+  against Mixbox, Brown Ochre Deep ×1
 - **Mixing: Mixbox | Kubelka-Munk** on the Paints tab. Kubelka-Munk is the
   published paint physics (free for a paid app; Mixbox is not), run on the
   smoothest spectrum that matches each paint's color, with each paint

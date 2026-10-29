@@ -227,3 +227,14 @@ def test_mixing_model_choice_and_cross_check(window, qapp):
     assert panel.mix_model().name == "Kubelka-Munk"
     assert panel.result().pairs  # no closeness check: tints of near-black paints are where the models differ
     assert "Mixbox: ΔE" in panel.pairs.item(0).text()
+
+
+def test_edit_paint_sets_strength(window):
+    from canvastransfer.paints import Paint, PaintLibrary
+    from canvastransfer.ui.paint_dialog import PaintDialog
+
+    blue = Paint(id="b", medium="oil", brand="B", name="Delft", lab=(5.4, 9.6, -19.7))
+    dialog = PaintDialog(PaintLibrary([blue]), blue)
+    assert dialog.strength.value() == 1.0
+    dialog.strength.setValue(3.0)
+    assert dialog.result_paint().strength == 3.0
