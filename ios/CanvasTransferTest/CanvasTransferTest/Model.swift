@@ -19,7 +19,7 @@ enum Blend: String, CaseIterable, Identifiable, Codable {
 
 /// Four corners in a photo's pixels (origin top-left), in the order
 /// top-left, top-right, bottom-right, bottom-left.
-struct Corners: Equatable {
+struct Corners: Codable, Equatable {
     var points: [CGPoint]
 
     static func inset(_ size: CGSize, by fraction: CGFloat) -> Corners {
@@ -35,7 +35,16 @@ struct Corners: Equatable {
 final class Layer: Identifiable {
     let id: UUID
     var name: String
-    let image: UIImage  // corrected and ready to show
+    private(set) var image: UIImage  // corrected and ready to show
+    /// Names the image's file and its undo copy; new whenever Edit corners
+    /// remakes the image. A layer from before that is named by its own id.
+    private(set) var imageID: UUID
+    // The upright photo the image was corrected from, and the corners used,
+    // in its pixels, so Edit corners can start where you left off. Nil for
+    // layers added before photos were kept.
+    var source: UIImage? = nil
+    var sourceID: UUID? = nil  // names its file; shared by duplicates
+    var corners: Corners? = nil
     var opacity = 0.6
     var blend = Blend.multiply  // white paper disappears
     var isVisible = true
@@ -60,12 +69,28 @@ final class Layer: Identifiable {
     /// reference, while keeping the image a size the iPad can draw.
     static let maxWidth: CGFloat = 12
 
-    init(id: UUID = UUID(), name: String, image: UIImage, canvasAspect: CGFloat) {
+    init(id: UUID = UUID(), name: String, image: UIImage, imageID: UUID? = nil, canvasAspect: CGFloat) {
         self.id = id
         self.name = name
         self.image = image
+        self.imageID = imageID ?? id
         shownImage = image
         fit(canvasAspect: canvasAspect)
+    }
+
+    /// A new image for the layer (Edit corners, or undoing it). Placement,
+    /// crop and adjustments stay; the height follows the new proportions.
+    func replaceImage(_ image: UIImage, id: UUID = UUID()) {
+        self.image = image
+        imageID = id
+        refreshShownImage()
+    }
+
+    /// Remakes the image from `source` with new corners, as Add layer does.
+    func applyCorners(_ newCorners: Corners) {
+        guard let source else { return }
+        corners = newCorners
+        replaceImage(ImageOps.layerImage(from: source, corners: newCorners))
     }
 
     /// One render at a time, always of the latest adjustments: while a
@@ -84,7 +109,8 @@ final class Layer: Identifiable {
         Task { @MainActor in
             let adjusted = await Task.detached(priority: .userInitiated) { Look.adjusted(image, wanted) }.value
             rendering = false
-            if adjustments == wanted { shownImage = adjusted ?? image }
+            if adjustments == wanted && self.image === image { shownImage = adjusted ?? image }
+            else if self.image !== image { renderAgain = true }  // the image changed while rendering
             if renderAgain {
                 renderAgain = false
                 refreshShownImage()
@@ -145,7 +171,10 @@ final class TransferSession {
     /// A copy just above the original, nudged so it shows; selected.
     func duplicate(_ layer: Layer) {
         guard let i = layers.firstIndex(where: { $0.id == layer.id }) else { return }
-        let copy = Layer(name: layer.name, image: layer.image, canvasAspect: canvasAspect)
+        let copy = Layer(name: layer.name, image: layer.image, imageID: layer.imageID, canvasAspect: canvasAspect)
+        copy.source = layer.source
+        copy.sourceID = layer.sourceID
+        copy.corners = layer.corners
         copy.opacity = layer.opacity
         copy.blend = layer.blend
         copy.isVisible = true

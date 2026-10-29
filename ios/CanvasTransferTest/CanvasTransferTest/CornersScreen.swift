@@ -12,6 +12,7 @@ struct CornersScreen: View {
     var onAdd: (Corners) -> Void
     var onRetake: (() -> Void)?
     var onCancel: () -> Void
+    let addTitle: String  // "Add layer", or "Done" when editing a layer's corners
 
     @AppStorage(findRectangleKey) private var findRectangle = true
     @State private var corners: Corners
@@ -21,16 +22,20 @@ struct CornersScreen: View {
 
     /// `notFoundInset`: how far in from the edges the corners start when no
     /// rectangle is found (a camera shot rarely fills the frame exactly).
-    init(image: UIImage, detected: Corners?, notFoundInset: CGFloat, onAdd: @escaping (Corners) -> Void,
+    /// `start`: corners to begin with, when editing a layer's; otherwise they
+    /// come from detection and the Find rectangle setting.
+    init(image: UIImage, detected: Corners?, notFoundInset: CGFloat, start: Corners? = nil,
+         addTitle: String = "Add layer", onAdd: @escaping (Corners) -> Void,
          onRetake: (() -> Void)?, onCancel: @escaping () -> Void) {
         self.image = image
         self.onAdd = onAdd
         self.onRetake = onRetake
         self.onCancel = onCancel
+        self.addTitle = addTitle
         self.detected = detected
         notFound = Corners.inset(image.size, by: notFoundInset)
         let find = UserDefaults.standard.object(forKey: findRectangleKey) as? Bool ?? true
-        _corners = State(initialValue: find ? detected ?? notFound : Corners.inset(image.size, by: 0))
+        _corners = State(initialValue: start ?? (find ? detected ?? notFound : Corners.inset(image.size, by: 0)))
     }
 
     private var wholePhoto: Corners { Corners.inset(image.size, by: 0) }
@@ -136,7 +141,7 @@ struct CornersScreen: View {
             Button {
                 onAdd(corners)
             } label: {
-                Text("Add layer").frame(maxWidth: .infinity).padding(.vertical, 6)
+                Text(addTitle).frame(maxWidth: .infinity).padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
         }
@@ -191,6 +196,10 @@ struct CaptureFlow: View {
     private func add(_ corners: Corners) {
         guard let photo else { return }
         let image = ImageOps.layerImage(from: photo, corners: corners)
-        onDone(Layer(name: "Image", image: image, canvasAspect: canvasAspect))
+        let layer = Layer(name: "Image", image: image, canvasAspect: canvasAspect)
+        layer.source = photo  // kept, so Edit corners can change them later
+        layer.sourceID = UUID()
+        layer.corners = corners
+        onDone(layer)
     }
 }

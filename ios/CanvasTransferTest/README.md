@@ -62,8 +62,9 @@ automatically.
   marks A and B.
 - **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
   opacity. Long-press a layer to move it up or down, to the front or back,
-  duplicate, hide or delete it. **Flip** (Look bar) mirrors it horizontally
-  or vertically.
+  duplicate, hide or delete it. The Look bar's **⋯** has Fit, Flip
+  horizontal / vertical, and **Edit corners…**, which reopens Adjust corners
+  on the original photo (kept since this build) and keeps the placement.
 - **Grid** (left strip): rows and columns, Square cells, color and opacity.
   It's saved with the session but isn't an undo step.
 - **Share** (top right): the canvas as a full-resolution JPEG, with or

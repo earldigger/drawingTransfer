@@ -32,6 +32,7 @@ struct WorkspaceView: View {
     @State private var exporting = false  // rendering the image to share
     @State private var shareFile: ShareFile? = nil
     @State private var shareFailed = false
+    @State private var editingCorners: CornerEdit? = nil
     @State private var layerBarExpanded = false  // names, eye, blend · opacity; collapsed by default (decision H)
 
     var body: some View {
@@ -78,6 +79,15 @@ struct WorkspaceView: View {
                 }
             }
         }
+        .fullScreenCover(item: $editingCorners) { edit in
+            if let source = edit.layer.source {
+                CornersScreen(image: source, detected: edit.detected, notFoundInset: 0, start: edit.layer.corners,
+                              addTitle: "Done", onAdd: { corners in
+                                  edit.layer.applyCorners(corners)  // one undo step
+                                  editingCorners = nil
+                              }, onRetake: nil, onCancel: { editingCorners = nil })
+            }
+        }
         .photosPicker(isPresented: $showPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
             guard let item else { return }
@@ -111,6 +121,14 @@ struct WorkspaceView: View {
         transformOn = c.wasTransforming
         cropping = nil
         history.release("crop")
+    }
+
+    /// Opens Adjust corners on the layer's original photo, where it left off.
+    private func editCorners(_ layer: Layer) {
+        guard let source = layer.source else { return }
+        finishCrop(keep: true)
+        compare = nil
+        editingCorners = CornerEdit(layer: layer, detected: ImageOps.detectRectangle(in: source))
     }
 
     /// Off while cropping, which has its own Cancel.
@@ -221,7 +239,7 @@ struct WorkspaceView: View {
                     GridBar(session: session) { gridBarShown = false }
                 } else if let layer = session.selected {
                     LookBar(layer: layer, transformOn: $transformOn, canvasAspect: session.canvasAspect,
-                            onCrop: { startCrop(layer) })
+                            onCrop: { startCrop(layer) }, onEditCorners: { editCorners(layer) })
                 }
             }
             .padding(.bottom, 12)
@@ -406,6 +424,8 @@ struct WorkspaceView: View {
             Button("Send to back", systemImage: "square.3.layers.3d.bottom.filled") { session.move(layer, to: 0) }
                 .disabled(number == 1)
             Divider()
+            Button("Edit corners…", systemImage: "perspective") { editCorners(layer) }
+                .disabled(layer.source == nil)
             Button("Duplicate", systemImage: "plus.square.on.square") { session.duplicate(layer) }
             Button(layer.isVisible ? "Hide" : "Show", systemImage: layer.isVisible ? "eye.slash" : "eye") {
                 layer.isVisible.toggle()
@@ -449,12 +469,14 @@ struct WorkspaceView: View {
 }
 
 /// The selected layer's Look, cut down: opacity first and largest, blend,
-/// Adjust (levels, hue / saturation, colorize, invert), Transform, Fit and Crop.
+/// Adjust (levels, hue / saturation, colorize, invert), Transform, Crop, and
+/// ⋯ for Fit, Flip and Edit corners.
 struct LookBar: View {
     @Bindable var layer: Layer
     @Binding var transformOn: Bool
     let canvasAspect: CGFloat
     var onCrop: () -> Void
+    var onEditCorners: () -> Void
 
     @Environment(History.self) private var history
     @State private var adjusting = false
@@ -485,19 +507,30 @@ struct LookBar: View {
             }
             .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
             Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
+            Button("Crop", systemImage: "crop", action: onCrop)
             Menu {
+                Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
                 Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipH.toggle() }
                 Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipV.toggle() }
+                Divider()
+                Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
+                    .disabled(layer.source == nil)  // added before photos were kept
             } label: {
-                Label("Flip", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                Image(systemName: "ellipsis.circle").font(.system(size: 20))
             }
-            Button("Fit") { layer.fit(canvasAspect: canvasAspect) }
-            Button("Crop", systemImage: "crop", action: onCrop)
+            .accessibilityLabel("More")
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
+}
+
+/// A layer whose corners are being edited, and the rectangle found in its photo.
+struct CornerEdit: Identifiable {
+    let layer: Layer
+    let detected: Corners?
+    var id: UUID { layer.id }
 }
 
 /// One rendered image on its way to the share sheet.
