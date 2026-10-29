@@ -36,6 +36,11 @@ struct WorkspaceView: View {
     @State private var shareFailed = false
     @State private var editingCorners: CornerEdit? = nil
     @State private var layerBarExpanded = false  // names, eye, blend · opacity; collapsed by default (decision H)
+    @State private var workspace = Workspace.transfer
+    @State private var pickOn = true  // Color: one finger picks
+    @State private var sampleSize = SampleSize.small
+    @State private var selectedSwatchID: UUID? = nil
+    @State private var probe: (pick: PickProbe, screen: CGPoint)? = nil  // while a finger is picking
 
     var body: some View {
         GeometryReader { geo in
@@ -47,7 +52,8 @@ struct WorkspaceView: View {
             ZStack {
                 (fullScreen ? Color.black : Color(white: 0.23)).ignoresSafeArea()
                 // Under the canvas, which lets touches through except on crop handles.
-                CanvasGestureView(handlers: canvasGestures(canvas: rect.size))
+                CanvasGestureView(handlers: canvasGestures(canvas: rect.size, at: rect),
+                                  picking: workspace == .color && pickOn && !fullScreen)
                 canvas(size: rect.size)
                     .scaleEffect(viewScale)
                     .offset(viewOffset)
@@ -56,6 +62,10 @@ struct WorkspaceView: View {
                     exitFullScreenButton
                 } else {
                     chrome
+                }
+                if let probe {
+                    Loupe(probe: probe.pick, sample: sampleSize)
+                        .position(x: probe.screen.x, y: max(probe.screen.y - 120, 100))  // above the finger
                 }
                 if exporting {
                     ProgressView("Preparing image…")
@@ -106,6 +116,15 @@ struct WorkspaceView: View {
         }
         .onChange(of: transformOn) { _, on in
             if on { noteTransformStart() } else { transformStart = nil }
+        }
+        .onChange(of: workspace) { _, now in
+            // Transfer's tools close in Color, and the reverse.
+            finishCrop(keep: true)
+            transformOn = false
+            compare = nil
+            gridBarShown = false
+            probe = nil
+            if now == .color { pickOn = true }
         }
         .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
         .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
@@ -172,7 +191,42 @@ struct WorkspaceView: View {
                                  onEnd: { history.release("handle") })
             }
         }
+        .overlay {
+            if workspace == .color {
+                SwatchMarkers(swatches: session.swatches, layers: session.layers, canvas: size,
+                              selectedID: selectedSwatchID, scale: viewScale)
+            }
+        }
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+    }
+
+    // MARK: pick
+
+    /// One finger in Color: the loupe follows it, and lifting adds a swatch
+    /// from the selected layer. `screen` is in the workspace's coordinates.
+    private func pick(at screen: CGPoint, finished: Bool?, canvas: CGSize, rect: CGRect) {
+        // From the screen to canvas points, through the view's pan and zoom.
+        let point = CGPoint(x: (screen.x - rect.midX - viewOffset.width) / viewScale + canvas.width / 2,
+                            y: (screen.y - rect.midY - viewOffset.height) / viewScale + canvas.height / 2)
+        guard let layer = session.selected,
+              let found = PickProbe.at(point, layer: layer, canvas: canvas, sample: sampleSize)
+        else {
+            probe = nil
+            return
+        }
+        switch finished {
+        case nil:
+            probe = (found, screen)
+        case true?:
+            probe = nil
+            if let rgb = found.rgb {
+                let swatch = Swatch(layerID: layer.id, u: found.u, v: found.v, red: rgb.0, green: rgb.1, blue: rgb.2)
+                session.swatches.append(swatch)  // one undo step
+                selectedSwatchID = swatch.id
+            }
+        case false?:
+            probe = nil  // a second finger: panning or zooming instead
+        }
     }
 
     /// The layers, or while comparing, the layers Compare shows: in Split, A
@@ -194,7 +248,7 @@ struct WorkspaceView: View {
     /// twist rotates. Transform off: the same gestures pan and zoom the view.
     /// Double-tap fits the view. Each change is applied as a step from the
     /// last one, so a cancelled gesture leaves nothing behind.
-    private func canvasGestures(canvas: CGSize) -> CanvasGestureHandlers {
+    private func canvasGestures(canvas: CGSize, at rect: CGRect) -> CanvasGestureHandlers {
         CanvasGestureHandlers(
             pan: { d in
                 if let layer = transformTarget {
@@ -222,7 +276,8 @@ struct WorkspaceView: View {
                 } else {
                     gestureLog.notice("View ended: scale \(viewScale), offset \(viewOffset.width), \(viewOffset.height)")
                 }
-            })
+            },
+            pick: { screen, finished in pick(at: screen, finished: finished, canvas: canvas, rect: rect) })
     }
 
     /// The layer the gestures move, or nil when they move the view.
@@ -240,7 +295,13 @@ struct WorkspaceView: View {
             }
             Spacer()
             Group {
-                if let cropping, let layer = session.selected, layer.id == cropping.id {
+                if workspace == .color {
+                    if gridBarShown {
+                        GridBar(session: session) { gridBarShown = false }
+                    } else {
+                        SwatchBar(session: session, selectedID: $selectedSwatchID, sample: $sampleSize)
+                    }
+                } else if let cropping, let layer = session.selected, layer.id == cropping.id {
                     CropBar(layer: layer, shape: $cropShape,
                             onCancel: { finishCrop(keep: false) }, onDone: { finishCrop(keep: true) })
                 } else if compare != nil {
@@ -277,6 +338,12 @@ struct WorkspaceView: View {
     private var topBar: some View {
         HStack {
             Text("Transfer test").font(.headline)
+            Spacer()
+            Picker("Workspace", selection: $workspace) {
+                ForEach(Workspace.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
             Spacer()
             Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward") }
                 .accessibilityLabel("Undo")
@@ -323,7 +390,35 @@ struct WorkspaceView: View {
         .background(Color(white: 0.13))
     }
 
+    @ViewBuilder
     private var toolStrip: some View {
+        if workspace == .color {
+            VStack(spacing: 6) {
+                toolButton("eyedropper", "Pick", on: pickOn) { pickOn.toggle() }
+                    .disabled(session.layers.isEmpty)
+                gridTool
+            }
+            .padding(6)
+            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        } else {
+            transferTools
+        }
+    }
+
+    private var gridTool: some View {
+        toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
+            finishCrop(keep: true)
+            compare = nil
+            if gridBarShown {
+                gridBarShown = false
+            } else {
+                gridBarShown = true
+                session.grid.isOn = true  // opening Grid shows it
+            }
+        }
+    }
+
+    private var transferTools: some View {
         VStack(spacing: 6) {
             toolButton("camera", "Camera") { capture = Capture(picked: nil) }
             toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
@@ -331,16 +426,7 @@ struct WorkspaceView: View {
                 transformOn.toggle()
             }
             .disabled(session.selected == nil || cropping != nil)
-            toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
-                finishCrop(keep: true)
-                compare = nil
-                if gridBarShown {
-                    gridBarShown = false
-                } else {
-                    gridBarShown = true
-                    session.grid.isOn = true  // opening Grid shows it
-                }
-            }
+            gridTool
             toolButton("rectangle.split.2x1", "Compare", on: compare != nil) {
                 finishCrop(keep: true)
                 gridBarShown = false

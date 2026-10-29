@@ -9,7 +9,8 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: there are no projects or iCloud, and no Color tools. The current session is saved on the iPad as you work and reopens at
+It is not the app: there are no projects or iCloud, and Color has only Pick
+so far. The current session is saved on the iPad as you work and reopens at
 launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
@@ -51,6 +52,9 @@ automatically.
   to slide it; what's cut off shows faintly. Free, Original or Square; Reset;
   Cancel or Done. The crop moves, scales and turns with the image, and Crop
   again brings back what you cut.
+- **Color** (top bar): Pick is on; touch the canvas for a loupe on the
+  selected layer and lift to add a numbered swatch. Two fingers pan and zoom.
+  The Swatch bar shows hex, RGB and value; long-press a chip to delete it.
 - **Transform**: a bar with Proportional, Free, Skew and Distort for the
   corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
   pinch and twist in every mode. Placement is four corners, as in the prototype.
@@ -89,6 +93,7 @@ automatically.
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
+| `Swatches.swift` | Workspaces, swatches, picking (pixels, loupe, markers), Swatch bar |
 | `Transform.swift` | The prototype's quad geometry and modes, drawing into a quad, Transform handles and bar |
 | `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
 | `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |

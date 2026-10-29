@@ -62,6 +62,15 @@ final class Layer: Identifiable {
     private(set) var shownImage: UIImage
     @ObservationIgnored private var rendering = false
     @ObservationIgnored private var renderAgain = false
+    @ObservationIgnored private var pixelCache: (image: UIImage, pixels: PixelBuffer)? = nil
+
+    /// The shown image's pixels, for Pick; read once per image.
+    func pixels() -> PixelBuffer? {
+        if let cache = pixelCache, cache.image === shownImage { return cache.pixels }
+        guard let pixels = PixelBuffer(shownImage) else { return nil }
+        pixelCache = (shownImage, pixels)
+        return pixels
+    }
 
     /// Largest and smallest top edge, in canvas widths: room to zoom into a
     /// small part of a reference, while keeping the image a size the iPad can draw.
@@ -211,6 +220,7 @@ final class TransferSession {
     var layers: [Layer] = []  // bottom to top
     var selectedID: UUID?
     var grid = GridSettings()
+    var swatches: [Swatch] = []  // numbered in this order
 
     var canvasAspect: CGFloat { canvasSize.width / canvasSize.height }
     var selected: Layer? { layers.first { $0.id == selectedID } }
