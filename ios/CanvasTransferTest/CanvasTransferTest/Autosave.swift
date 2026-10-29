@@ -18,6 +18,8 @@ struct SessionSnapshot: Codable, Equatable {
         var rotation: Double  // radians
         var crop: CGRect
         var adjustments: Adjustments?  // optional, so sessions saved before Look still open
+        var flipH: Bool?  // optional, so sessions saved before Flip still open
+        var flipV: Bool?
     }
 
     var version = 1
@@ -34,7 +36,7 @@ extension TransferSession {
             layers: layers.map {
                 .init(id: $0.id, name: $0.name, opacity: $0.opacity, blend: $0.blend, isVisible: $0.isVisible,
                       center: $0.center, width: $0.width, rotation: $0.rotation.radians, crop: $0.crop,
-                      adjustments: $0.adjustments)
+                      adjustments: $0.adjustments, flipH: $0.flipH, flipV: $0.flipV)
             },
             selectedID: selectedID,
             grid: grid)
@@ -60,6 +62,8 @@ extension TransferSession {
             layer.rotation = .radians(state.rotation)
             layer.crop = state.crop
             layer.adjustments = state.adjustments ?? Adjustments()
+            layer.flipH = state.flipH ?? false
+            layer.flipV = state.flipV ?? false
             return layer
         }
         selectedID = snapshot.selectedID.flatMap { id in layers.contains { $0.id == id } ? id : nil }

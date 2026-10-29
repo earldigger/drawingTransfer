@@ -132,6 +132,7 @@ struct CropFrame: View {
         }
         .frame(width: w, height: h, alignment: .topLeading)
         .coordinateSpace(.named("crop"))
+        .flipped(layer)  // drags are measured inside, so a flipped image still drags true
         .rotationEffect(layer.rotation)
         .position(x: layer.center.x * canvas.width, y: layer.center.y * canvas.height)
     }

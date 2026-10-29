@@ -32,6 +32,7 @@ struct WorkspaceView: View {
     @State private var exporting = false  // rendering the image to share
     @State private var shareFile: ShareFile? = nil
     @State private var shareFailed = false
+    @State private var layerBarExpanded = false  // names, eye, blend · opacity; collapsed by default (decision H)
 
     var body: some View {
         GeometryReader { geo in
@@ -134,6 +135,7 @@ struct WorkspaceView: View {
                     .frame(width: c.width * w, height: c.height * h)
                     .position(x: c.midX * w, y: c.midY * h)
                     .frame(width: w, height: h)
+                    .flipped(layer)
                     .rotationEffect(layer.rotation)
                     .position(x: layer.center.x * size.width, y: layer.center.y * size.height)
                     .allowsHitTesting(false)
@@ -331,27 +333,21 @@ struct WorkspaceView: View {
             .foregroundStyle(.white)
     }
 
+    /// Thumbnails, top layer first. Expanded (‹), each row also shows its
+    /// number, an eye, and blend · opacity. Long-press a layer for moving,
+    /// duplicating, hiding and deleting.
     private var layerBar: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .trailing, spacing: 6) {
+            Button {
+                withAnimation(.snappy) { layerBarExpanded.toggle() }
+            } label: {
+                Image(systemName: layerBarExpanded ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 48, height: 28)
+            }
+            .accessibilityLabel(layerBarExpanded ? "Collapse layers" : "Expand layers")
             ForEach(session.layers.reversed()) { layer in  // top layer first
-                Button {
-                    session.selectedID = layer.id
-                } label: {
-                    Image(uiImage: layer.shownImage)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 48, height: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                        .opacity(layer.isVisible ? 1 : 0.35)
-                        .overlay(RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.blue, lineWidth: session.selectedID == layer.id ? 3 : 0))
-                        .overlay(alignment: .bottomLeading) { compareBadge(layer) }
-                }
-                .contextMenu {
-                    Button(layer.isVisible ? "Hide" : "Show") { layer.isVisible.toggle() }
-                    Button("Delete", role: .destructive) { session.delete(layer) }
-                }
-                .accessibilityLabel(layer.name)
+                layerRow(layer)
             }
             if session.layers.isEmpty {
                 Text("No layers").font(.caption).foregroundStyle(.secondary).frame(width: 60)
@@ -359,6 +355,63 @@ struct WorkspaceView: View {
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+
+    private func layerRow(_ layer: Layer) -> some View {
+        let number = (session.layers.firstIndex { $0.id == layer.id } ?? 0) + 1  // 1 = bottom
+        let selected = session.selectedID == layer.id
+        return HStack(spacing: 10) {
+            if layerBarExpanded {
+                Button {
+                    layer.isVisible.toggle()
+                } label: {
+                    Image(systemName: layer.isVisible ? "eye" : "eye.slash")
+                        .frame(width: 32, height: 44)
+                        .foregroundStyle(layer.isVisible ? .primary : .secondary)
+                }
+                .accessibilityLabel(layer.isVisible ? "Hide layer \(number)" : "Show layer \(number)")
+                Button {
+                    session.selectedID = layer.id
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Layer \(number)").font(.subheadline.weight(selected ? .semibold : .regular))
+                        Text("\(layer.blend.rawValue) · \(Int((layer.opacity * 100).rounded()))%")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(width: 96, alignment: .leading)
+                }
+            }
+            Button {
+                session.selectedID = layer.id
+            } label: {
+                Image(uiImage: layer.shownImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 48, height: 48)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .opacity(layer.isVisible ? 1 : 0.35)
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue, lineWidth: selected ? 3 : 0))
+                    .overlay(alignment: .bottomLeading) { compareBadge(layer) }
+            }
+            .accessibilityLabel("Layer \(number)")
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button("Move up", systemImage: "arrow.up") { session.move(layer, by: 1) }
+                .disabled(number == session.layers.count)
+            Button("Move down", systemImage: "arrow.down") { session.move(layer, by: -1) }
+                .disabled(number == 1)
+            Button("Bring to front", systemImage: "square.3.layers.3d.top.filled") { session.move(layer, to: session.layers.count - 1) }
+                .disabled(number == session.layers.count)
+            Button("Send to back", systemImage: "square.3.layers.3d.bottom.filled") { session.move(layer, to: 0) }
+                .disabled(number == 1)
+            Divider()
+            Button("Duplicate", systemImage: "plus.square.on.square") { session.duplicate(layer) }
+            Button(layer.isVisible ? "Hide" : "Show", systemImage: layer.isVisible ? "eye.slash" : "eye") {
+                layer.isVisible.toggle()
+            }
+            Button("Delete", systemImage: "trash", role: .destructive) { session.delete(layer) }
+        }
     }
 
     /// While comparing: the layer's number (as in the A and B menus), and A or B.
@@ -432,6 +485,12 @@ struct LookBar: View {
             }
             .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
             Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
+            Menu {
+                Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipH.toggle() }
+                Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipV.toggle() }
+            } label: {
+                Label("Flip", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+            }
             Button("Fit") { layer.fit(canvasAspect: canvasAspect) }
             Button("Crop", systemImage: "crop", action: onCrop)
         }

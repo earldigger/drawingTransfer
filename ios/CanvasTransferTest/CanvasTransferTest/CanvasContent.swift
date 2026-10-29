@@ -48,10 +48,19 @@ struct CanvasContent: View {
 
     private func placed(_ content: some View, _ layer: Layer, opacity: Double) -> some View {
         content
+            .flipped(layer)
             .rotationEffect(layer.rotation)
             .position(x: layer.center.x * size.width, y: layer.center.y * size.height)
             .opacity(opacity)
             .blendMode(layer.blend.mode)
+    }
+}
+
+extension View {
+    /// Mirrors a view drawn in the layer's own space, as the layer is
+    /// flipped. Goes before the rotation, so a flip is about the image's own axes.
+    func flipped(_ layer: Layer) -> some View {
+        scaleEffect(x: layer.flipH ? -1 : 1, y: layer.flipV ? -1 : 1)
     }
 }
 

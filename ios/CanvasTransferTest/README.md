@@ -60,6 +60,10 @@ automatically.
 - **Compare** (left strip): Blink A (A fades in and out), Blink A / B (a
   crossfade), or Split with a draggable line; A and B, swap, speed, pause. The layer bar numbers the layers and
   marks A and B.
+- **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
+  opacity. Long-press a layer to move it up or down, to the front or back,
+  duplicate, hide or delete it. **Flip** (Look bar) mirrors it horizontally
+  or vertically.
 - **Grid** (left strip): rows and columns, Square cells, color and opacity.
   It's saved with the session but isn't an undo step.
 - **Share** (top right): the canvas as a full-resolution JPEG, with or

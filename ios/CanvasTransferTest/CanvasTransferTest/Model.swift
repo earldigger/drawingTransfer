@@ -45,6 +45,8 @@ final class Layer: Identifiable {
     var width: CGFloat = 1
     var rotation: Angle = .zero
     var crop = Crop.full  // the part of the image that shows, in fractions of it
+    var flipH = false  // mirrored left to right, before rotation; the crop flips with it
+    var flipV = false  // mirrored top to bottom
     var adjustments = Adjustments() {
         didSet { if adjustments != oldValue { refreshShownImage() } }
     }
@@ -130,6 +132,32 @@ final class TransferSession {
     func delete(_ layer: Layer) {
         layers.removeAll { $0.id == layer.id }
         if selectedID == layer.id { selectedID = layers.last?.id }
+    }
+
+    /// Moves a layer `by` places up (+) or down (-) the stack, or to `to` (0 = bottom).
+    func move(_ layer: Layer, by offset: Int = 0, to place: Int? = nil) {
+        guard let i = layers.firstIndex(where: { $0.id == layer.id }) else { return }
+        let target = min(max(place ?? i + offset, 0), layers.count - 1)
+        guard target != i else { return }
+        layers.insert(layers.remove(at: i), at: target)
+    }
+
+    /// A copy just above the original, nudged so it shows; selected.
+    func duplicate(_ layer: Layer) {
+        guard let i = layers.firstIndex(where: { $0.id == layer.id }) else { return }
+        let copy = Layer(name: layer.name, image: layer.image, canvasAspect: canvasAspect)
+        copy.opacity = layer.opacity
+        copy.blend = layer.blend
+        copy.isVisible = true
+        copy.center = CGPoint(x: min(layer.center.x + 0.03, 1.5), y: min(layer.center.y + 0.03, 1.5))
+        copy.width = layer.width
+        copy.rotation = layer.rotation
+        copy.crop = layer.crop
+        copy.flipH = layer.flipH
+        copy.flipV = layer.flipV
+        copy.adjustments = layer.adjustments
+        layers.insert(copy, at: i + 1)
+        selectedID = copy.id
     }
 }
 
