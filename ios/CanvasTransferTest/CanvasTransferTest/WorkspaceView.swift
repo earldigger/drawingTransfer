@@ -28,7 +28,7 @@ struct WorkspaceView: View {
     @State private var cropShape: CropShape = .free
     @State private var gridBarShown = false
     @State private var compare: CompareState? = nil  // nil = not comparing
-    @State private var blinkOn = true  // Compare: which half of the blink is showing
+    @State private var blinkClock = BlinkClock()  // Compare: where the blink is in its fade
     @State private var exporting = false  // rendering the image to share
     @State private var shareFile: ShareFile? = nil
     @State private var shareFailed = false
@@ -90,14 +90,8 @@ struct WorkspaceView: View {
         .onChange(of: session.selectedID) { _, id in
             if let cropping, cropping.id != id { finishCrop(keep: true) }  // another layer: keep this crop
         }
-        // Compare's blink: restarts when the mode, speed or pause changes.
-        .task(id: compare.map { "\($0.mode)\($0.interval)\($0.paused)" }) {
-            guard let compare, compare.mode.blinks, !compare.paused else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(compare.interval))
-                if !Task.isCancelled { blinkOn.toggle() }
-            }
-        }
+        .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
+        .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
     }
 
     // MARK: crop
@@ -155,16 +149,8 @@ struct WorkspaceView: View {
         let grid = session.grid.isOn ? session.grid : nil
         let lineWidth = 1.5 / viewScale  // the same thickness on screen at any zoom
         if let compare {
-            let shown = compare.shown(in: session.layers, blinkOn: blinkOn)
-            ZStack {
-                CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
-                              only: shown.right)
-                if compare.mode == .split {
-                    CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
-                                  only: shown.left)
-                        .clipShape(LeftPart(fraction: compare.split))
-                }
-            }
+            CompareCanvas(state: compare, clock: blinkClock, layers: session.layers, size: size,
+                          grid: grid, gridLineWidth: lineWidth)
         } else {
             CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
                           faintFullImageOf: cropping?.id)
@@ -228,7 +214,7 @@ struct WorkspaceView: View {
                             onCancel: { finishCrop(keep: false) }, onDone: { finishCrop(keep: true) })
                 } else if compare != nil {
                     CompareBar(state: Binding(get: { compare ?? CompareState(session: session) }, set: { compare = $0 }),
-                               layers: session.layers, blinkOn: blinkOn) { compare = nil }
+                               layers: session.layers, clock: blinkClock) { compare = nil }
                 } else if gridBarShown {
                     GridBar(session: session) { gridBarShown = false }
                 } else if let layer = session.selected {
@@ -324,7 +310,7 @@ struct WorkspaceView: View {
             toolButton("rectangle.split.2x1", "Compare", on: compare != nil) {
                 finishCrop(keep: true)
                 gridBarShown = false
-                blinkOn = true
+                blinkClock.restart()  // starts on A
                 compare = compare == nil ? CompareState(session: session) : nil
             }
             .disabled(session.layers.isEmpty)

@@ -11,6 +11,7 @@ struct CanvasContent: View {
     var gridLineWidth: CGFloat = 1.5
     var faintFullImageOf: UUID? = nil  // the layer being cropped: its whole image shows faintly too
     var only: Set<UUID>? = nil  // Compare: exactly these layers, hidden or not; nil = the visible ones
+    var fades: [UUID: Double] = [:]  // Compare: a layer's opacity times this, while it fades in and out
 
     var body: some View {
         ZStack {
@@ -42,7 +43,7 @@ struct CanvasContent: View {
             .clipped()
             .offset(x: c.minX * w, y: c.minY * h)
             .frame(width: w, height: h, alignment: .topLeading)
-        placed(cropped, layer, opacity: layer.opacity)
+        placed(cropped, layer, opacity: layer.opacity * (fades[layer.id] ?? 1))
     }
 
     private func placed(_ content: some View, _ layer: Layer, opacity: Double) -> some View {

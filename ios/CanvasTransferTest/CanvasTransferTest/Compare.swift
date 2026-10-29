@@ -31,21 +31,81 @@ struct CompareState: Equatable {
         }
     }
 
-    /// Which layers show right now; nil = the normal stack.
-    func shown(in layers: [Layer], blinkOn: Bool) -> (left: Set<UUID>?, right: Set<UUID>?) {
-        let visible = Set(layers.filter(\.isVisible).map(\.id))
-        let a = layers.first { $0.id == self.a }?.id, b = layers.first { $0.id == self.b }?.id
-        switch mode {
-        case .blinkA:
-            guard let a else { return (nil, nil) }
-            let set = blinkOn ? visible.union([a]) : visible.subtracting([a])
-            return (set, set)
-        case .blinkAB:
-            let one = (blinkOn ? a : b).map { Set([$0]) } ?? []
-            return (one, one)
-        case .split:
-            return (a.map { [$0] } ?? [], b.map { [$0] } ?? [])
+    /// A and B if they're still layers, and the layers the user has showing.
+    func roles(in layers: [Layer]) -> (a: UUID?, b: UUID?, visible: Set<UUID>) {
+        (layers.first { $0.id == a }?.id, layers.first { $0.id == b }?.id,
+         Set(layers.filter(\.isVisible).map(\.id)))
+    }
+}
+
+/// The blink's timing. Each half of a blink holds for the first half of
+/// `interval` and fades over the second, eased. Pausing freezes it mid-fade.
+struct BlinkClock: Equatable {
+    private var start = Date()
+    private var pausedElapsed: TimeInterval? = nil
+
+    /// How much of A shows: 1 = A, 0 = not A (Blink A) or B (Blink A / B).
+    func level(at date: Date, interval: Double) -> Double {
+        let elapsed = pausedElapsed ?? date.timeIntervalSince(start)
+        let half = max(interval, 0.05)
+        let u = elapsed.truncatingRemainder(dividingBy: 2 * half) / half  // 0..<2
+        func fade(_ t: Double) -> Double {  // 0 while holding, then eased to 1
+            let x = min(max((t - 0.5) / 0.5, 0), 1)
+            return x * x * (3 - 2 * x)
         }
+        return u < 1 ? 1 - fade(u) : fade(u - 1)
+    }
+
+    mutating func restart() {
+        start = Date()
+        pausedElapsed = nil
+    }
+
+    mutating func setPaused(_ paused: Bool) {
+        if paused {
+            if pausedElapsed == nil { pausedElapsed = Date().timeIntervalSince(start) }
+        } else if let elapsed = pausedElapsed {
+            start = Date().addingTimeInterval(-elapsed)
+            pausedElapsed = nil
+        }
+    }
+}
+
+/// The canvas while comparing. Blinks fade: Blink A fades layer A in and out
+/// over the stack; Blink A / B crossfades from A alone to B alone. Split
+/// shows A left of the line and B right of it.
+struct CompareCanvas: View {
+    let state: CompareState
+    let clock: BlinkClock
+    let layers: [Layer]
+    let size: CGSize
+    let grid: GridSettings?
+    let gridLineWidth: CGFloat
+
+    var body: some View {
+        let roles = state.roles(in: layers)
+        TimelineView(.animation(paused: state.paused || !state.mode.blinks)) { context in
+            let level = clock.level(at: context.date, interval: state.interval)
+            switch state.mode {
+            case .blinkA:
+                content(only: roles.a.map { roles.visible.union([$0]) } ?? roles.visible,
+                        fades: roles.a.map { [$0: level] } ?? [:])
+            case .blinkAB:
+                ZStack {
+                    content(only: roles.b.map { [$0] } ?? [])
+                    content(only: roles.a.map { [$0] } ?? []).opacity(level)  // white underneath, so this crossfades
+                }
+            case .split:
+                ZStack {
+                    content(only: roles.b.map { [$0] } ?? [])
+                    content(only: roles.a.map { [$0] } ?? []).clipShape(LeftPart(fraction: state.split))
+                }
+            }
+        }
+    }
+
+    private func content(only: Set<UUID>, fades: [UUID: Double] = [:]) -> CanvasContent {
+        CanvasContent(layers: layers, size: size, grid: grid, gridLineWidth: gridLineWidth, only: only, fades: fades)
     }
 }
 
@@ -112,7 +172,7 @@ struct SplitHandle: View {
 struct CompareBar: View {
     @Binding var state: CompareState
     let layers: [Layer]
-    let blinkOn: Bool
+    let clock: BlinkClock
     var onDone: () -> Void
 
     var body: some View {
@@ -136,7 +196,10 @@ struct CompareBar: View {
                     state.paused.toggle()
                 }
                 .labelStyle(.iconOnly)
-                Text(showing).font(.caption).foregroundStyle(.secondary).frame(width: 74, alignment: .leading)
+                TimelineView(.animation(paused: state.paused)) { context in
+                    Text(showing(clock.level(at: context.date, interval: state.interval)))
+                        .font(.caption).foregroundStyle(.secondary).frame(width: 74, alignment: .leading)
+                }
             }
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
@@ -145,10 +208,10 @@ struct CompareBar: View {
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
 
-    private var showing: String {
+    private func showing(_ level: Double) -> String {
         switch state.mode {
-        case .blinkA: blinkOn ? "A shown" : "A hidden"
-        case .blinkAB: blinkOn ? "Showing A" : "Showing B"
+        case .blinkA: level == 1 ? "A shown" : (level == 0 ? "A hidden" : "Fading")
+        case .blinkAB: level == 1 ? "Showing A" : (level == 0 ? "Showing B" : "Fading")
         case .split: ""
         }
     }

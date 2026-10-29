@@ -57,8 +57,8 @@ automatically.
 - **Adjust** (bottom bar): invert, levels, hue / saturation or colorize,
   lightness, as in the prototype; live, saved and undoable. Blend has Normal,
   Multiply and Screen.
-- **Compare** (left strip): Blink A, Blink A / B, or Split with a draggable
-  line; A and B, swap, speed, pause. The layer bar numbers the layers and
+- **Compare** (left strip): Blink A (A fades in and out), Blink A / B (a
+  crossfade), or Split with a draggable line; A and B, swap, speed, pause. The layer bar numbers the layers and
   marks A and B.
 - **Grid** (left strip): rows and columns, Square cells, color and opacity.
   It's saved with the session but isn't an undo step.
