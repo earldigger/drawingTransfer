@@ -13,12 +13,13 @@ struct SessionSnapshot: Codable, Equatable {
         var opacity: Double
         var blend: Blend
         var isVisible: Bool
-        var center: CGPoint
-        var width: CGFloat
-        var rotation: Double  // radians
+        var quad: [CGPoint]?  // the placement; nil in sessions from before, which have the four below
+        var center: CGPoint?
+        var width: CGFloat?
+        var rotation: Double?  // radians
         var crop: CGRect
         var adjustments: Adjustments?  // optional, so sessions saved before Look still open
-        var flipH: Bool?  // optional, so sessions saved before Flip still open
+        var flipH: Bool?  // before the quad, with center, width and rotation
         var flipV: Bool?
         var imageID: UUID?  // the image's file; nil = named by the layer's id, as before Edit corners
         var sourceID: UUID?  // the original photo's file, if kept
@@ -38,8 +39,7 @@ extension TransferSession {
             canvasSize: canvasSize,
             layers: layers.map {
                 .init(id: $0.id, name: $0.name, opacity: $0.opacity, blend: $0.blend, isVisible: $0.isVisible,
-                      center: $0.center, width: $0.width, rotation: $0.rotation.radians, crop: $0.crop,
-                      adjustments: $0.adjustments, flipH: $0.flipH, flipV: $0.flipV,
+                      quad: $0.quad, crop: $0.crop, adjustments: $0.adjustments,
                       imageID: $0.imageID, sourceID: $0.sourceID, corners: $0.corners)
             },
             selectedID: selectedID,
@@ -73,13 +73,16 @@ extension TransferSession {
             layer.opacity = state.opacity
             layer.blend = state.blend
             layer.isVisible = state.isVisible
-            layer.center = state.center
-            layer.width = state.width
-            layer.rotation = .radians(state.rotation)
+            if let quad = state.quad, quad.count == 4 {
+                layer.quad = quad
+            } else {  // a session from before the quad
+                layer.quad = Layer.rectangle(center: state.center ?? CGPoint(x: 0.5, y: 0.5), width: state.width ?? 1,
+                                             rotation: state.rotation ?? 0, flipH: state.flipH ?? false,
+                                             flipV: state.flipV ?? false, imageAspect: layer.aspect,
+                                             canvasAspect: snapshot.canvasSize.width / max(snapshot.canvasSize.height, 1e-9))
+            }
             layer.crop = state.crop
             layer.adjustments = state.adjustments ?? Adjustments()
-            layer.flipH = state.flipH ?? false
-            layer.flipV = state.flipV ?? false
             return layer
         }
         selectedID = snapshot.selectedID.flatMap { id in layers.contains { $0.id == id } ? id : nil }

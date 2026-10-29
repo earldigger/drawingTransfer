@@ -19,6 +19,8 @@ struct WorkspaceView: View {
     @State private var showPhotos = false
     @State private var photoItem: PhotosPickerItem? = nil
     @State private var transformOn = false
+    @State private var transformMode = TransformMode.proportional
+    @State private var transformStart: (id: UUID, quad: [CGPoint])? = nil  // for Cancel
     @State private var fullScreen = false
     @State private var viewScale: CGFloat = 1
     @State private var viewOffset: CGSize = .zero
@@ -83,7 +85,7 @@ struct WorkspaceView: View {
             if let source = edit.layer.source {
                 CornersScreen(image: source, detected: edit.detected, notFoundInset: 0, start: edit.layer.corners,
                               addTitle: "Done", onAdd: { corners in
-                                  edit.layer.applyCorners(corners)  // one undo step
+                                  edit.layer.applyCorners(corners, canvasAspect: session.canvasAspect)  // one undo step
                                   editingCorners = nil
                               }, onRetake: nil, onCancel: { editingCorners = nil })
             }
@@ -100,6 +102,10 @@ struct WorkspaceView: View {
         }
         .onChange(of: session.selectedID) { _, id in
             if let cropping, cropping.id != id { finishCrop(keep: true) }  // another layer: keep this crop
+            if transformOn { noteTransformStart() }
+        }
+        .onChange(of: transformOn) { _, on in
+            if on { noteTransformStart() } else { transformStart = nil }
         }
         .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
         .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
@@ -131,6 +137,21 @@ struct WorkspaceView: View {
         editingCorners = CornerEdit(layer: layer, detected: ImageOps.detectRectangle(in: source))
     }
 
+    // MARK: transform
+
+    /// Where the layer was when Transform came on, for Cancel.
+    private func noteTransformStart() {
+        transformStart = session.selected.map { ($0.id, $0.quad) }
+    }
+
+    /// Puts the layer back where it was when Transform came on.
+    private func cancelTransform() {
+        if let start = transformStart, let layer = session.layers.first(where: { $0.id == start.id }) {
+            layer.quad = start.quad
+        }
+        transformOn = false
+    }
+
     /// Off while cropping, which has its own Cancel.
     private var canUndo: Bool { cropping == nil && history.canUndo }
     private var canRedo: Bool { cropping == nil && history.canRedo }
@@ -146,17 +167,9 @@ struct WorkspaceView: View {
             } else if compare?.mode == .split {
                 SplitHandle(split: Binding(get: { compare?.split ?? 0.5 }, set: { compare?.split = $0 }), canvas: size)
             } else if transformOn, let layer = session.selected {
-                // Outlines what shows: the crop, turned and placed with the layer.
-                let w = layer.width * size.width, h = w / layer.aspect, c = layer.crop
-                Rectangle()
-                    .stroke(Color.blue, lineWidth: 2)
-                    .frame(width: c.width * w, height: c.height * h)
-                    .position(x: c.midX * w, y: c.midY * h)
-                    .frame(width: w, height: h)
-                    .flipped(layer)
-                    .rotationEffect(layer.rotation)
-                    .position(x: layer.center.x * size.width, y: layer.center.y * size.height)
-                    .allowsHitTesting(false)
+                TransformHandles(layer: layer, canvas: size, mode: transformMode,
+                                 onBegin: { history.hold("handle") },  // one drag, one step
+                                 onEnd: { history.release("handle") })
             }
         }
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
@@ -185,21 +198,19 @@ struct WorkspaceView: View {
         CanvasGestureHandlers(
             pan: { d in
                 if let layer = transformTarget {
-                    // The center stays within half a canvas of the edges, so the image can't be lost.
-                    layer.center = CGPoint(x: min(max(layer.center.x + d.width / (canvas.width * viewScale), -0.5), 1.5),
-                                           y: min(max(layer.center.y + d.height / (canvas.height * viewScale), -0.5), 1.5))
+                    layer.move(by: CGPoint(x: d.width / (canvas.width * viewScale), y: d.height / (canvas.height * viewScale)))
                 } else {
                     viewOffset = CGSize(width: viewOffset.width + d.width, height: viewOffset.height + d.height)
                 }
             },
             pinch: { s in
                 if let layer = transformTarget {
-                    layer.width = min(max(layer.width * s, 0.03), Layer.maxWidth)
+                    layer.scale(by: s, in: canvas)  // evenly, about its center, in every mode
                 } else {
                     viewScale = min(max(viewScale * s, 0.5), 8)
                 }
             },
-            rotate: { r in transformTarget?.rotation += r },
+            rotate: { r in transformTarget?.rotate(by: r, in: canvas) },
             doubleTap: { withAnimation { viewScale = 1; viewOffset = .zero } },
             undo: { if canUndo { history.undo() } },
             redo: { if canRedo { history.redo() } },
@@ -237,6 +248,9 @@ struct WorkspaceView: View {
                                layers: session.layers, clock: blinkClock) { compare = nil }
                 } else if gridBarShown {
                     GridBar(session: session) { gridBarShown = false }
+                } else if transformOn, let layer = session.selected {
+                    TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
+                                 onCancel: cancelTransform, onDone: { transformOn = false })
                 } else if let layer = session.selected {
                     LookBar(layer: layer, transformOn: $transformOn, canvasAspect: session.canvasAspect,
                             onCrop: { startCrop(layer) }, onEditCorners: { editCorners(layer) })
@@ -510,8 +524,8 @@ struct LookBar: View {
             Button("Crop", systemImage: "crop", action: onCrop)
             Menu {
                 Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
-                Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipH.toggle() }
-                Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipV.toggle() }
+                Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
+                Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipVertical() }
                 Divider()
                 Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
                     .disabled(layer.source == nil)  // added before photos were kept

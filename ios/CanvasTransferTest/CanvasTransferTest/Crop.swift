@@ -80,46 +80,52 @@ enum Crop {
 }
 
 /// The crop frame on the selected layer: corner and edge handles, and drag
-/// inside to slide it. Lives in the layer's own (unrotated) space, so the
-/// handles turn and scale with it.
+/// inside to slide it. Drawn on the canvas through the layer's corners, so
+/// it follows every move, turn, flip, skew and distortion.
 struct CropFrame: View {
     @Bindable var layer: Layer
     let canvas: CGSize
     let shape: CropShape
 
-    @State private var start: CGRect? = nil
+    @State private var start: (crop: CGRect, quad: [CGPoint])? = nil
 
     var body: some View {
-        let w = layer.width * canvas.width, h = w / layer.aspect
+        let quad = layer.quadPoints(in: canvas)
         let c = layer.crop
-        let r = CGRect(x: c.minX * w, y: c.minY * h, width: c.width * w, height: c.height * h)
+        // Image fractions to canvas points, through the layer's own corners.
+        let corners = (0..<4).map { i in
+            QuadGeometry.point([c.minX, c.maxX, c.maxX, c.minX][i], [c.minY, c.minY, c.maxY, c.maxY][i], in: quad)
+        }
         let ratio = Crop.ratio(shape, imageAspect: layer.aspect)
         ZStack(alignment: .topLeading) {
-            Rectangle()
-                .fill(Color.white.opacity(0.001))  // catches drags inside the frame
-                .frame(width: r.width, height: r.height)
-                .position(x: r.midX, y: r.midY)
-                .gesture(drag(.move, size: CGSize(width: w, height: h), ratio: ratio))
-            Rectangle()
-                .stroke(Color.blue, lineWidth: 2)
-                .frame(width: r.width, height: r.height)
-                .position(x: r.midX, y: r.midY)
-                .allowsHitTesting(false)
+            Path { p in
+                p.addLines(corners)
+                p.closeSubpath()
+            }
+            .fill(Color.white.opacity(0.001))  // catches drags inside the frame
+            .gesture(drag(.move, ratio: ratio))
+            Path { p in
+                p.addLines(corners)
+                p.closeSubpath()
+            }
+            .stroke(Color.blue, lineWidth: 2)
+            .allowsHitTesting(false)
             if ratio == nil {
-                let edges = [CGPoint(x: r.midX, y: r.minY), CGPoint(x: r.maxX, y: r.midY),
-                             CGPoint(x: r.midX, y: r.maxY), CGPoint(x: r.minX, y: r.midY)]
+                let edges = (0..<4).map { i in
+                    QuadGeometry.point([c.midX, c.maxX, c.midX, c.minX][i], [c.minY, c.midY, c.maxY, c.midY][i], in: quad)
+                }
                 ForEach(0..<4, id: \.self) { i in
+                    let a = corners[i], b = corners[(i + 1) % 4]
                     Capsule()
                         .fill(Color.white)
                         .overlay(Capsule().stroke(Color.blue, lineWidth: 2))
-                        .frame(width: i % 2 == 0 ? 30 : 8, height: i % 2 == 0 ? 8 : 30)
+                        .frame(width: 30, height: 8)
+                        .rotationEffect(.radians(atan2(b.y - a.y, b.x - a.x)))  // along its edge
                         .contentShape(Rectangle().inset(by: -16))  // 40 pt or more to touch
                         .position(edges[i])
-                        .gesture(drag(.edge(i), size: CGSize(width: w, height: h), ratio: ratio))
+                        .gesture(drag(.edge(i), ratio: ratio))
                 }
             }
-            let corners = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY),
-                           CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
             ForEach(0..<4, id: \.self) { i in
                 Circle()
                     .fill(Color.white)
@@ -127,24 +133,24 @@ struct CropFrame: View {
                     .frame(width: 24, height: 24)
                     .contentShape(Circle().inset(by: -11))  // 46 pt to touch
                     .position(corners[i])
-                    .gesture(drag(.corner(i), size: CGSize(width: w, height: h), ratio: ratio))
+                    .gesture(drag(.corner(i), ratio: ratio))
             }
         }
-        .frame(width: w, height: h, alignment: .topLeading)
+        .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
         .coordinateSpace(.named("crop"))
-        .flipped(layer)  // drags are measured inside, so a flipped image still drags true
-        .rotationEffect(layer.rotation)
-        .position(x: layer.center.x * canvas.width, y: layer.center.y * canvas.height)
     }
 
-    /// Measured in the layer's own space, so a rotated or zoomed layer drags true.
-    private func drag(_ handle: CropHandle, size: CGSize, ratio: CGFloat?) -> some Gesture {
+    /// The finger's start and current points are taken back into the image
+    /// through its corners, so a rotated, flipped, skewed or distorted layer drags true.
+    private func drag(_ handle: CropHandle, ratio: CGFloat?) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("crop"))
             .onChanged { value in
-                if start == nil { start = layer.crop }
-                guard let start else { return }
-                layer.crop = Crop.dragged(start, handle, du: value.translation.width / max(size.width, 1),
-                                          dv: value.translation.height / max(size.height, 1), ratio: ratio)
+                if start == nil { start = (layer.crop, layer.quadPoints(in: canvas)) }
+                guard let start,
+                      let from = QuadGeometry.imageFraction(of: value.startLocation, in: start.quad),
+                      let to = QuadGeometry.imageFraction(of: value.location, in: start.quad)
+                else { return }
+                layer.crop = Crop.dragged(start.crop, handle, du: to.x - from.x, dv: to.y - from.y, ratio: ratio)
             }
             .onEnded { _ in start = nil }
     }

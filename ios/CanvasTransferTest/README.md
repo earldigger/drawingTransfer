@@ -51,6 +51,9 @@ automatically.
   to slide it; what's cut off shows faintly. Free, Original or Square; Reset;
   Cancel or Done. The crop moves, scales and turns with the image, and Crop
   again brings back what you cut.
+- **Transform**: a bar with Proportional, Free, Skew and Distort for the
+  corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
+  pinch and twist in every mode. Placement is four corners, as in the prototype.
 - **Undo / redo**: the top-bar buttons, a two-finger tap to undo, a
   three-finger tap to redo, or ⌘Z / ⇧⌘Z. A gesture, an opacity drag or a
   whole crop is one step; selecting a layer isn't.
@@ -86,6 +89,7 @@ automatically.
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
+| `Transform.swift` | The prototype's quad geometry and modes, drawing into a quad, Transform handles and bar |
 | `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
 | `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |
 | `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |

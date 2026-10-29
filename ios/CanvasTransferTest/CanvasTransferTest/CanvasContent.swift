@@ -30,7 +30,8 @@ struct CanvasContent: View {
     /// whole image also shows faintly underneath, so you see what's cut off.
     @ViewBuilder
     private func layerView(_ layer: Layer) -> some View {
-        let w = layer.width * size.width, h = w / layer.aspect, c = layer.crop
+        // The image at its own proportions, then projected into its corners.
+        let w = size.width, h = w / layer.aspect, c = layer.crop
         let image = Image(uiImage: layer.shownImage).resizable().frame(width: w, height: h)
         if faintFullImageOf == layer.id {
             placed(image, layer, opacity: layer.opacity * 0.3)
@@ -46,21 +47,16 @@ struct CanvasContent: View {
         placed(cropped, layer, opacity: layer.opacity * (fades[layer.id] ?? 1))
     }
 
+    /// Draws `content` (the image's own w × h rectangle, at the canvas's top
+    /// left) into the layer's quad: moved, scaled, rotated, flipped, skewed or
+    /// distorted in one projective transform.
     private func placed(_ content: some View, _ layer: Layer, opacity: Double) -> some View {
-        content
-            .flipped(layer)
-            .rotationEffect(layer.rotation)
-            .position(x: layer.center.x * size.width, y: layer.center.y * size.height)
+        let own = CGSize(width: size.width, height: size.width / layer.aspect)
+        return content
+            .projectionEffect(QuadGeometry.projection(from: own, to: layer.quadPoints(in: size)))
+            .frame(width: size.width, height: size.height, alignment: .topLeading)
             .opacity(opacity)
             .blendMode(layer.blend.mode)
-    }
-}
-
-extension View {
-    /// Mirrors a view drawn in the layer's own space, as the layer is
-    /// flipped. Goes before the rotation, so a flip is about the image's own axes.
-    func flipped(_ layer: Layer) -> some View {
-        scaleEffect(x: layer.flipH ? -1 : 1, y: layer.flipV ? -1 : 1)
     }
 }
 
@@ -97,7 +93,7 @@ enum CanvasExport {
     static func pixelSize(_ session: TransferSession) -> CGSize {
         let aspect = session.canvasAspect
         let perCanvasWidth = session.layers.filter(\.isVisible)
-            .map { $0.image.size.width * $0.image.scale / max($0.width, 0.01) }
+            .map { $0.image.size.width * $0.image.scale / max($0.topEdge(in: session.canvasSize), 0.01) }
             .max() ?? longEdgeRange.lowerBound
         let size = CGSize(width: perCanvasWidth, height: perCanvasWidth / aspect)
         let longEdge = max(size.width, size.height)
