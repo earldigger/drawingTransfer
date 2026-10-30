@@ -54,6 +54,14 @@ automatically.
 - **Color** (top bar): Pick is on; touch the canvas for a loupe on the
   selected layer and lift to add a numbered swatch. Two fingers pan and zoom.
   The Swatch bar shows hex, RGB and value; long-press a chip to delete it.
+- **Flatten** (bottom of the layer bar): the visible layers exactly as shown
+  (opacity, blend, Look, crop, transform) become one new layer, "Flattened 1",
+  on top at Normal 100 %, filling the canvas; the layers in it are hidden,
+  not deleted. Pick, Simplify and Highlight on it read what you see. In Color,
+  a layer that isn't at Normal 100 % shows a hint to flatten.
+- **Update** (layer bar, or long-press a flattened layer): show the layers you
+  want and Update. The flattened layer is hidden, rendered again from what's
+  visible, and its swatches are read again at the same spots.
 - **Simplify** (Color): Colors, Values or Value scale, 2–12, smoothing; the
   colors found with their shares. Pick reads the flat color you see.
   **Highlight**: each swatch's range in its own bright color over gray.
@@ -90,6 +98,7 @@ automatically.
 | `CanvasTransferTestApp.swift` | App entry |
 | `Autosave.swift` | Saves the session (session.json and a PNG per layer) and opens it at launch |
 | `History.swift` | Undo and redo: a step per settled change, holds for gestures, drags and crops |
+| `Flatten.swift` | Flatten and Update: the visible layers rendered into one layer, swatches read again |
 | `Look.swift` | Adjustments (prototype's order and ranges) with Core Image; the Adjust popover |
 | `Model.swift` | Layer (look, placement), the session, canvas sizes |
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |

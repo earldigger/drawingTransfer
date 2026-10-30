@@ -24,6 +24,7 @@ struct SessionSnapshot: Codable, Equatable {
         var imageID: UUID?  // the image's file; nil = named by the layer's id, as before Edit corners
         var sourceID: UUID?  // the original photo's file, if kept
         var corners: Corners?  // in the original photo's pixels
+        var flattenedFrom: [UUID]?  // a flattened layer's sources; nil for any other
     }
 
     var version = 1
@@ -41,7 +42,8 @@ extension TransferSession {
             layers: layers.map {
                 .init(id: $0.id, name: $0.name, opacity: $0.opacity, blend: $0.blend, isVisible: $0.isVisible,
                       quad: $0.quad, crop: $0.crop, adjustments: $0.adjustments,
-                      imageID: $0.imageID, sourceID: $0.sourceID, corners: $0.corners)
+                      imageID: $0.imageID, sourceID: $0.sourceID, corners: $0.corners,
+                      flattenedFrom: $0.flattenedFrom)
             },
             selectedID: selectedID,
             grid: grid,
@@ -72,6 +74,7 @@ extension TransferSession {
                 layer.source = state.sourceID.flatMap(sources)
             }
             layer.corners = state.corners
+            layer.flattenedFrom = state.flattenedFrom
             layer.name = state.name
             layer.opacity = state.opacity
             layer.blend = state.blend

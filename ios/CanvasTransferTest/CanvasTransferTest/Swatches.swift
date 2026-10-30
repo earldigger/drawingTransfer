@@ -20,6 +20,7 @@ struct Swatch: Codable, Equatable, Identifiable {
     var red: Int
     var green: Int
     var blue: Int
+    var radius: Int? = nil  // the sample size it was picked with, for reading it again; nil = 1 pixel
 
     var color: Color { Color(red: Double(red) / 255, green: Double(green) / 255, blue: Double(blue) / 255) }
     var hex: String { String(format: "#%02X%02X%02X", red, green, blue) }

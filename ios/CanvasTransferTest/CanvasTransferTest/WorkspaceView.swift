@@ -256,7 +256,8 @@ struct WorkspaceView: View {
         case true?:
             probe = nil
             if let rgb = found.rgb {
-                let swatch = Swatch(layerID: layer.id, u: found.u, v: found.v, red: rgb.0, green: rgb.1, blue: rgb.2)
+                let swatch = Swatch(layerID: layer.id, u: found.u, v: found.v, red: rgb.0, green: rgb.1, blue: rgb.2,
+                                    radius: sampleSize.rawValue)
                 session.swatches.append(swatch)  // one undo step
                 selectedSwatchID = swatch.id
             }
@@ -364,6 +365,14 @@ struct WorkspaceView: View {
                 layerBar.padding(12)
             }
             Spacer()
+            if workspace == .color, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
+                // Pick, Simplify and Highlight read the layer's own image, not the mix on the canvas.
+                Text("Colors are read from this layer at full strength. Flatten to read what you see.")
+                    .font(.footnote)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Capsule().fill(Color(white: 0.13).opacity(0.95)))
+                    .padding(.bottom, 8)
+            }
             Group {
                 if workspace == .color {
                     if gridBarShown {
@@ -556,10 +565,47 @@ struct WorkspaceView: View {
             }
             if session.layers.isEmpty {
                 Text("No layers").font(.caption).foregroundStyle(.secondary).frame(width: 60)
+            } else {
+                Divider().frame(width: 48)
+                layerBarButton("Flatten", systemImage: "square.3.layers.3d.down.right") { flatten() }
+                    .disabled(!session.layers.contains(where: \.isVisible))
+                if let layer = session.selected, layer.isFlattened {
+                    layerBarButton("Update", systemImage: "arrow.triangle.2.circlepath") { update(layer) }
+                }
             }
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+
+    /// An icon in the collapsed bar; icon and title expanded.
+    private func layerBarButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            if layerBarExpanded {
+                Label(title, systemImage: systemImage).frame(width: 196, height: 36, alignment: .trailing)
+            } else {
+                Image(systemName: systemImage).frame(width: 48, height: 36)
+            }
+        }
+        .accessibilityLabel(title)
+    }
+
+    // MARK: flatten
+
+    /// The visible layers into one new layer on top (see `flattenVisible`).
+    private func flatten() {
+        finishCrop(keep: true)
+        transformOn = false
+        compare = nil
+        session.flattenVisible()
+    }
+
+    /// A flattened layer rendered again from what's visible now.
+    private func update(_ layer: Layer) {
+        finishCrop(keep: true)
+        transformOn = false
+        compare = nil
+        session.update(layer)
     }
 
     private func layerRow(_ layer: Layer) -> some View {
@@ -579,7 +625,9 @@ struct WorkspaceView: View {
                     session.selectedID = layer.id
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Layer \(number)").font(.subheadline.weight(selected ? .semibold : .regular))
+                        Text(layer.isFlattened ? layer.name : "Layer \(number)")  // "Flattened 1"
+                            .font(.subheadline.weight(selected ? .semibold : .regular))
+                            .lineLimit(1)
                         Text("\(layer.blend.rawValue) · \(Int((layer.opacity * 100).rounded()))%")
                             .font(.caption).foregroundStyle(.secondary)
                     }
@@ -611,6 +659,9 @@ struct WorkspaceView: View {
             Button("Send to back", systemImage: "square.3.layers.3d.bottom.filled") { session.move(layer, to: 0) }
                 .disabled(number == 1)
             Divider()
+            if layer.isFlattened {
+                Button("Update", systemImage: "arrow.triangle.2.circlepath") { update(layer) }
+            }
             Button("Edit corners…", systemImage: "perspective") { editCorners(layer) }
                 .disabled(layer.source == nil)
             Button("Duplicate", systemImage: "plus.square.on.square") { session.duplicate(layer) }

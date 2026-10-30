@@ -45,6 +45,10 @@ final class Layer: Identifiable {
     var source: UIImage? = nil
     var sourceID: UUID? = nil  // names its file; shared by duplicates
     var corners: Corners? = nil
+    /// For a flattened layer, the layers it was last rendered from; nil for
+    /// any other layer. (It has no photo, so no Edit corners.)
+    var flattenedFrom: [UUID]? = nil
+    var isFlattened: Bool { flattenedFrom != nil }
     var opacity = 0.6
     var blend = Blend.multiply  // white paper disappears
     var isVisible = true
@@ -251,6 +255,7 @@ final class TransferSession {
         copy.source = layer.source
         copy.sourceID = layer.sourceID
         copy.corners = layer.corners
+        copy.flattenedFrom = layer.flattenedFrom
         copy.opacity = layer.opacity
         copy.blend = layer.blend
         copy.isVisible = true
