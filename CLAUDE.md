@@ -71,7 +71,8 @@ libdbus-1-3 are needed). Keep them passing.
 
 ## iPad app — open work
 
-- **Flatten** (asked for, Oct 2026): render the visible layers as shown into
-  a new layer so Pick/Simplify/Highlight read what you see; hide the
-  originals; **Update** re-renders and refreshes its swatches. No masks,
-  painting or merge-down: it isn't an image editor.
+- Nothing open.
+
+## iPad app — done
+
+- **Flatten** and **Update** (Oct 2026, `Flatten.swift`): visible layers as shown into "Flattened n", sources hidden; Update re-renders and re-reads its swatches.
