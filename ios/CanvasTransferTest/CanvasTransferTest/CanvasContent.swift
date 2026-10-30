@@ -12,6 +12,7 @@ struct CanvasContent: View {
     var faintFullImageOf: UUID? = nil  // the layer being cropped: its whole image shows faintly too
     var only: Set<UUID>? = nil  // Compare: exactly these layers, hidden or not; nil = the visible ones
     var fades: [UUID: Double] = [:]  // Compare: a layer's opacity times this, while it fades in and out
+    var replacements: [UUID: UIImage] = [:]  // Color: a layer shown simplified or highlighted instead
 
     var body: some View {
         ZStack {
@@ -32,7 +33,7 @@ struct CanvasContent: View {
     private func layerView(_ layer: Layer) -> some View {
         // The image at its own proportions, then projected into its corners.
         let w = size.width, h = w / layer.aspect, c = layer.crop
-        let image = Image(uiImage: layer.shownImage).resizable().frame(width: w, height: h)
+        let image = Image(uiImage: replacements[layer.id] ?? layer.shownImage).resizable().frame(width: w, height: h)
         if faintFullImageOf == layer.id {
             placed(image, layer, opacity: layer.opacity * 0.3)
         }

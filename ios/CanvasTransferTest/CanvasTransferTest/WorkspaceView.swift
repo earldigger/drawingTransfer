@@ -41,6 +41,11 @@ struct WorkspaceView: View {
     @State private var sampleSize = SampleSize.small
     @State private var selectedSwatchID: UUID? = nil
     @State private var probe: (pick: PickProbe, screen: CGPoint)? = nil  // while a finger is picking
+    @State private var colorView = ColorView.normal  // Color: Simplify or Highlight the selected layer
+    @State private var simplifySettings = SimplifySettings()
+    @State private var highlightSettings = HighlightSettings()
+    @State private var study: StudyResult? = nil  // the selected layer, simplified or highlighted
+    @State private var studyWorking = false
 
     var body: some View {
         GeometryReader { geo in
@@ -124,7 +129,37 @@ struct WorkspaceView: View {
             compare = nil
             gridBarShown = false
             probe = nil
+            colorView = .normal
             if now == .color { pickOn = true }
+        }
+        // Simplify or Highlight again when what they depend on changes; a
+        // moving slider settles first.
+        .task(id: studyKey) {
+            guard studyKey != nil, let layer = session.selected else {
+                study = nil
+                studyWorking = false
+                return
+            }
+            studyWorking = true
+            try? await Task.sleep(for: .milliseconds(120))
+            guard !Task.isCancelled else { return }
+            let source = layer.shownImage, view = colorView, simplify = simplifySettings
+            let tolerance = highlightSettings.tolerance, swatches = highlightSwatches
+            let result = await Task.detached(priority: .userInitiated) { () -> (UIImage, ColorStudy.Simplified?)? in
+                switch view {
+                case .simplify:
+                    return ColorStudy.simplify(source, count: simplify.count, smoothing: simplify.smoothing, mode: simplify.mode)
+                        .map { ($0.image, $0) }
+                case .highlight:
+                    return ColorStudy.highlight(source, swatches: swatches, tolerance: tolerance).map { ($0, nil) }
+                case .normal:
+                    return nil
+                }
+            }.value
+            guard !Task.isCancelled else { return }
+            studyWorking = false
+            study = result.map { StudyResult(layerID: layer.id, view: view, image: $0.0, simplified: $0.1,
+                                             pixels: PixelBuffer($0.0)) }
         }
         .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
         .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
@@ -209,7 +244,8 @@ struct WorkspaceView: View {
         let point = CGPoint(x: (screen.x - rect.midX - viewOffset.width) / viewScale + canvas.width / 2,
                             y: (screen.y - rect.midY - viewOffset.height) / viewScale + canvas.height / 2)
         guard let layer = session.selected,
-              let found = PickProbe.at(point, layer: layer, canvas: canvas, sample: sampleSize)
+              let found = PickProbe.at(point, layer: layer, canvas: canvas, sample: sampleSize,
+                                       shown: shownStudy?.view == .simplify ? shownStudy?.pixels : nil)  // the flat color you see
         else {
             probe = nil
             return
@@ -240,7 +276,41 @@ struct WorkspaceView: View {
                           grid: grid, gridLineWidth: lineWidth)
         } else {
             CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
-                          faintFullImageOf: cropping?.id)
+                          faintFullImageOf: cropping?.id,
+                          replacements: shownStudy.map { [$0.layerID: $0.image] } ?? [:])
+        }
+    }
+
+    // MARK: simplify and highlight
+
+    /// The result to show: for the selected layer, in the view it was made for.
+    /// While a new one is made, the last one stays up.
+    private var shownStudy: StudyResult? {
+        guard workspace == .color, colorView != .normal, let study,
+              study.layerID == session.selectedID, study.view == colorView else { return nil }
+        return study
+    }
+
+    /// The swatches Highlight shows, each with its number's highlight color.
+    private var highlightSwatches: [(rgb: (Int, Int, Int), index: Int)] {
+        session.swatches.enumerated()
+            .filter { !highlightSettings.selectedOnly || $0.element.id == selectedSwatchID }
+            .map { (($0.element.red, $0.element.green, $0.element.blue), $0.offset) }
+    }
+
+    /// Everything Simplify or Highlight depends on; nil when neither is on.
+    private var studyKey: String? {
+        guard workspace == .color, colorView != .normal, let layer = session.selected else { return nil }
+        let image = ObjectIdentifier(layer.shownImage).hashValue  // a new image after Look or Edit corners
+        switch colorView {
+        case .simplify:
+            let s = simplifySettings
+            return "simplify \(layer.id) \(image) \(s.mode) \(s.count) \(s.smoothing)"
+        case .highlight:
+            let colors = highlightSwatches.map { "\($0.rgb.0),\($0.rgb.1),\($0.rgb.2)@\($0.index)" }.joined(separator: " ")
+            return "highlight \(layer.id) \(image) \(highlightSettings.tolerance) \(colors)"
+        case .normal:
+            return nil
         }
     }
 
@@ -298,6 +368,13 @@ struct WorkspaceView: View {
                 if workspace == .color {
                     if gridBarShown {
                         GridBar(session: session) { gridBarShown = false }
+                    } else if colorView == .simplify {
+                        SimplifyBar(settings: $simplifySettings, result: shownStudy?.simplified, working: studyWorking) {
+                            colorView = .normal
+                        }
+                    } else if colorView == .highlight {
+                        HighlightBar(settings: $highlightSettings, swatches: session.swatches, selectedID: $selectedSwatchID,
+                                     working: studyWorking) { colorView = .normal }
                     } else {
                         SwatchBar(session: session, selectedID: $selectedSwatchID, sample: $sampleSize)
                     }
@@ -396,6 +473,16 @@ struct WorkspaceView: View {
             VStack(spacing: 6) {
                 toolButton("eyedropper", "Pick", on: pickOn) { pickOn.toggle() }
                     .disabled(session.layers.isEmpty)
+                toolButton("circle.lefthalf.filled", "Simplify", on: colorView == .simplify) {
+                    gridBarShown = false
+                    colorView = colorView == .simplify ? .normal : .simplify
+                }
+                .disabled(session.selected == nil)
+                toolButton("highlighter", "Highlight", on: colorView == .highlight) {
+                    gridBarShown = false
+                    colorView = colorView == .highlight ? .normal : .highlight
+                }
+                .disabled(session.selected == nil)
                 gridTool
             }
             .padding(6)
@@ -624,6 +711,16 @@ struct LookBar: View {
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
+}
+
+/// A layer shown simplified or highlighted: the image, and for Simplify the
+/// colors it found, and its pixels so Pick reads what you see.
+struct StudyResult {
+    let layerID: UUID
+    let view: ColorView
+    let image: UIImage
+    let simplified: ColorStudy.Simplified?
+    let pixels: PixelBuffer?
 }
 
 /// A layer whose corners are being edited, and the rectangle found in its photo.

@@ -9,8 +9,7 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: there are no projects or iCloud, and Color has only Pick
-so far. The current session is saved on the iPad as you work and reopens at
+It is not the app: there are no projects or iCloud, and no paints or mixes. The current session is saved on the iPad as you work and reopens at
 launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
@@ -55,6 +54,9 @@ automatically.
 - **Color** (top bar): Pick is on; touch the canvas for a loupe on the
   selected layer and lift to add a numbered swatch. Two fingers pan and zoom.
   The Swatch bar shows hex, RGB and value; long-press a chip to delete it.
+- **Simplify** (Color): Colors, Values or Value scale, 2–12, smoothing; the
+  colors found with their shares. Pick reads the flat color you see.
+  **Highlight**: each swatch's range in its own bright color over gray.
 - **Transform**: a bar with Proportional, Free, Skew and Distort for the
   corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
   pinch and twist in every mode. Placement is four corners, as in the prototype.
@@ -98,5 +100,6 @@ automatically.
 | `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
 | `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |
 | `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |
+| `ColorStudy.swift` | Simplify and Highlight (the prototype's math, applied with a Core Image color cube), their bars |
 | `Compare.swift` | Compare modes, which layers show, the Split line, Compare bar |
 | `Crop.swift` | Crop math (same as the prototype), crop frame and handles, Crop bar |

@@ -132,12 +132,14 @@ struct PickProbe: Equatable {
         a.location == b.location && a.u == b.u && a.v == b.v && a.rgb?.0 == b.rgb?.0 && a.rgb?.1 == b.rgb?.1 && a.rgb?.2 == b.rgb?.2
     }
 
-    /// Reads the selected layer at a canvas point, through its corners.
-    static func at(_ location: CGPoint, layer: Layer, canvas: CGSize, sample: SampleSize) -> PickProbe? {
+    /// Reads the selected layer at a canvas point, through its corners: what
+    /// the canvas shows of it, so `shown` when it's simplified.
+    static func at(_ location: CGPoint, layer: Layer, canvas: CGSize, sample: SampleSize,
+                   shown: PixelBuffer? = nil) -> PickProbe? {
         guard let f = QuadGeometry.imageFraction(of: location, in: layer.quadPoints(in: canvas)) else { return nil }
         let inside = (0...1).contains(f.x) && (0...1).contains(f.y)
             && layer.crop.contains(CGPoint(x: min(f.x, 0.999_999), y: min(f.y, 0.999_999)))
-        let pixels = layer.pixels()
+        let pixels = shown ?? layer.pixels()
         return PickProbe(location: location, layerID: layer.id, u: f.x, v: f.y,
                          rgb: inside ? pixels?.average(u: f.x, v: f.y, radius: sample.rawValue) : nil,
                          patch: pixels?.patch(u: f.x, v: f.y, size: 15))
