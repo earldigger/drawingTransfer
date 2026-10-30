@@ -22,7 +22,8 @@ from PySide6.QtWidgets import (
 
 from .. import color_study as cs
 from .. import palettes
-from ..mixing import MIXBOX, MODELS, WATER, MatchResult, MixModel, Recipe, closeness, find_recipes, predict
+from ..mixing import (MIXBOX, MODELS, WATER, MatchResult, MixModel, Recipe, closeness, find_recipes, percent,
+                      predict)
 from ..paints import Paint, PaintLibrary, medium_label
 from .paint_dialog import chip_style
 
@@ -130,7 +131,8 @@ class PaintMatchPanel(QWidget):
             "color. ΔE is the difference from your swatch; under 2 is hard to see. Two paints plus white can "
             "match almost anything, so mixes within ΔE 1 are listed starting from paints already near your "
             "color. Both models treat every paint as "
-            "equally strong, so trust which paints they name more than the amounts: phthalos and other strong "
+            "equally strong unless you set its Strength in Edit Paint, so without it trust which paints they "
+            "name more than the amounts: phthalos and other strong "
             "pigments need much less than it says, earths more. ⚠ marks paints whose color is outside what a "
             "screen can show (clipped before mixing); * marks paints mixed with a stand-in's color.")
         self.note.setWordWrap(True)
@@ -319,7 +321,8 @@ class PaintMatchPanel(QWidget):
                 mark = ("⚠" if paint.id in off else "") + ("*" if paint.id in borrowed else "")
                 alt = r.also.get(paint.id, [])
                 alt_text = f"  (or {', '.join(a.name + ('*' if a.lab is None else '') for a in alt)})" if alt else ""
-                lines.append(f"{round(share * 100)}%  {paint.name}{mark}{alt_text}")
+                strength = f"  (strength ×{paint.strength:g})" if paint.strength != 1 else ""
+                lines.append(f"{percent(share)}  {paint.name}{mark}{strength}{alt_text}")
             other = self.other_model()
             other_rgb, other_de = predict(r, self._target, other)
             text = (f"ΔE {r.delta_e:.1f} — {closeness(r.delta_e)}\n" + "\n".join(lines)

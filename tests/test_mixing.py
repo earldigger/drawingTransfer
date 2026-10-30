@@ -125,3 +125,32 @@ def test_closeness_words():
     assert mixing.closeness(0.5) == "very close"
     assert mixing.closeness(3) == "close"
     assert mixing.closeness(12) == "far off"
+
+
+def test_strength_turns_effective_amounts_into_real_ones():
+    assert mixing.real_shares([3, 1], [0.5, 0.5]) == pytest.approx([0.25, 0.75])
+    assert mixing.effective_shares([3, 1], [0.25, 0.75]) == pytest.approx([0.5, 0.5])
+    assert mixing.percent(0.003) == "<1%" and mixing.percent(0.25) == "25%"
+
+
+def test_a_strong_paint_is_asked_for_in_smaller_amounts(library):
+    white = library.get("titanium-white")
+    blue = library.get("old-delft-blue")
+    target = mixing.mix([screen(blue), screen(white)], [0.5, 0.5])  # what half and half looks like at strength 1
+    plain = mixing.find_recipes(target, library, [blue], white).singles[0]
+    blue.strength = 3.0
+    strong = mixing.find_recipes(target, library, [blue], white).singles[0]
+    assert dict((p.id, s) for p, s in plain.parts)["old-delft-blue"] == pytest.approx(0.5, abs=0.02)
+    assert dict((p.id, s) for p, s in strong.parts)["old-delft-blue"] == pytest.approx(0.25, abs=0.02)
+    assert strong.delta_e == pytest.approx(plain.delta_e, abs=0.5)
+    rgb, de = mixing.predict(strong, target, mixing.MIXBOX)  # the real amounts mix back to the same color
+    assert de < 1.5
+
+
+def test_strength_is_saved_and_defaults_to_one():
+    p = paint("Viridian")
+    p.strength = 2.5
+    assert Paint.from_dict(p.to_dict()).strength == 2.5
+    old = p.to_dict()
+    del old["strength"]
+    assert Paint.from_dict(old).strength == 1.0

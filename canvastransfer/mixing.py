@@ -8,6 +8,11 @@ Two mixing models, to compare:
 Both treat every color as if it had the same tinting strength, so a recipe
 names sensible paints, but its amounts are only a starting point: a strong
 pigment such as phthalo blue needs far less than it says, a weak earth more.
+A paint's strength (Paint.strength, measured from your own tints) corrects
+that: the search runs on "effective" amounts, what each paint contributes
+to the color, and a recipe lists real amounts, effective / strength. With
+strength 3, a quarter part of the paint does what half a part of an average
+paint would.
 
 Two searches run for a target color:
   * one paint, lightened with the chosen white (or water) in 1% steps;
@@ -65,7 +70,25 @@ class Recipe:
     paint_rgbs: dict[str, RGB]  # paint id -> the screen color it was mixed as
 
     def text(self) -> str:
-        return "  +  ".join(f"{p.name} {round(share * 100)}%" for p, share in self.parts)
+        return "  +  ".join(f"{p.name} {percent(share)}" for p, share in self.parts)
+
+
+def percent(share: float) -> str:
+    return "<1%" if 0 < share < 0.005 else f"{round(share * 100)}%"
+
+
+def real_shares(strengths, effective) -> list[float]:
+    """Amounts of paint to mix, from what each should contribute."""
+    amounts = [e / max(k, 1e-6) for k, e in zip(strengths, effective)]
+    total = sum(amounts) or 1.0
+    return [a / total for a in amounts]
+
+
+def effective_shares(strengths, real) -> list[float]:
+    """What each paint contributes to the color, from the amounts mixed."""
+    weights = [k * s for k, s in zip(strengths, real)]
+    total = sum(weights) or 1.0
+    return [w / total for w in weights]
 
 
 @dataclass
@@ -88,22 +111,27 @@ def mix_latents(latents: np.ndarray) -> np.ndarray:
 @dataclass(frozen=True)
 class MixModel:
     """A way of predicting paint mixes. A paint is encoded as a vector;
-    shares times those vectors add up to the mix, which decode turns into
-    sRGB floats (N, 3)."""
+    shares (raised to share_power) times those vectors add up to the mix,
+    which decode turns into sRGB floats (N, 3)."""
     id: str
     name: str
     size: int
     encode: Callable[[RGB], np.ndarray]
     decode: Callable[[np.ndarray], np.ndarray]
+    share_power: float = 1.0
+
+    def weight(self, shares):
+        return np.asarray(shares, dtype=float) ** self.share_power
 
 
 MIXBOX = MixModel("mixbox", "Mixbox", mixbox.LATENT_SIZE, _latent, mix_latents)
-KUBELKA_MUNK = MixModel("km", "Kubelka-Munk", km_mixing.SIZE, km_mixing.encode, km_mixing.decode)
+KUBELKA_MUNK = MixModel("km", "Kubelka-Munk", km_mixing.SIZE, km_mixing.encode, km_mixing.decode,
+                        km_mixing.SHARE_POWER)
 MODELS = (MIXBOX, KUBELKA_MUNK)
 
 
 def mix(paint_rgbs: list[RGB], shares: list[float], model: MixModel = MIXBOX) -> RGB:
-    z = sum(s * model.encode(c) for c, s in zip(paint_rgbs, shares))
+    z = sum(w * model.encode(c) for c, w in zip(paint_rgbs, model.weight(shares)))
     return tuple(int(round(v * 255)) for v in model.decode(z[None, :])[0])
 
 
@@ -117,6 +145,7 @@ class _Palette:
         self.rgbs: list[RGB] = []
         self.off_screen: list[bool] = []
         self.stand_in: list[bool] = []
+        self.strengths: list[float] = []
         self.also: dict[str, list[Paint]] = {}
         by_color: dict[tuple, int] = {}
         for paint in sorted(paints, key=lambda p: p.lab is None):  # measured paints first
@@ -133,6 +162,7 @@ class _Palette:
             self.rgbs.append(rgb)
             self.off_screen.append(not in_gamut)
             self.stand_in.append(paint.lab is None)
+            self.strengths.append(paint.strength)
         self.latents = np.array([model.encode(c) for c in self.rgbs]).reshape(-1, model.size)
 
     def flags(self, indices) -> tuple[list[Paint], list[Paint]]:
@@ -147,7 +177,8 @@ def _score(model: MixModel, latents: np.ndarray, target_lab: np.ndarray) -> tupl
 
 def _recipe(palette: _Palette, indices: list[int], shares: list[float], rgb, delta_e) -> Recipe:
     used = [(i, float(s)) for i, s in zip(indices, shares) if s >= 0.005]
-    parts = [(palette.paints[i], s) for i, s in used]
+    real = real_shares([palette.strengths[i] for i, _ in used], [s for _, s in used])
+    parts = [(palette.paints[i], r) for (i, _), r in zip(used, real)]
     off, stand = palette.flags([i for i, _ in used])
     also = {p.id: palette.also[p.id] for p, _ in parts if p.id in palette.also}
     rgbs = {palette.paints[i].id: palette.rgbs[i] for i, _ in used}
@@ -164,7 +195,7 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
     if lightener is not None:
         white = _Palette(library, [lightener], model)
         if white.paints:
-            for name in ("paints", "rgbs", "off_screen", "stand_in"):
+            for name in ("paints", "rgbs", "off_screen", "stand_in", "strengths"):
                 getattr(palette, name).extend(getattr(white, name))
             palette.latents = np.vstack([palette.latents, white.latents])
     has_white = len(palette.paints) > n
@@ -176,7 +207,8 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
 
     # one paint (+ white)
     shares = np.linspace(0.01, 1.0, 100) if has_white else np.array([1.0])
-    lat = (shares[None, :, None] * Z[:, None, :] + (1 - shares)[None, :, None] * zw).reshape(-1, model.size)
+    lat = (model.weight(shares)[None, :, None] * Z[:, None, :]
+           + model.weight(1 - shares)[None, :, None] * zw).reshape(-1, model.size)
     de, rgb = _score(model, lat, target_lab)
     de, rgb = de.reshape(n, -1), rgb.reshape(n, -1, 3)
     best = de.argmin(axis=1)
@@ -196,8 +228,9 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
                          if (i + j <= steps if has_white else i + j == steps)]) / steps
         a, b = grid[:, 0], grid[:, 1]
         w = 1 - a - b
-        lat = (a[None, :, None] * Z[pair_idx[:, 0]][:, None, :] + b[None, :, None] * Z[pair_idx[:, 1]][:, None, :]
-               + w[None, :, None] * zw).reshape(-1, model.size)
+        wa, wb, ww = model.weight(a), model.weight(b), model.weight(np.maximum(w, 0.0))
+        lat = (wa[None, :, None] * Z[pair_idx[:, 0]][:, None, :] + wb[None, :, None] * Z[pair_idx[:, 1]][:, None, :]
+               + ww[None, :, None] * zw).reshape(-1, model.size)
         de, _ = _score(model, lat, target_lab)
         de = de.reshape(len(pair_idx), -1)
         coarse_best = de.argmin(axis=1)
@@ -210,7 +243,8 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
                              and (x + y <= 1.0 + 1e-9 if has_white else abs(x + y - 1.0) < 1e-9)])
             i, j = pair_idx[k]
             fw = 1 - fine[:, 0] - fine[:, 1]
-            lat = fine[:, :1] * Z[i] + fine[:, 1:2] * Z[j] + fw[:, None] * zw
+            fine_w = model.weight(fine)
+            lat = fine_w[:, :1] * Z[i] + fine_w[:, 1:2] * Z[j] + model.weight(np.maximum(fw, 0.0))[:, None] * zw
             fde, frgb = _score(model, lat, target_lab)
             m = int(fde.argmin())
             idx, sh = [i, j], [fine[m, 0], fine[m, 1]]
@@ -228,6 +262,7 @@ def find_recipes(target_rgb: RGB, library: PaintLibrary, paints: list[Paint],
 def predict(recipe: Recipe, target_rgb: RGB, model: MixModel) -> tuple[RGB, float]:
     """What `model` says a recipe's amounts make, and how far that is from
     the target: the other model's view of the same recipe."""
-    rgb = mix([recipe.paint_rgbs[p.id] for p, _ in recipe.parts], [s for _, s in recipe.parts], model)
+    shares = effective_shares([p.strength for p, _ in recipe.parts], [s for _, s in recipe.parts])
+    rgb = mix([recipe.paint_rgbs[p.id] for p, _ in recipe.parts], shares, model)
     target_lab = cs.srgb_to_lab_d50(np.asarray(target_rgb, dtype=float) / 255.0)
     return rgb, float(cs.delta_e(cs.srgb_to_lab_d50(np.asarray(rgb, dtype=float) / 255.0), target_lab))
