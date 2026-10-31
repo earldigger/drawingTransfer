@@ -67,8 +67,11 @@ automatically.
   hex, RGB, Lab, value, warm or cool, complement, and Mixbox tints, shades
   and tones; then Mix from (a palette or all your paints of a medium) and
   Lighten with (a white, water or nothing), and the best one-paint and
-  two-paint recipes with ΔE. Your paints come from the prototype's
-  paints.json; **Import paints…** loads a newer one from Files.
+  two-paint recipes with ΔE. Mix from also offers the classic palettes (Zorn,
+  Sargent, …) filled from your paints, and Favorites only. Your paints come
+  from the prototype's paints.json; **Import paints…** loads a newer one.
+- **Share swatch sheet (PDF)** (top right): the canvas with its numbered
+  swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
 - **Simplify** (Color): Colors, Values or Value scale, 2–12, smoothing; the
   colors found with their shares. Pick reads the flat color you see.
   **Highlight**: each swatch's range in its own bright color over gray.
@@ -114,12 +117,14 @@ automatically.
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
 | `Paints.swift`, `paints.json` | Your paint library from the prototype, its stand-ins and whites; Import paints… |
+| `SwatchSheet.swift` | The swatch sheet PDF |
 | `Swatches.swift` | Workspaces, swatches, picking (pixels, loupe, markers), Swatch bar |
 | `Transform.swift` | The prototype's quad geometry and modes, drawing into a quad, Transform handles and bar |
 | `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
 | `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |
 | `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |
 | `ColorStudy.swift` | Simplify and Highlight (the prototype's math, applied with a Core Image color cube), their bars |
+| `ClassicPalettes.swift` | Zorn, Sargent, classical, triad, split primary, earth: roles filled from your paints (palettes.py) |
 | `ColorPanel.swift` | The Color panel: swatch Details, and Paints & mixes (Mix from, Lighten with, recipes) |
 | `Compare.swift` | Compare modes, which layers show, the Split line, Compare bar |
 | `Crop.swift` | Crop math (same as the prototype), crop frame and handles, Crop bar |

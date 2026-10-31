@@ -430,6 +430,17 @@ struct WorkspaceView: View {
         }
     }
 
+    /// The swatches and their best mixes as a PDF, then the share sheet.
+    private func shareSwatchSheet() {
+        exporting = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            let url = SwatchSheet.render(session)
+            exporting = false
+            if let url { shareFile = ShareFile(url: url) } else { shareFailed = true }
+        }
+    }
+
     private var topBar: some View {
         HStack {
             Text("Transfer test").font(.headline)
@@ -473,6 +484,8 @@ struct WorkspaceView: View {
                 if session.grid.isOn {
                     Button("Share image with grid", systemImage: "square.grid.3x3") { share(withGrid: true) }
                 }
+                Button("Share swatch sheet (PDF)", systemImage: "doc.richtext") { shareSwatchSheet() }
+                    .disabled(session.swatches.isEmpty)
             } label: {
                 Image(systemName: "square.and.arrow.up")
             }

@@ -143,6 +143,66 @@ final class PaintLibrary {
             }
     }
 
+    // MARK: what to mix from (the prototype's Mix from and Lighten with)
+
+    /// One Mix from choice: your palettes, all your paints of a medium, or a
+    /// classic palette filled from your paints.
+    struct MixSource: Identifiable {
+        var key: String  // "palette:<id>", "medium:<m>" or "template:<key>:<m>"
+        var title: String
+        var medium: String
+        var paints: [Paint]
+        var note = ""  // what a classic palette is, and what filled it
+        var id: String { key }
+    }
+
+    func mixSources(favoritesOnly: Bool) -> [MixSource] {
+        let mine = palettes.map {
+            MixSource(key: "palette:\($0.id)", title: "\($0.name) (\($0.medium), \($0.paintIDs.count))", medium: $0.medium,
+                      paints: paints(of: $0))
+        }
+        let all = media.map { m -> MixSource in
+            let list = paints.filter { $0.medium == m && $0.enabled && ($0.favorite || !favoritesOnly) }
+            let withColor = list.filter { color(of: $0) != nil }.count
+            return MixSource(key: "medium:\(m)", title: "All \(m) paints\(favoritesOnly ? ", favorites" : "") (\(withColor) with color)",
+                             medium: m, paints: list)
+        }
+        // Classic palettes need at least two roles filled to be worth offering.
+        let classics = media.flatMap { m in
+            ClassicPalettes.templates.compactMap { t -> MixSource? in
+                let filled = ClassicPalettes.fill(t, library: self, medium: m)
+                guard filled.filter({ $0.paint != nil }).count >= 2 else { return nil }
+                let parts = filled.compactMap { f in f.paint.map { "\($0.name)\(f.substitute ? " (for \(f.role.name.lowercased()))" : "")" } }
+                let empty = filled.filter { $0.paint == nil }.map { $0.role.name.lowercased() }
+                var note = t.note + "\nYours: " + parts.joined(separator: ", ") + "."
+                if !empty.isEmpty { note += " None of your paints fits: " + empty.joined(separator: ", ") + "." }
+                return MixSource(key: "template:\(t.id):\(m)", title: "\(t.name) (classic, \(m))", medium: m,
+                                 paints: filled.compactMap(\.paint), note: note)
+            }
+        }
+        return mine + all + classics
+    }
+
+    /// The choice for `key`, or the first if it's gone.
+    func mixSource(_ key: String, favoritesOnly: Bool) -> MixSource? {
+        let all = mixSources(favoritesOnly: favoritesOnly)
+        return all.first { $0.key == key } ?? all.first
+    }
+
+    /// What lightens the mixes: `choice` is a white's id, "water" or "none";
+    /// otherwise a white (the selection's own first), or water for watercolor.
+    func lightener(_ choice: String, for source: MixSource?) -> Paint? {
+        guard let source else { return nil }
+        let whites = whites(medium: source.medium, selection: source.paints)
+        switch choice {
+        case "none": return nil
+        case "water": return Mixing.water
+        default:
+            if let chosen = whites.first(where: { $0.id == choice }) { return chosen }
+            return source.medium == "watercolor" || whites.isEmpty ? Mixing.water : whites.first
+        }
+    }
+
     // MARK: stand-ins (stand_in_for and auto_stand_in in paints.py)
 
     private func standIn(for paint: Paint) -> Paint? {

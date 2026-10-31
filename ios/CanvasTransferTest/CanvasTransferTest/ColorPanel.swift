@@ -152,49 +152,20 @@ struct MixesView: View {
     @State private var library = PaintLibrary.shared
     @AppStorage("mixFrom") private var mixFrom = ""  // "medium:oil" or "palette:<id>"
     @AppStorage("lightenWith") private var lightenWith = ""  // a paint id, "water" or "none"; "" = the first white
+    @AppStorage("mixFavoritesOnly") private var favoritesOnly = false
     @State private var result: Mixing.Result? = nil
     @State private var working = false
     @State private var importing = false
     @State private var importError: String? = nil
 
-    private struct Source: Identifiable {
-        let key: String, title: String, medium: String, paints: [Paint]
-        var id: String { key }
-    }
-
-    private var sources: [Source] {
-        let media = library.media.map { m -> Source in
-            let paints = library.paints.filter { $0.medium == m && $0.enabled }
-            let withColor = paints.filter { library.color(of: $0) != nil }.count
-            return Source(key: "medium:\(m)", title: "All \(m) paints (\(withColor) with color)", medium: m, paints: paints)
-        }
-        let palettes = library.palettes.map {
-            Source(key: "palette:\($0.id)", title: "\($0.name) (\($0.medium), \($0.paintIDs.count))", medium: $0.medium,
-                   paints: library.paints(of: $0))
-        }
-        return palettes + media  // your palettes first
-    }
-
-    private var source: Source? { sources.first { $0.key == mixFrom } ?? sources.first }
-
-    private var whites: [Paint] {
-        guard let source else { return [] }
-        return library.whites(medium: source.medium, selection: source.paints)
-    }
-
-    /// The chosen lightener; by default a white (the selection's own first), or water for watercolor.
-    private var lightener: Paint? {
-        switch lightenWith {
-        case "none": return nil
-        case "water": return Mixing.water
-        default:
-            if let chosen = whites.first(where: { $0.id == lightenWith }) { return chosen }
-            return source?.medium == "watercolor" || whites.isEmpty ? Mixing.water : whites.first
-        }
-    }
+    private var sources: [PaintLibrary.MixSource] { library.mixSources(favoritesOnly: favoritesOnly) }
+    private var source: PaintLibrary.MixSource? { library.mixSource(mixFrom, favoritesOnly: favoritesOnly) }
+    private var whites: [Paint] { source.map { library.whites(medium: $0.medium, selection: $0.paints) } ?? [] }
+    private var lightener: Paint? { library.lightener(lightenWith, for: source) }
 
     private var searchKey: String {
-        "\(swatch.red),\(swatch.green),\(swatch.blue) \(source?.key ?? "") \(lightener?.id ?? "none") \(library.paints.count) \(library.origin)"
+        "\(swatch.red),\(swatch.green),\(swatch.blue) \(source?.key ?? "") \(source?.paints.map(\.id).joined() ?? "") "
+            + "\(lightener?.id ?? "none") \(library.paints.count) \(library.origin)"
     }
 
     var body: some View {
@@ -203,6 +174,9 @@ struct MixesView: View {
                 Text("No paints. Import your paints.json from the prototype.").font(.callout)
             } else {
                 settings
+                if let note = source?.note, !note.isEmpty {
+                    Text(note).font(.caption2).foregroundStyle(.secondary)
+                }
                 if let source, let missing = Optional(source.paints.filter { library.color(of: $0) == nil }), !missing.isEmpty {
                     Text("No color data (left out): " + missing.map(\.name).joined(separator: ", "))
                         .font(.caption2).foregroundStyle(.secondary)
@@ -252,6 +226,12 @@ struct MixesView: View {
                     Text("Nothing").tag("none")
                 }
                 .pickerStyle(.menu)
+            }
+            GridRow {
+                Text("")
+                Toggle("Favorites only", isOn: $favoritesOnly)  // for "All … paints"
+                    .toggleStyle(.switch).controlSize(.small)
+                    .disabled(!(source?.key.hasPrefix("medium:") ?? false))
             }
         }
         .font(.callout)
