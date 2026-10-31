@@ -65,6 +65,12 @@ final class PaintLibrary {
     private(set) var paints: [Paint] = []
     private(set) var palettes: [Palette] = []
     private(set) var origin = ""  // where they came from, for the panel
+    /// Strengths measured on the iPad, by paint id. They replace paints.json's
+    /// strength in mixes, survive Import paints…, and are listed for copying
+    /// into the prototype by hand (its paints.json is never written).
+    private(set) var measured: [String: MeasuredStrength] = [:]
+    private(set) var revision = 0  // changes whenever paints or strengths do, so mixes are found again
+    @ObservationIgnored private var fileStrengths: [String: Double] = [:]  // paints.json's own values
     @ObservationIgnored private var colors: [String: [Double]] = [:]  // own or stand-in Lab, by paint id
     @ObservationIgnored private var standIns: [String: Paint] = [:]
 
@@ -77,7 +83,15 @@ final class PaintLibrary {
         URL.applicationSupportDirectory.appending(path: "paints.json")
     }
 
+    private static var strengthsURL: URL {
+        URL.applicationSupportDirectory.appending(path: "measured-strengths.json")
+    }
+
     private init() {
+        if let data = try? Data(contentsOf: Self.strengthsURL),
+           let saved = try? JSONDecoder().decode([String: MeasuredStrength].self, from: data) {
+            measured = saved
+        }
         if let data = try? Data(contentsOf: Self.importedURL), load(data) {
             origin = "Imported"
         } else if let url = Bundle.main.url(forResource: "paints", withExtension: "json"),
@@ -100,7 +114,13 @@ final class PaintLibrary {
     @discardableResult
     private func load(_ data: Data) -> Bool {
         guard let file = try? JSONDecoder().decode(File.self, from: data), !file.paints.isEmpty else { return false }
-        paints = file.paints
+        fileStrengths = Dictionary(file.paints.map { ($0.id, $0.strength) }, uniquingKeysWith: { a, _ in a })
+        paints = file.paints.map { paint in
+            var p = paint
+            if let m = measured[p.id] { p.strength = m.strength }
+            return p
+        }
+        revision += 1
         palettes = file.palettes ?? []
         standIns = [:]
         colors = [:]
@@ -116,6 +136,34 @@ final class PaintLibrary {
     }
 
     func paint(_ id: String) -> Paint? { paints.first { $0.id == id } }
+
+    /// paints.json's strength for a paint, before any measured on the iPad.
+    func fileStrength(of paint: Paint) -> Double { fileStrengths[paint.id] ?? 1 }
+
+    /// Uses a strength measured on the iPad for this paint from now on.
+    func setMeasured(_ m: MeasuredStrength, for paintID: String) {
+        measured[paintID] = m
+        applyMeasured()
+    }
+
+    /// Back to paints.json's strength.
+    func removeMeasured(for paintID: String) {
+        measured[paintID] = nil
+        applyMeasured()
+    }
+
+    private func applyMeasured() {
+        paints = paints.map { paint in
+            var p = paint
+            p.strength = measured[p.id]?.strength ?? fileStrengths[p.id] ?? 1
+            return p
+        }
+        revision += 1
+        if let data = try? JSONEncoder().encode(measured) {
+            try? FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+            try? data.write(to: Self.strengthsURL, options: .atomic)
+        }
+    }
 
     /// The paint's own Lab (D50), or its stand-in's; nil if it has neither.
     func color(of paint: Paint) -> [Double]? { colors[paint.id] }

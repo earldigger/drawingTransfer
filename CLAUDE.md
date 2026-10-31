@@ -65,9 +65,13 @@ libdbus-1-3 are needed). Keep them passing.
   Measured against Mixbox: Old Delft Blue ×3 (1:3 with white looks like
   the model's 1:1), Brown Ochre Deep ×1. Get more from the owner's tints:
   paint + white at a known ratio, RAW photo, compare at matching lightness.
-- Possible next steps (not started): strength from a photo inside the app;
-  replacing a paint's library color with one measured from the owner's own
-  masstone.
+- **Strength from a photo** is in the iPad app (`Strength.swift`): tint +
+  white swatches from one photo, the white cancels exposure and cast, then
+  lightness is matched in Mixbox. Measured strengths stay on the iPad
+  (measured-strengths.json, applied over paints.json, never written back);
+  the owner copies them into the prototype by hand. Not yet tried on real tints.
+- Possible next step (not started): replacing a paint's library color with
+  one measured from the owner's own masstone.
 
 ## iPad app — open work
 

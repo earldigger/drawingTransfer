@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct ColorPanel: View {
     let swatch: Swatch
     let number: Int
+    let allSwatches: [Swatch]  // for Measure strength, which needs a tint and a white
     var onClose: () -> Void
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -38,7 +39,7 @@ struct ColorPanel: View {
             ScrollView {
                 switch tab {
                 case .details: SwatchDetails(swatch: swatch)
-                case .mixes: MixesView(swatch: swatch)
+                case .mixes: MixesView(swatch: swatch, allSwatches: allSwatches)
                 }
             }
         }
@@ -148,6 +149,8 @@ struct SwatchDetails: View {
 /// recipes, as in the prototype's Paints panel.
 struct MixesView: View {
     let swatch: Swatch
+    let allSwatches: [Swatch]
+    @State private var measuring = false
 
     @State private var library = PaintLibrary.shared
     @AppStorage("mixFrom") private var mixFrom = ""  // "medium:oil" or "palette:<id>"
@@ -165,7 +168,7 @@ struct MixesView: View {
 
     private var searchKey: String {
         "\(swatch.red),\(swatch.green),\(swatch.blue) \(source?.key ?? "") \(source?.paints.map(\.id).joined() ?? "") "
-            + "\(lightener?.id ?? "none") \(library.paints.count) \(library.origin)"
+            + "\(lightener?.id ?? "none") \(library.revision)"
     }
 
     var body: some View {
@@ -192,13 +195,22 @@ struct MixesView: View {
             }
             Divider()
             HStack {
-                Text("\(library.paints.count) paints · \(library.origin)").font(.caption).foregroundStyle(.secondary)
+                Text("\(library.paints.count) paints · \(library.origin)"
+                     + (library.measured.isEmpty ? "" : " · \(library.measured.count) strengths measured here"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+            }
+            HStack {
+                Button("Measure strength…") { measuring = true }.font(.caption)
                 Spacer()
                 Button("Import paints…") { importing = true }.font(.caption)
             }
             if let importError { Text(importError).font(.caption).foregroundStyle(.red) }
         }
         .task(id: searchKey) { await search() }
+        .sheet(isPresented: $measuring) {
+            MeasureStrengthView(swatches: allSwatches) { measuring = false }
+        }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { picked in
             do {
                 try library.importFile(at: picked.get())

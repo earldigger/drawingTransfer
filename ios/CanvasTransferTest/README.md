@@ -70,6 +70,12 @@ automatically.
   two-paint recipes with ΔE. Mix from also offers the classic palettes (Zorn,
   Sargent, …) filled from your paints, and Favorites only. Your paints come
   from the prototype's paints.json; **Import paints…** loads a newer one.
+- **Measure strength…** (Paints & mixes): mix a paint with white at a known
+  ratio (say 1 : 3), photograph the tint next to a dab of the same white in
+  even light, add it as a layer, and pick a swatch on each. The white cancels
+  the photo's exposure and cast; the strength is where Mixbox's tint has your
+  lightness, with how far the hue is off. Strengths measured here are used in
+  the iPad's mixes and listed to copy into the prototype by hand.
 - **Share swatch sheet (PDF)** (top right): the canvas with its numbered
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
 - **Simplify** (Color): Colors, Values or Value scale, 2–12, smoothing; the
@@ -117,6 +123,7 @@ automatically.
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
 | `Paints.swift`, `paints.json` | Your paint library from the prototype, its stand-ins and whites; Import paints… |
+| `Strength.swift` | Paint strength from a photo of a tint, kept on the iPad; Measure strength sheet |
 | `SwatchSheet.swift` | The swatch sheet PDF |
 | `Swatches.swift` | Workspaces, swatches, picking (pixels, loupe, markers), Swatch bar |
 | `Transform.swift` | The prototype's quad geometry and modes, drawing into a quad, Transform handles and bar |

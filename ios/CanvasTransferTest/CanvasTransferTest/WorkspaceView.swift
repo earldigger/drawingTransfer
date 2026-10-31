@@ -368,7 +368,9 @@ struct WorkspaceView: View {
                 Spacer()
                 if workspace == .color, colorPanelOpen,
                    let index = session.swatches.firstIndex(where: { $0.id == selectedSwatchID }) {
-                    ColorPanel(swatch: session.swatches[index], number: index + 1) { colorPanelOpen = false }
+                    ColorPanel(swatch: session.swatches[index], number: index + 1, allSwatches: session.swatches) {
+                        colorPanelOpen = false
+                    }
                         .padding(.top, 12)
                 }
                 layerBar.padding(12)
