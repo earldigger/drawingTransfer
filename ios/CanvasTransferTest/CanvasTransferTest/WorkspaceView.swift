@@ -46,6 +46,7 @@ struct WorkspaceView: View {
     @State private var highlightSettings = HighlightSettings()
     @State private var study: StudyResult? = nil  // the selected layer, simplified or highlighted
     @State private var studyWorking = false
+    @State private var colorPanelOpen = true  // Details | Paints & mixes for the selected swatch
 
     var body: some View {
         GeometryReader { geo in
@@ -118,6 +119,9 @@ struct WorkspaceView: View {
         .onChange(of: session.selectedID) { _, id in
             if let cropping, cropping.id != id { finishCrop(keep: true) }  // another layer: keep this crop
             if transformOn { noteTransformStart() }
+        }
+        .onChange(of: selectedSwatchID) { _, id in
+            if id != nil { colorPanelOpen = true }  // choosing a swatch opens its panel again
         }
         .onChange(of: transformOn) { _, on in
             if on { noteTransformStart() } else { transformStart = nil }
@@ -362,6 +366,11 @@ struct WorkspaceView: View {
             HStack(alignment: .top, spacing: 0) {
                 toolStrip.padding(12)
                 Spacer()
+                if workspace == .color, colorPanelOpen,
+                   let index = session.swatches.firstIndex(where: { $0.id == selectedSwatchID }) {
+                    ColorPanel(swatch: session.swatches[index], number: index + 1) { colorPanelOpen = false }
+                        .padding(.top, 12)
+                }
                 layerBar.padding(12)
             }
             Spacer()

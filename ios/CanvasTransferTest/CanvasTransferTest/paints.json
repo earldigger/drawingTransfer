@@ -1,0 +1,2912 @@
+{
+ "version": 1,
+ "paints": [
+  {
+   "id": "ro1zj",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Ivory Black",
+   "code": "6001721 (220)",
+   "series": "1",
+   "pigments": [
+    "PBk9"
+   ],
+   "opacity": "SO",
+   "lightfastness": "ASTM I",
+   "lab": [
+    10.40346553,
+    0.00139627,
+    -0.38467855
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/ro1zj-ivory-black",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Ivory Black",
+    "code": "6001721 (220)",
+    "series": "1",
+    "pigments": [
+     "PBk9"
+    ],
+    "opacity": "SO",
+    "lightfastness": "ASTM I",
+    "lab": [
+     10.4035,
+     0.0014,
+     -0.3847
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/ro1zj-ivory-black"
+   }
+  },
+  {
+   "id": "kdr2h",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Vine Black",
+   "code": "367",
+   "series": "A",
+   "pigments": [
+    "PBk8"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    8.817,
+    0.16,
+    1.047
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/kdr2h-vine-black",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Vine Black",
+    "code": "367",
+    "series": "A",
+    "pigments": [
+     "PBk8"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     8.817,
+     0.16,
+     1.047
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/kdr2h-vine-black"
+   }
+  },
+  {
+   "id": "njvx5",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Brilliant Yellow Reddish",
+   "code": "109",
+   "series": "B",
+   "pigments": [
+    "PW4",
+    "PW6",
+    "PY53",
+    "PO73"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    78.739,
+    27.121,
+    34.627
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/njvx5-brilliant-yellow-reddish",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Brilliant Yellow Reddish",
+    "code": "109",
+    "series": "B",
+    "pigments": [
+     "PW4",
+     "PW6",
+     "PY53",
+     "PO73"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     78.739,
+     27.121,
+     34.627
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/njvx5-brilliant-yellow-reddish"
+   }
+  },
+  {
+   "id": "c1s59",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Cadmium Yellow Lemon",
+   "code": "009",
+   "series": "D",
+   "pigments": [
+    "PY35"
+   ],
+   "opacity": "SO",
+   "lightfastness": "I",
+   "lab": [
+    85.49,
+    -1.565,
+    86.934
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/c1s59-cadmium-yellow-lemon",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Cadmium Yellow Lemon",
+    "code": "009",
+    "series": "D",
+    "pigments": [
+     "PY35"
+    ],
+    "opacity": "SO",
+    "lightfastness": "I",
+    "lab": [
+     85.49,
+     -1.565,
+     86.934
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/c1s59-cadmium-yellow-lemon"
+   }
+  },
+  {
+   "id": "crfeq",
+   "medium": "watercolor",
+   "brand": "Old Holland Classic Watercolours",
+   "name": "Cobalt (Aureolin) Yellow Lake",
+   "code": "119",
+   "series": "E",
+   "pigments": [
+    "PY40"
+   ],
+   "opacity": "T",
+   "lightfastness": "",
+   "lab": [
+    82.5458427,
+    4.0107655,
+    76.7897644
+   ],
+   "source": "Handmade masstone sample",
+   "url": "https://artistpigments.org/brands/old-holland-classic-watercolours/crfeq-cobalt-aureolin-yellow-lake",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "watercolor",
+    "brand": "Old Holland Classic Watercolours",
+    "name": "Cobalt (Aureolin) Yellow Lake",
+    "code": "119",
+    "series": "E",
+    "pigments": [
+     "PY40"
+    ],
+    "opacity": "T",
+    "lightfastness": "",
+    "lab": [
+     82.5458,
+     4.0108,
+     76.7898
+    ],
+    "source": "Handmade masstone sample",
+    "url": "https://artistpigments.org/brands/old-holland-classic-watercolours/crfeq-cobalt-aureolin-yellow-lake"
+   }
+  },
+  {
+   "id": "ntvye",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Cadmium Yellow Extra Deep",
+   "code": "6000416 (260)",
+   "series": "6",
+   "pigments": [
+    "PY35"
+   ],
+   "opacity": "O",
+   "lightfastness": "ASTM I",
+   "lab": [
+    70.6882074,
+    47.51560223,
+    104.60729286
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/ntvye-cadmium-yellow-extra-deep",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Cadmium Yellow Extra Deep",
+    "code": "6000416 (260)",
+    "series": "6",
+    "pigments": [
+     "PY35"
+    ],
+    "opacity": "O",
+    "lightfastness": "ASTM I",
+    "lab": [
+     70.6882,
+     47.5156,
+     104.6073
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/ntvye-cadmium-yellow-extra-deep"
+   }
+  },
+  {
+   "id": "cp20o",
+   "medium": "watercolor",
+   "brand": "Old Holland Classic Watercolours",
+   "name": "Cobalt Violet Dark",
+   "code": "032",
+   "series": "F",
+   "pigments": [
+    "PB73",
+    "PV23",
+    "PV19"
+   ],
+   "opacity": "T",
+   "lightfastness": "",
+   "lab": [
+    29.2814745,
+    26.1312295,
+    -21.2673872
+   ],
+   "source": "Handmade masstone sample",
+   "url": "https://artistpigments.org/brands/old-holland-classic-watercolours/cp20o-cobalt-violet-dark",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "watercolor",
+    "brand": "Old Holland Classic Watercolours",
+    "name": "Cobalt Violet Dark",
+    "code": "032",
+    "series": "F",
+    "pigments": [
+     "PB73",
+     "PV23",
+     "PV19"
+    ],
+    "opacity": "T",
+    "lightfastness": "",
+    "lab": [
+     29.2815,
+     26.1312,
+     -21.2674
+    ],
+    "source": "Handmade masstone sample",
+    "url": "https://artistpigments.org/brands/old-holland-classic-watercolours/cp20o-cobalt-violet-dark"
+   }
+  },
+  {
+   "id": "f9622",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Cobalt Violet Dark",
+   "code": "032",
+   "series": "F",
+   "pigments": [
+    "PV14"
+   ],
+   "opacity": "SO",
+   "lightfastness": "I",
+   "lab": [
+    18.637,
+    37.145,
+    -3.727
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/f9622-cobalt-violet-dark",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Cobalt Violet Dark",
+    "code": "032",
+    "series": "F",
+    "pigments": [
+     "PV14"
+    ],
+    "opacity": "SO",
+    "lightfastness": "I",
+    "lab": [
+     18.637,
+     37.145,
+     -3.727
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/f9622-cobalt-violet-dark"
+   }
+  },
+  {
+   "id": "4zwfc",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Scheveningen Violet",
+   "code": "030",
+   "series": "E",
+   "pigments": [
+    "PV19"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    21.731,
+    51.213,
+    20.77
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/4zwfc-scheveningen-violet",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Scheveningen Violet",
+    "code": "030",
+    "series": "E",
+    "pigments": [
+     "PV19"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     21.731,
+     51.213,
+     20.77
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/4zwfc-scheveningen-violet"
+   }
+  },
+  {
+   "id": "ctqp7",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Cadmium Red Purple",
+   "code": "025",
+   "series": "E",
+   "pigments": [
+    "PR108"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    27.672,
+    50.727,
+    29.199
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/ctqp7-cadmium-red-purple",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Cadmium Red Purple",
+    "code": "025",
+    "series": "E",
+    "pigments": [
+     "PR108"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     27.672,
+     50.727,
+     29.199
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/ctqp7-cadmium-red-purple"
+   }
+  },
+  {
+   "id": "24y5n",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Alizarin Crimson Lake Extra",
+   "code": "163",
+   "series": "C",
+   "pigments": [
+    "PV19",
+    "PR177",
+    "PBr23"
+   ],
+   "opacity": "T",
+   "lightfastness": "I",
+   "lab": [
+    29.156,
+    64.01,
+    43.499
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/24y5n-alizarin-crimson-lake-extra",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Alizarin Crimson Lake Extra",
+    "code": "163",
+    "series": "C",
+    "pigments": [
+     "PV19",
+     "PR177",
+     "PBr23"
+    ],
+    "opacity": "T",
+    "lightfastness": "I",
+    "lab": [
+     29.156,
+     64.01,
+     43.499
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/24y5n-alizarin-crimson-lake-extra"
+   }
+  },
+  {
+   "id": "g9yyx",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Scheveningen Red Deep",
+   "code": "024",
+   "series": "C",
+   "pigments": [
+    "PR214"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    36.221,
+    61.334,
+    46.048
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/g9yyx-scheveningen-red-deep",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Scheveningen Red Deep",
+    "code": "024",
+    "series": "C",
+    "pigments": [
+     "PR214"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     36.221,
+     61.334,
+     46.048
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/g9yyx-scheveningen-red-deep"
+   }
+  },
+  {
+   "id": "c0tch",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Cadmium Red Scarlet",
+   "code": "020",
+   "series": "E",
+   "pigments": [
+    "PR108"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    52.912,
+    67.608,
+    75.343
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/c0tch-cadmium-red-scarlet",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Cadmium Red Scarlet",
+    "code": "020",
+    "series": "E",
+    "pigments": [
+     "PR108"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     52.912,
+     67.608,
+     75.343
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/c0tch-cadmium-red-scarlet"
+   }
+  },
+  {
+   "id": "vp13k",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Ultramarine Violet",
+   "code": "199",
+   "series": "B",
+   "pigments": [
+    "PV15"
+   ],
+   "opacity": "SO",
+   "lightfastness": "I",
+   "lab": [
+    22.221,
+    23.766,
+    -31.014
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/vp13k-ultramarine-violet",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Ultramarine Violet",
+    "code": "199",
+    "series": "B",
+    "pigments": [
+     "PV15"
+    ],
+    "opacity": "SO",
+    "lightfastness": "I",
+    "lab": [
+     22.221,
+     23.766,
+     -31.014
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/vp13k-ultramarine-violet"
+   }
+  },
+  {
+   "id": "p5kgy",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "French Ultramarine Light Extra",
+   "code": "037",
+   "series": "B",
+   "pigments": [
+    "PB29",
+    "PB28"
+   ],
+   "opacity": "ST",
+   "lightfastness": "I",
+   "lab": [
+    11.284,
+    23.832,
+    -50.787
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/p5kgy-french-ultramarine-light-extra",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "French Ultramarine Light Extra",
+    "code": "037",
+    "series": "B",
+    "pigments": [
+     "PB29",
+     "PB28"
+    ],
+    "opacity": "ST",
+    "lightfastness": "I",
+    "lab": [
+     11.284,
+     23.832,
+     -50.787
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/p5kgy-french-ultramarine-light-extra"
+   }
+  },
+  {
+   "id": "3x7b8",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Scheveningen Blue",
+   "code": "035",
+   "series": "B",
+   "pigments": [
+    "PB15:3"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    8.537,
+    9.517,
+    -30.578
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/3x7b8-scheveningen-blue",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Scheveningen Blue",
+    "code": "035",
+    "series": "B",
+    "pigments": [
+     "PB15:3"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     8.537,
+     9.517,
+     -30.578
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/3x7b8-scheveningen-blue"
+   }
+  },
+  {
+   "id": "dyoq9",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Old Delft Blue",
+   "code": "220",
+   "series": "C",
+   "pigments": [
+    "PB60"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    5.385,
+    9.614,
+    -19.735
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/dyoq9-old-delft-blue",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Old Delft Blue",
+    "code": "220",
+    "series": "C",
+    "pigments": [
+     "PB60"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     5.385,
+     9.614,
+     -19.735
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/dyoq9-old-delft-blue"
+   }
+  },
+  {
+   "id": "fnq1h",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Old Holland Bright Green",
+   "code": "280",
+   "series": "C",
+   "pigments": [
+    "PY3",
+    "PG36",
+    "PB15"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    40.741,
+    -62.427,
+    26.087
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/fnq1h-old-holland-bright-green",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Old Holland Bright Green",
+    "code": "280",
+    "series": "C",
+    "pigments": [
+     "PY3",
+     "PG36",
+     "PB15"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     40.741,
+     -62.427,
+     26.087
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/fnq1h-old-holland-bright-green"
+   }
+  },
+  {
+   "id": "frn9z",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Old Holland Golden Green Deep",
+   "code": "298",
+   "series": "C",
+   "pigments": [
+    "PY129",
+    "PG36"
+   ],
+   "opacity": "ST",
+   "lightfastness": "I",
+   "lab": [
+    47.819,
+    -0.113,
+    60.0
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/frn9z-old-holland-golden-green-deep",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Old Holland Golden Green Deep",
+    "code": "298",
+    "series": "C",
+    "pigments": [
+     "PY129",
+     "PG36"
+    ],
+    "opacity": "ST",
+    "lightfastness": "I",
+    "lab": [
+     47.819,
+     -0.113,
+     60.0
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/frn9z-old-holland-golden-green-deep"
+   }
+  },
+  {
+   "id": "qd4ty",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Yellow Ochre Deep",
+   "code": "054",
+   "series": "A",
+   "pigments": [
+    "PY43"
+   ],
+   "opacity": "SO",
+   "lightfastness": "I",
+   "lab": [
+    57.224,
+    26.917,
+    62.045
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/qd4ty-yellow-ochre-deep",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Yellow Ochre Deep",
+    "code": "054",
+    "series": "A",
+    "pigments": [
+     "PY43"
+    ],
+    "opacity": "SO",
+    "lightfastness": "I",
+    "lab": [
+     57.224,
+     26.917,
+     62.045
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/qd4ty-yellow-ochre-deep"
+   }
+  },
+  {
+   "id": "9ongn",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "English Red",
+   "code": "063",
+   "series": "A",
+   "pigments": [
+    "PR101"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    31.451,
+    33.191,
+    32.58
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/9ongn-english-red",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "English Red",
+    "code": "063",
+    "series": "A",
+    "pigments": [
+     "PR101"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     31.451,
+     33.191,
+     32.58
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/9ongn-english-red"
+   }
+  },
+  {
+   "id": "5c76r",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Brown Ochre Deep",
+   "code": "067",
+   "series": "A",
+   "pigments": [
+    "PR102"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    25.38,
+    13.397,
+    15.389
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/5c76r-brown-ochre-deep",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Brown Ochre Deep",
+    "code": "067",
+    "series": "A",
+    "pigments": [
+     "PR102"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     25.38,
+     13.397,
+     15.389
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/5c76r-brown-ochre-deep"
+   }
+  },
+  {
+   "id": "p5mgy",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Caput Mortuum Violet (Mars)",
+   "code": "066",
+   "series": "A",
+   "pigments": [
+    "PR101"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    22.256,
+    30.217,
+    19.802
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/p5mgy-caput-mortuum-violet-mars",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Caput Mortuum Violet (Mars)",
+    "code": "066",
+    "series": "A",
+    "pigments": [
+     "PR101"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     22.256,
+     30.217,
+     19.802
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/p5mgy-caput-mortuum-violet-mars"
+   }
+  },
+  {
+   "id": "85bxw",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Lead White",
+   "code": "003",
+   "series": "",
+   "pigments": [
+    "PW1"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    91.361,
+    -1.228,
+    17.061
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/85bxw-lead-white",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Lead White",
+    "code": "003",
+    "series": "",
+    "pigments": [
+     "PW1"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     91.361,
+     -1.228,
+     17.061
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/85bxw-lead-white"
+   }
+  },
+  {
+   "id": "7c7xt",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Zinc White",
+   "code": "002",
+   "series": "A",
+   "pigments": [
+    "PW4"
+   ],
+   "opacity": "SO",
+   "lightfastness": "I",
+   "lab": [
+    90.948,
+    -0.913,
+    18.791
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/7c7xt-zinc-white",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Zinc White",
+    "code": "002",
+    "series": "A",
+    "pigments": [
+     "PW4"
+    ],
+    "opacity": "SO",
+    "lightfastness": "I",
+    "lab": [
+     90.948,
+     -0.913,
+     18.791
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/7c7xt-zinc-white"
+   }
+  },
+  {
+   "id": "kec76",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Cerulean Blue (Genuine)",
+   "code": "6000848 (289)",
+   "series": "8",
+   "pigments": [
+    "PB35"
+   ],
+   "opacity": "O",
+   "lightfastness": "ASTM I",
+   "lab": [
+    33.68865426,
+    -9.6167922,
+    -41.75350438
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/kec76-cerulean-blue-genuine",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Cerulean Blue (Genuine)",
+    "code": "6000848 (289)",
+    "series": "8",
+    "pigments": [
+     "PB35"
+    ],
+    "opacity": "O",
+    "lightfastness": "ASTM I",
+    "lab": [
+     33.6887,
+     -9.6168,
+     -41.7535
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/kec76-cerulean-blue-genuine"
+   }
+  },
+  {
+   "id": "e2m00",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Cobalt Blue",
+   "code": "6000927 (162)",
+   "series": "7",
+   "pigments": [
+    "PB28"
+   ],
+   "opacity": "SO",
+   "lightfastness": "ASTM I",
+   "lab": [
+    20.88537217,
+    17.61594885,
+    -55.58597029
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/e2m00-cobalt-blue",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Cobalt Blue",
+    "code": "6000927 (162)",
+    "series": "7",
+    "pigments": [
+     "PB28"
+    ],
+    "opacity": "SO",
+    "lightfastness": "ASTM I",
+    "lab": [
+     20.8854,
+     17.6159,
+     -55.586
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/e2m00-cobalt-blue"
+   }
+  },
+  {
+   "id": "9x182",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Sap Green",
+   "code": "6001303 (238)",
+   "series": "5",
+   "pigments": [
+    "PY42",
+    "PY129",
+    "PG7"
+   ],
+   "opacity": "ST",
+   "lightfastness": "ASTM I",
+   "lab": [
+    17.32114359,
+    -14.71343322,
+    8.0243514
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/9x182-sap-green",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Sap Green",
+    "code": "6001303 (238)",
+    "series": "5",
+    "pigments": [
+     "PY42",
+     "PY129",
+     "PG7"
+    ],
+    "opacity": "ST",
+    "lightfastness": "ASTM I",
+    "lab": [
+     17.3211,
+     -14.7134,
+     8.0244
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/9x182-sap-green"
+   }
+  },
+  {
+   "id": "68xmv",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Light Ultramarine Blue",
+   "code": "123",
+   "series": "2",
+   "pigments": [
+    "PB29"
+   ],
+   "opacity": "T",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/68xmv-light-ultramarine-blue",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Light Ultramarine Blue",
+    "code": "123",
+    "series": "2",
+    "pigments": [
+     "PB29"
+    ],
+    "opacity": "T",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/68xmv-light-ultramarine-blue"
+   }
+  },
+  {
+   "id": "1szpd",
+   "medium": "watercolor",
+   "brand": "M. Graham & Co. Artists' Watercolor",
+   "name": "Viridian",
+   "code": "195",
+   "series": "",
+   "pigments": [
+    "PG18"
+   ],
+   "opacity": "T",
+   "lightfastness": "ASTM I",
+   "lab": [
+    51.0835805,
+    -49.5484213,
+    3.8616523
+   ],
+   "source": "Handmade masstone sample",
+   "url": "https://artistpigments.org/brands/m-graham-and-co-artists-watercolor/1szpd-viridian",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "watercolor",
+    "brand": "M. Graham & Co. Artists' Watercolor",
+    "name": "Viridian",
+    "code": "195",
+    "series": "",
+    "pigments": [
+     "PG18"
+    ],
+    "opacity": "T",
+    "lightfastness": "ASTM I",
+    "lab": [
+     51.0836,
+     -49.5484,
+     3.8617
+    ],
+    "source": "Handmade masstone sample",
+    "url": "https://artistpigments.org/brands/m-graham-and-co-artists-watercolor/1szpd-viridian"
+   }
+  },
+  {
+   "id": "qpbpn",
+   "medium": "watercolor",
+   "brand": "Michael Harding Professional Watercolour Paint",
+   "name": "Emerald Green",
+   "code": "146",
+   "series": "1",
+   "pigments": [
+    "PY3",
+    "PW6",
+    "PW4",
+    "PG7"
+   ],
+   "opacity": "O",
+   "lightfastness": "E",
+   "lab": [
+    49.92,
+    -47.66,
+    9.73
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/michael-harding-professional-watercolour/qpbpn-emerald-green",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "watercolor",
+    "brand": "Michael Harding Professional Watercolour Paint",
+    "name": "Emerald Green",
+    "code": "146",
+    "series": "1",
+    "pigments": [
+     "PY3",
+     "PW6",
+     "PW4",
+     "PG7"
+    ],
+    "opacity": "O",
+    "lightfastness": "E",
+    "lab": [
+     49.922,
+     -47.659,
+     9.735
+    ],
+    "source": "Handmade masstone sample  45\u00b0/0\u00b0",
+    "url": "https://artistpigments.org/brands/michael-harding-professional-watercolour/qpbpn-emerald-green"
+   }
+  },
+  {
+   "id": "9rmhe",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Burnt Sienna",
+   "code": "181",
+   "series": "1",
+   "pigments": [
+    "PR101",
+    "PBk11"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/9rmhe-burnt-sienna",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Burnt Sienna",
+    "code": "181",
+    "series": "1",
+    "pigments": [
+     "PR101",
+     "PBk11"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/9rmhe-burnt-sienna"
+   }
+  },
+  {
+   "id": "w2cor",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Burnt Sienna",
+   "code": "6001521 (136)",
+   "series": "1",
+   "pigments": [
+    "PR102"
+   ],
+   "opacity": "SO",
+   "lightfastness": "ASTM I",
+   "lab": [
+    26.59314938,
+    24.88541297,
+    24.7828944
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/w2cor-burnt-sienna",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Burnt Sienna",
+    "code": "6001521 (136)",
+    "series": "1",
+    "pigments": [
+     "PR102"
+    ],
+    "opacity": "SO",
+    "lightfastness": "ASTM I",
+    "lab": [
+     26.5931,
+     24.8854,
+     24.7829
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/w2cor-burnt-sienna"
+   }
+  },
+  {
+   "id": "m27hg",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Anise",
+   "code": "140",
+   "series": "2",
+   "pigments": [
+    "PY74",
+    "PY65",
+    "PG7"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2606",
+   "lab": [
+    81.79,
+    0.28,
+    77.39
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/m27hg-anise",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Anise",
+    "code": "140",
+    "series": "2",
+    "pigments": [
+     "PY74",
+     "PY65",
+     "PG7"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2606",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/m27hg-anise"
+   }
+  },
+  {
+   "id": "s0e0k",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Meadow Green",
+   "code": "135",
+   "series": "3",
+   "pigments": [
+    "PY74",
+    "PY65",
+    "PG7"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2606",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/s0e0k-meadow-green",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Meadow Green",
+    "code": "135",
+    "series": "3",
+    "pigments": [
+     "PY74",
+     "PY65",
+     "PG7"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2606",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/s0e0k-meadow-green"
+   }
+  },
+  {
+   "id": "hv0nj",
+   "medium": "oil",
+   "brand": "Sennelier Finest Artists' Oils",
+   "name": "Caput Mortum",
+   "code": "919",
+   "series": "1",
+   "pigments": [
+    "PR101",
+    "PB29",
+    "PV23"
+   ],
+   "opacity": "SO",
+   "lightfastness": "\u2605\u2605\u2605 \u00b7 ASTM I",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/sennelier-finest-artists-oils/hv0nj-caput-mortum",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Sennelier Finest Artists' Oils",
+    "name": "Caput Mortum",
+    "code": "919",
+    "series": "1",
+    "pigments": [
+     "PR101",
+     "PB29",
+     "PV23"
+    ],
+    "opacity": "SO",
+    "lightfastness": "\u2605\u2605\u2605 \u00b7 ASTM I",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/sennelier-finest-artists-oils/hv0nj-caput-mortum"
+   }
+  },
+  {
+   "id": "xoo2d",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Burnt Umber",
+   "code": "6001661 (139)",
+   "series": "1",
+   "pigments": [
+    "PBr7"
+   ],
+   "opacity": "SO",
+   "lightfastness": "ASTM I",
+   "lab": [
+    18.34937737,
+    3.60739768,
+    6.65769891
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/xoo2d-burnt-umber",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Burnt Umber",
+    "code": "6001661 (139)",
+    "series": "1",
+    "pigments": [
+     "PBr7"
+    ],
+    "opacity": "SO",
+    "lightfastness": "ASTM I",
+    "lab": [
+     18.3494,
+     3.6074,
+     6.6577
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/xoo2d-burnt-umber"
+   }
+  },
+  {
+   "id": "f8pck",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Burnt Umber",
+   "code": "188",
+   "series": "1",
+   "pigments": [
+    "PY42",
+    "PR101",
+    "PBk11"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": [
+    22.26,
+    13.46,
+    19.86
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/f8pck-burnt-umber",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Burnt Umber",
+    "code": "188",
+    "series": "1",
+    "pigments": [
+     "PY42",
+     "PR101",
+     "PBk11"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/f8pck-burnt-umber"
+   }
+  },
+  {
+   "id": "qgw37",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Cassel Earth",
+   "code": "193",
+   "series": "1",
+   "pigments": [
+    "PBr7"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": [
+    26.85,
+    5.58,
+    17.95
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/qgw37-cassel-earth",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Cassel Earth",
+    "code": "193",
+    "series": "1",
+    "pigments": [
+     "PBr7"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/qgw37-cassel-earth"
+   }
+  },
+  {
+   "id": "p729o",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Graphite Gray",
+   "code": "6001702 (146)",
+   "series": "1",
+   "pigments": [
+    "PBk10"
+   ],
+   "opacity": "O",
+   "lightfastness": "ASTM I",
+   "lab": [
+    33.4932789,
+    0.55131326,
+    0.87946488
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/p729o-graphite-gray",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Graphite Gray",
+    "code": "6001702 (146)",
+    "series": "1",
+    "pigments": [
+     "PBk10"
+    ],
+    "opacity": "O",
+    "lightfastness": "ASTM I",
+    "lab": [
+     33.4933,
+     0.5513,
+     0.8795
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/p729o-graphite-gray"
+   }
+  },
+  {
+   "id": "gsjog",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Titanium White",
+   "code": "6000101 (148)",
+   "series": "1",
+   "pigments": [
+    "PW6"
+   ],
+   "opacity": "O",
+   "lightfastness": "ASTM I",
+   "lab": [
+    97.0504225,
+    -0.77327011,
+    2.2578612
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/gsjog-titanium-white",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Titanium White",
+    "code": "6000101 (148)",
+    "series": "1",
+    "pigments": [
+     "PW6"
+    ],
+    "opacity": "O",
+    "lightfastness": "ASTM I",
+    "lab": [
+     97.0504,
+     -0.7733,
+     2.2579
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/gsjog-titanium-white"
+   }
+  },
+  {
+   "id": "01t26",
+   "medium": "oil",
+   "brand": "Schmincke Norma [Series 11]",
+   "name": "Opaque White",
+   "code": "116",
+   "series": "1",
+   "pigments": [
+    "PW7"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605\u2605\u2606",
+   "lab": [
+    94.3723575,
+    -1.6399533,
+    12.1588248
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/schmincke-norma-series-11/01t26-opaque-white",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Schmincke Norma [Series 11]",
+    "name": "Opaque White",
+    "code": "116",
+    "series": "1",
+    "pigments": [
+     "PW7"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605\u2605\u2606",
+    "lab": [
+     94.3724,
+     -1.64,
+     12.1588
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/schmincke-norma-series-11/01t26-opaque-white"
+   }
+  },
+  {
+   "id": "8h4o2",
+   "medium": "oil",
+   "brand": "Schmincke Norma [Series 11]",
+   "name": "Titanium White",
+   "code": "114",
+   "series": "1",
+   "pigments": [
+    "PW6",
+    "PW4"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605\u2605\u2605",
+   "lab": [
+    96.934206,
+    -0.5683957,
+    4.3949713
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/schmincke-norma-series-11/8h4o2-titanium-white",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Schmincke Norma [Series 11]",
+    "name": "Titanium White",
+    "code": "114",
+    "series": "1",
+    "pigments": [
+     "PW6",
+     "PW4"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605\u2605\u2605",
+    "lab": [
+     96.9342,
+     -0.5684,
+     4.395
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/schmincke-norma-series-11/8h4o2-titanium-white"
+   }
+  },
+  {
+   "id": "sw9rs",
+   "medium": "oil",
+   "brand": "Lefranc & Bourgeois Extra Fine Oil Paint",
+   "name": "Titanium Zinc White",
+   "code": "013",
+   "series": "1",
+   "pigments": [
+    "PW4",
+    "PW5",
+    "PW6"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/lefranc-and-bourgeois-extra-fine-oil-paint/sw9rs-titanium-zinc-white",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Lefranc & Bourgeois Extra Fine Oil Paint",
+    "name": "Titanium Zinc White",
+    "code": "013",
+    "series": "1",
+    "pigments": [
+     "PW4",
+     "PW5",
+     "PW6"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/lefranc-and-bourgeois-extra-fine-oil-paint/sw9rs-titanium-zinc-white"
+   }
+  },
+  {
+   "id": "kws60",
+   "medium": "oil",
+   "brand": "Natural Pigments Rublev Oil",
+   "name": "Lead White #2",
+   "code": "803",
+   "series": "5",
+   "pigments": [
+    "PW1"
+   ],
+   "opacity": "O",
+   "lightfastness": "ASTM I",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/natural-pigments-rublev-oil/kws60-lead-white-2",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Natural Pigments Rublev Oil",
+    "name": "Lead White #2",
+    "code": "803",
+    "series": "5",
+    "pigments": [
+     "PW1"
+    ],
+    "opacity": "O",
+    "lightfastness": "ASTM I",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/natural-pigments-rublev-oil/kws60-lead-white-2"
+   }
+  },
+  {
+   "id": "voqh8",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Medium Cadmium red (Genuine)",
+   "code": "054",
+   "series": "5",
+   "pigments": [
+    "PR108"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/voqh8-medium-cadmium-red-genuine",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Medium Cadmium red (Genuine)",
+    "code": "054",
+    "series": "5",
+    "pigments": [
+     "PR108"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/voqh8-medium-cadmium-red-genuine"
+   }
+  },
+  {
+   "id": "r81eq",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Carmine Lake",
+   "code": "059",
+   "series": "3",
+   "pigments": [
+    "PR176"
+   ],
+   "opacity": "T",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": [
+    43.43,
+    64.59,
+    45.94
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/r81eq-carmine-lake",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Carmine Lake",
+    "code": "059",
+    "series": "3",
+    "pigments": [
+     "PR176"
+    ],
+    "opacity": "T",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/r81eq-carmine-lake"
+   }
+  },
+  {
+   "id": "cp8bq",
+   "medium": "oil",
+   "brand": "Vasari Classic Artists' Oil Colors",
+   "name": "Alizarin Crimson",
+   "code": "[002]",
+   "series": "",
+   "pigments": [
+    "PR83"
+   ],
+   "opacity": "",
+   "lightfastness": "",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/vasari-classic-artists-oil-colors/cp8bq-alizarin-crimson",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Vasari Classic Artists' Oil Colors",
+    "name": "Alizarin Crimson",
+    "code": "[002]",
+    "series": "",
+    "pigments": [
+     "PR83"
+    ],
+    "opacity": "",
+    "lightfastness": "",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/vasari-classic-artists-oil-colors/cp8bq-alizarin-crimson"
+   }
+  },
+  {
+   "id": "vkkbp",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Light Cobalt Violet (Hue)",
+   "code": "081",
+   "series": "3",
+   "pigments": [
+    "PR122",
+    "PV23"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": [
+    55.36,
+    -17.26,
+    -33.94
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/vkkbp-light-cobalt-violet-hue",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Light Cobalt Violet (Hue)",
+    "code": "081",
+    "series": "3",
+    "pigments": [
+     "PR122",
+     "PV23"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/vkkbp-light-cobalt-violet-hue"
+   }
+  },
+  {
+   "id": "jwhow",
+   "medium": "oil",
+   "brand": "Schmincke Mussini [Series 10]",
+   "name": "Vermilion Red",
+   "code": "364",
+   "series": "3",
+   "pigments": [
+    "PR255"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605\u2605\u2605",
+   "lab": [
+    48.3287523,
+    69.8939821,
+    53.0097142
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/schmincke-mussini-series-10/jwhow-vermilion-red",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Schmincke Mussini [Series 10]",
+    "name": "Vermilion Red",
+    "code": "364",
+    "series": "3",
+    "pigments": [
+     "PR255"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605\u2605\u2605",
+    "lab": [
+     48.3288,
+     69.894,
+     53.0097
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/schmincke-mussini-series-10/jwhow-vermilion-red"
+   }
+  },
+  {
+   "id": "sq19n",
+   "medium": "oil",
+   "brand": "Gamblin Artist Grade Oil Colors",
+   "name": "Transparent Orange",
+   "code": "680",
+   "series": "3",
+   "pigments": [
+    "PY83",
+    "PR149"
+   ],
+   "opacity": "T",
+   "lightfastness": "I",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/gamblin-artist-grade-oil-colors/sq19n-transparent-orange",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Gamblin Artist Grade Oil Colors",
+    "name": "Transparent Orange",
+    "code": "680",
+    "series": "3",
+    "pigments": [
+     "PY83",
+     "PR149"
+    ],
+    "opacity": "T",
+    "lightfastness": "I",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/gamblin-artist-grade-oil-colors/sq19n-transparent-orange"
+   }
+  },
+  {
+   "id": "m9fyw",
+   "medium": "oil",
+   "brand": "Vasari Classic Artists' Oil Colors",
+   "name": "French Yellow Ochre",
+   "code": "[065]",
+   "series": "",
+   "pigments": [
+    "PY43"
+   ],
+   "opacity": "",
+   "lightfastness": "",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/vasari-classic-artists-oil-colors/m9fyw-french-yellow-ochre",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Vasari Classic Artists' Oil Colors",
+    "name": "French Yellow Ochre",
+    "code": "[065]",
+    "series": "",
+    "pigments": [
+     "PY43"
+    ],
+    "opacity": "",
+    "lightfastness": "",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/vasari-classic-artists-oil-colors/m9fyw-french-yellow-ochre"
+   }
+  },
+  {
+   "id": "ro5g3",
+   "medium": "oil",
+   "brand": "Vasari Classic Artists' Oil Colors",
+   "name": "Naples Yellow Light Genuine",
+   "code": "[091]",
+   "series": "",
+   "pigments": [
+    "PY41"
+   ],
+   "opacity": "",
+   "lightfastness": "",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/vasari-classic-artists-oil-colors/ro5g3-naples-yellow-light-genuine",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Vasari Classic Artists' Oil Colors",
+    "name": "Naples Yellow Light Genuine",
+    "code": "[091]",
+    "series": "",
+    "pigments": [
+     "PY41"
+    ],
+    "opacity": "",
+    "lightfastness": "",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/vasari-classic-artists-oil-colors/ro5g3-naples-yellow-light-genuine"
+   }
+  },
+  {
+   "id": "royk4",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Aub\u00e8re Pink",
+   "code": "026",
+   "series": "2",
+   "pigments": [
+    "PR101"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/royk4-aubere-pink",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Aub\u00e8re Pink",
+    "code": "026",
+    "series": "2",
+    "pigments": [
+     "PR101"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/royk4-aubere-pink"
+   }
+  },
+  {
+   "id": "rh1sf",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Hazy Rose",
+   "code": "061",
+   "series": "2",
+   "pigments": [
+    "PR108",
+    "PBk11"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": [
+    74.85,
+    17.91,
+    12.06
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/rh1sf-hazy-rose",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Hazy Rose",
+    "code": "061",
+    "series": "2",
+    "pigments": [
+     "PR108",
+     "PBk11"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/rh1sf-hazy-rose"
+   }
+  },
+  {
+   "id": "40n4k",
+   "medium": "watercolor",
+   "brand": "Old Holland Classic Watercolours",
+   "name": "Naples Yellow Extra",
+   "code": "313",
+   "series": "A",
+   "pigments": [
+    "PY42",
+    "PR101",
+    "PW4"
+   ],
+   "opacity": "O",
+   "lightfastness": "",
+   "lab": [
+    83.9750064,
+    11.0928076,
+    50.546381
+   ],
+   "source": "Handmade masstone sample",
+   "url": "https://artistpigments.org/brands/old-holland-classic-watercolours/40n4k-naples-yellow-extra",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "watercolor",
+    "brand": "Old Holland Classic Watercolours",
+    "name": "Naples Yellow Extra",
+    "code": "313",
+    "series": "A",
+    "pigments": [
+     "PY42",
+     "PR101",
+     "PW4"
+    ],
+    "opacity": "O",
+    "lightfastness": "",
+    "lab": [
+     83.975,
+     11.0928,
+     50.5464
+    ],
+    "source": "Handmade masstone sample",
+    "url": "https://artistpigments.org/brands/old-holland-classic-watercolours/40n4k-naples-yellow-extra"
+   }
+  },
+  {
+   "id": "y9sq7",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Cadmium Red Medium",
+   "code": "154",
+   "series": "E",
+   "pigments": [
+    "PR108"
+   ],
+   "opacity": "O",
+   "lightfastness": "I",
+   "lab": [
+    41.208,
+    67.65,
+    51.874
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/y9sq7-cadmium-red-medium",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Cadmium Red Medium",
+    "code": "154",
+    "series": "E",
+    "pigments": [
+     "PR108"
+    ],
+    "opacity": "O",
+    "lightfastness": "I",
+    "lab": [
+     41.208,
+     67.65,
+     51.874
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/y9sq7-cadmium-red-medium"
+   }
+  },
+  {
+   "id": "3hxsf",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Medium French Yellow",
+   "code": "035",
+   "series": "2",
+   "pigments": [
+    "PY74",
+    "PY65"
+   ],
+   "opacity": "ST",
+   "lightfastness": "\u2605\u2605\u2606",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/3hxsf-medium-french-yellow",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Medium French Yellow",
+    "code": "035",
+    "series": "2",
+    "pigments": [
+     "PY74",
+     "PY65"
+    ],
+    "opacity": "ST",
+    "lightfastness": "\u2605\u2605\u2606",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/3hxsf-medium-french-yellow"
+   }
+  },
+  {
+   "id": "93g4h",
+   "medium": "oil",
+   "brand": "Charvin Fine & Extra Fine Oil Colors",
+   "name": "Amethyst Parma",
+   "code": "082",
+   "series": "3",
+   "pigments": [
+    "PB29",
+    "PV23"
+   ],
+   "opacity": "O",
+   "lightfastness": "\u2605\u2605\u2605",
+   "lab": [
+    69.38,
+    10.6,
+    -23.57
+   ],
+   "source": "Entered by hand",
+   "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/93g4h-amethyst-parma",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": true,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [
+    "lab"
+   ],
+   "site": {
+    "medium": "oil",
+    "brand": "Charvin Fine & Extra Fine Oil Colors",
+    "name": "Amethyst Parma",
+    "code": "082",
+    "series": "3",
+    "pigments": [
+     "PB29",
+     "PV23"
+    ],
+    "opacity": "O",
+    "lightfastness": "\u2605\u2605\u2605",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/charvin-extra-fine-oil-colors/93g4h-amethyst-parma"
+   }
+  },
+  {
+   "id": "gfowx",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Italian Burnt Sienna",
+   "code": "6000023 (359)",
+   "series": "3",
+   "pigments": [
+    "PBr7"
+   ],
+   "opacity": "SO",
+   "lightfastness": "ASTM I",
+   "lab": [
+    28.56311745,
+    19.04824944,
+    16.82686676
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/gfowx-italian-burnt-sienna",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Italian Burnt Sienna",
+    "code": "6000023 (359)",
+    "series": "3",
+    "pigments": [
+     "PBr7"
+    ],
+    "opacity": "SO",
+    "lightfastness": "ASTM I",
+    "lab": [
+     28.5631,
+     19.0482,
+     16.8269
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/gfowx-italian-burnt-sienna"
+   }
+  },
+  {
+   "id": "6q6qt",
+   "medium": "oil",
+   "brand": "Old Holland Classic Oil Colours",
+   "name": "Ultramarine Blue",
+   "code": "036",
+   "series": "A",
+   "pigments": [
+    "PB29"
+   ],
+   "opacity": "SO",
+   "lightfastness": "I",
+   "lab": [
+    13.263,
+    22.447,
+    -50.795
+   ],
+   "source": "Chart",
+   "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/6q6qt-ultramarine-blue",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Old Holland Classic Oil Colours",
+    "name": "Ultramarine Blue",
+    "code": "036",
+    "series": "A",
+    "pigments": [
+     "PB29"
+    ],
+    "opacity": "SO",
+    "lightfastness": "I",
+    "lab": [
+     13.263,
+     22.447,
+     -50.795
+    ],
+    "source": "Chart",
+    "url": "https://artistpigments.org/brands/old-holland-classic-oil-colours/6q6qt-ultramarine-blue"
+   }
+  },
+  {
+   "id": "eh9p9",
+   "medium": "oil",
+   "brand": "Holbein Artists' Oil Color (HOC)",
+   "name": "Quinacridone Opera",
+   "code": "H327",
+   "series": "C",
+   "pigments": [
+    "BV10",
+    "PR122"
+   ],
+   "opacity": "",
+   "lightfastness": "\u2605\u2606\u2606\u2606",
+   "lab": [
+    49.64854768,
+    78.43901693,
+    34.23843963
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/holbein-artists-oil-color-hoc/eh9p9-quinacridone-opera",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Holbein Artists' Oil Color (HOC)",
+    "name": "Quinacridone Opera",
+    "code": "H327",
+    "series": "C",
+    "pigments": [
+     "BV10",
+     "PR122"
+    ],
+    "opacity": "",
+    "lightfastness": "\u2605\u2606\u2606\u2606",
+    "lab": [
+     49.6485,
+     78.439,
+     34.2384
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/holbein-artists-oil-color-hoc/eh9p9-quinacridone-opera"
+   }
+  },
+  {
+   "id": "rqyh3",
+   "medium": "oil",
+   "brand": "Golden Williamsburg Artist Oil Colors",
+   "name": "Quinacridone Magenta",
+   "code": "6000775 (40)",
+   "series": "5",
+   "pigments": [
+    "PR122"
+   ],
+   "opacity": "T",
+   "lightfastness": "ASTM I",
+   "lab": [
+    20.52434932,
+    35.74045029,
+    12.6144237
+   ],
+   "source": "Manufacturer data (Munsell)",
+   "url": "https://artistpigments.org/brands/golden-williamsburg/rqyh3-quinacridone-magenta",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Golden Williamsburg Artist Oil Colors",
+    "name": "Quinacridone Magenta",
+    "code": "6000775 (40)",
+    "series": "5",
+    "pigments": [
+     "PR122"
+    ],
+    "opacity": "T",
+    "lightfastness": "ASTM I",
+    "lab": [
+     20.5243,
+     35.7405,
+     12.6144
+    ],
+    "source": "Manufacturer data (Munsell)",
+    "url": "https://artistpigments.org/brands/golden-williamsburg/rqyh3-quinacridone-magenta"
+   }
+  },
+  {
+   "id": "5wbbc",
+   "medium": "oil",
+   "brand": "Michael Harding Artists Oil Colours",
+   "name": "Emerald Green",
+   "code": "216",
+   "series": "",
+   "pigments": [
+    "PG7",
+    "PW6",
+    "PW4",
+    "PY3"
+   ],
+   "opacity": "O",
+   "lightfastness": "E",
+   "lab": [
+    54.454,
+    -60.33,
+    8.64
+   ],
+   "source": "Handmade masstone sample  45\u00b0/0\u00b0",
+   "url": "https://artistpigments.org/brands/michael-harding-artists-oil-colours/5wbbc-emerald-green",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "Michael Harding Artists Oil Colours",
+    "name": "Emerald Green",
+    "code": "216",
+    "series": "",
+    "pigments": [
+     "PG7",
+     "PW6",
+     "PW4",
+     "PY3"
+    ],
+    "opacity": "O",
+    "lightfastness": "E",
+    "lab": [
+     54.454,
+     -60.33,
+     8.64
+    ],
+    "source": "Handmade masstone sample  45\u00b0/0\u00b0",
+    "url": "https://artistpigments.org/brands/michael-harding-artists-oil-colours/5wbbc-emerald-green"
+   }
+  },
+  {
+   "id": "91551",
+   "medium": "oil",
+   "brand": "M. Graham & Co. Artists' Oil Color",
+   "name": "Viridian",
+   "code": "195",
+   "series": "6",
+   "pigments": [
+    "PG18"
+   ],
+   "opacity": "T",
+   "lightfastness": "I \u00b7 ASTM I",
+   "lab": null,
+   "source": "",
+   "url": "https://artistpigments.org/brands/m-graham-and-co-artists-oil-color/91551-viridian",
+   "drying": "",
+   "strength": 1.0,
+   "favorite": false,
+   "enabled": true,
+   "stand_in": null,
+   "edited": [],
+   "site": {
+    "medium": "oil",
+    "brand": "M. Graham & Co. Artists' Oil Color",
+    "name": "Viridian",
+    "code": "195",
+    "series": "6",
+    "pigments": [
+     "PG18"
+    ],
+    "opacity": "T",
+    "lightfastness": "I \u00b7 ASTM I",
+    "lab": null,
+    "source": "",
+    "url": "https://artistpigments.org/brands/m-graham-and-co-artists-oil-color/91551-viridian"
+   }
+  }
+ ],
+ "palettes": [
+  {
+   "id": "palette-69b852d9ee",
+   "name": "jenGenaro",
+   "medium": "oil",
+   "paint_ids": [
+    "cp8bq",
+    "e2m00",
+    "5wbbc",
+    "9ongn",
+    "m9fyw",
+    "ro1zj",
+    "kws60",
+    "ro5g3",
+    "9x182",
+    "jwhow"
+   ]
+  },
+  {
+   "id": "palette-248573701e",
+   "name": "testSpectrum",
+   "medium": "oil",
+   "paint_ids": [
+    "5c76r",
+    "c1s59"
+   ]
+  }
+ ]
+}

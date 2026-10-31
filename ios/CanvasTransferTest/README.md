@@ -9,7 +9,8 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: there are no projects or iCloud, and no paints or mixes. The current session is saved on the iPad as you work and reopens at
+It is not the app: there are no projects or iCloud, and paints can't be
+edited here (that's the prototype's job). The current session is saved on the iPad as you work and reopens at
 launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
@@ -62,6 +63,12 @@ automatically.
 - **Update** (layer bar, or long-press a flattened layer): show the layers you
   want and Update. The flattened layer is hidden, rendered again from what's
   visible, and its swatches are read again at the same spots.
+- **Details | Paints & mixes** (Color, opens when you select a swatch):
+  hex, RGB, Lab, value, warm or cool, complement, and Mixbox tints, shades
+  and tones; then Mix from (a palette or all your paints of a medium) and
+  Lighten with (a white, water or nothing), and the best one-paint and
+  two-paint recipes with ΔE. Your paints come from the prototype's
+  paints.json; **Import paints…** loads a newer one from Files.
 - **Simplify** (Color): Colors, Values or Value scale, 2–12, smoothing; the
   colors found with their shares. Pick reads the flat color you see.
   **Highlight**: each swatch's range in its own bright color over gray.
@@ -100,15 +107,19 @@ automatically.
 | `History.swift` | Undo and redo: a step per settled change, holds for gestures, drags and crops |
 | `Flatten.swift` | Flatten and Update: the visible layers rendered into one layer, swatches read again |
 | `Look.swift` | Adjustments (prototype's order and ranges) with Core Image; the Adjust popover |
+| `Mixbox.swift`, `mixbox_lut.bin` | Mixbox 2.0 ported from pymixbox (CC BY-NC 4.0, personal use) and its lookup table |
+| `Mixing.swift` | Lab D50, CIEDE2000, and the recipe search, as in the prototype's mixing.py |
 | `Model.swift` | Layer (look, placement), the session, canvas sizes |
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
+| `Paints.swift`, `paints.json` | Your paint library from the prototype, its stand-ins and whites; Import paints… |
 | `Swatches.swift` | Workspaces, swatches, picking (pixels, loupe, markers), Swatch bar |
 | `Transform.swift` | The prototype's quad geometry and modes, drawing into a quad, Transform handles and bar |
 | `WorkspaceView.swift` | Workspace: tools, layers, Look and Grid bars, transform gestures, full screen, Share |
 | `CanvasContent.swift` | The canvas's layers and grid, drawn for the screen and for Share; the export and share sheet |
 | `CanvasGestures.swift` | Pan, pinch and twist with UIKit recognizers (SwiftUI's combined gesture hung) |
 | `ColorStudy.swift` | Simplify and Highlight (the prototype's math, applied with a Core Image color cube), their bars |
+| `ColorPanel.swift` | The Color panel: swatch Details, and Paints & mixes (Mix from, Lighten with, recipes) |
 | `Compare.swift` | Compare modes, which layers show, the Split line, Compare bar |
 | `Crop.swift` | Crop math (same as the prototype), crop frame and handles, Crop bar |

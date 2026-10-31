@@ -76,3 +76,4 @@ libdbus-1-3 are needed). Keep them passing.
 ## iPad app — done
 
 - **Flatten** and **Update** (Oct 2026, `Flatten.swift`): visible layers as shown into "Flattened n", sources hidden; Update re-renders and re-reads its swatches.
+- **Paints & mixes** (Oct 2026, `Mixbox.swift`, `Mixing.swift`, `Paints.swift`, `ColorPanel.swift`): Mixbox and mixing.py ported, matching the prototype's recipes; paints from its paints.json (Import paints… for a newer one); no Kubelka-Munk, Munsell or classic palettes yet.
