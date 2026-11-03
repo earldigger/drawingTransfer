@@ -9,9 +9,10 @@ A small iPad app that tests the three things the Python prototype can't:
 3. **Color on the iPad** — images at Multiply 60 % (with auto levels),
    stacked as layers, opacity, and full screen.
 
-It is not the app: there are no projects or iCloud, and paints can't be
-edited here (that's the prototype's job). The current session is saved on the iPad as you work and reopens at
-launch; deleting the app deletes it. Names and defaults follow `docs/design/README.md`.
+It is not the app: projects are kept on the iPad only (no iCloud), and the
+iPad's paint library is its own copy. Each project is saved as you work, and
+the one you had open reopens at launch; deleting the app deletes them. Names
+and defaults follow `docs/design/README.md`.
 
 ## Run it on your iPad
 
@@ -37,6 +38,11 @@ New `.swift` files dropped into `CanvasTransferTest/` are picked up by Xcode
 automatically.
 
 ## What to try
+
+- **Gallery**: your paintings as cards, the most recent first. **New project**:
+  a name, a canvas size (8 × 10 to 36 × 48, or your own in inches or cm) and
+  orientation. Long-press a card to rename, duplicate or delete it. **‹ Gallery**
+  in the top bar goes back; each project keeps its own layers, swatches and grid.
 
 - **Camera** (left strip): point at the canvas on the easel. Does the blue
   outline find it — in studio light, at an angle, with a busy background?
@@ -117,7 +123,8 @@ automatically.
 | File | What it does |
 |---|---|
 | `CanvasTransferTestApp.swift` | App entry |
-| `Autosave.swift` | Saves the session (session.json and a PNG per layer) and opens it at launch |
+| `Projects.swift` | Projects (one folder each), the Gallery, New project, and the app's root |
+| `Autosave.swift` | Saves a project's session (session.json, a PNG per layer, photos) and opens it |
 | `History.swift` | Undo and redo: a step per settled change, holds for gestures, drags and crops |
 | `Flatten.swift` | Flatten and Update: the visible layers rendered into one layer, swatches read again |
 | `Look.swift` | Adjustments (prototype's order and ranges) with Core Image; the Adjust popover |

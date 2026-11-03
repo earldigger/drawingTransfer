@@ -12,6 +12,9 @@ struct Capture: Identifiable {
 /// layers on the right, the selected layer's look at the bottom, and the
 /// canvas fitted between them.
 struct WorkspaceView: View {
+    var projectName = ""
+    var onGallery: () -> Void = {}
+
     @Environment(TransferSession.self) private var session
     @Environment(History.self) private var history
 
@@ -457,7 +460,13 @@ struct WorkspaceView: View {
 
     private var topBar: some View {
         HStack {
-            Text("Transfer test").font(.headline)
+            Button {
+                endTools()
+                onGallery()
+            } label: {
+                Label("Gallery", systemImage: "chevron.left")
+            }
+            Text(projectName).font(.headline).lineLimit(1).padding(.leading, 12)
             Spacer()
             Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward") }
                 .accessibilityLabel("Undo")
