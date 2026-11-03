@@ -1,14 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// The two workspaces (decision B), switched in the top bar; same layers in both.
-enum Workspace: String, CaseIterable, Identifiable {
-    case transfer = "Transfer"
-    case color = "Color"
-
-    var id: String { rawValue }
-}
-
 /// A color picked from a layer (Swatch in canvastransfer/models.py). (u, v)
 /// is where, in fractions of the layer's image, so its marker follows the
 /// layer through every transform. Numbered by its place in the list.
@@ -49,8 +41,8 @@ enum SampleSize: Int, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .point: "1 px"
-        case .small: "5 × 5"
-        case .large: "11 × 11"
+        case .small: "5 px"  // a 5 × 5 square
+        case .large: "11 px"  // 11 × 11
         }
     }
 }
@@ -217,12 +209,13 @@ struct SwatchMarkers: View {
     }
 }
 
-/// The Color workspace's bottom bar: the swatches as numbered chips, the
-/// selected one's details, and the sample size.
+/// The Swatches tool's bottom bar: the swatches as numbered chips, the
+/// sample size, and Clear. A chip's numbers are in the swatch panel.
 struct SwatchBar: View {
     @Bindable var session: TransferSession
     @Binding var selectedID: UUID?
     @Binding var sample: SampleSize
+    var onDone: () -> Void
 
     var body: some View {
         HStack(spacing: 14) {
@@ -239,21 +232,26 @@ struct SwatchBar: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .frame(maxWidth: 420)
-                if let swatch = session.swatches.first(where: { $0.id == selectedID }) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(swatch.hex).font(.caption.monospaced().weight(.semibold))
-                        Text("RGB \(swatch.red) \(swatch.green) \(swatch.blue) · value \(Int(swatch.value.rounded()))")
-                            .font(.caption2).foregroundStyle(.secondary)
-                    }
-                    .frame(width: 150, alignment: .leading)
+                .frame(maxWidth: 520)
+            }
+            HStack(spacing: 6) {
+                Image(systemName: "eyedropper.halffull").foregroundStyle(.secondary)
+                Picker("Sample size", selection: $sample) {
+                    ForEach(SampleSize.allCases) { Text($0.label).tag($0) }
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
             }
-            Picker("Sample", selection: $sample) {
-                ForEach(SampleSize.allCases) { Text($0.label).tag($0) }
+            .fixedSize()
+            Button {
+                session.swatches.removeAll()  // one undo step
+                selectedID = nil
+            } label: {
+                Image(systemName: "trash").font(.system(size: 18))
             }
-            .pickerStyle(.segmented)
-            .frame(width: 200)
+            .accessibilityLabel("Clear all swatches")
+            .disabled(session.swatches.isEmpty)
+            Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)

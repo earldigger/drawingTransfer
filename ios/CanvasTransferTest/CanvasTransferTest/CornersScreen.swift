@@ -126,7 +126,7 @@ struct CornersScreen: View {
             Text("Adjust corners").font(.headline)
             Text("Keeps its proportions, at Multiply 60 % with auto levels.")
                 .font(.footnote).foregroundStyle(.secondary)
-            Button("Whole photo", systemImage: "arrow.up.left.and.arrow.down.right") { corners = wholePhoto }
+            Button("Reset", systemImage: "arrow.counterclockwise") { corners = wholePhoto }  // to the whole photo
             Button("Detected outline", systemImage: "viewfinder") { corners = detected ?? notFound }
                 .disabled(detected == nil)
             if findRectangle && detected == nil {

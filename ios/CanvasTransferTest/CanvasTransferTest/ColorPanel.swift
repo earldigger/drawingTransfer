@@ -1,13 +1,12 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
-/// The Color workspace's right-hand panel for the selected swatch (the
-/// design's Details | Paints & mixes): what the color is, and how to mix it
-/// from your paints with Mixbox.
+/// The right-hand panel for the selected swatch (the design's Details |
+/// Paints & mixes): what the color is, and how to mix it from your paints
+/// with Mixbox. A pointer on its right edge points at the swatch's layer.
 struct ColorPanel: View {
     let swatch: Swatch
     let number: Int
-    let allSwatches: [Swatch]  // for Measure strength, which needs a tint and a white
+    let pointerY: CGFloat?  // the swatch's layer, down from the panel's top; nil = no pointer
     var onClose: () -> Void
 
     enum Tab: String, CaseIterable, Identifiable {
@@ -17,6 +16,7 @@ struct ColorPanel: View {
     }
 
     @AppStorage("colorPanelTab") private var tab = Tab.mixes
+    private static let fill = Color(white: 0.13).opacity(0.97)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -39,14 +39,37 @@ struct ColorPanel: View {
             ScrollView {
                 switch tab {
                 case .details: SwatchDetails(swatch: swatch)
-                case .mixes: MixesView(swatch: swatch, allSwatches: allSwatches)
+                case .mixes: MixesView(swatch: swatch)
                 }
             }
         }
         .padding(14)
         .frame(width: 350)
         .frame(maxHeight: 600)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.97)))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Self.fill))
+        .overlay(alignment: .topTrailing) {
+            if let pointerY {
+                GeometryReader { g in
+                    Pointer()
+                        .fill(Self.fill)
+                        .frame(width: 12, height: 24)
+                        .position(x: g.size.width + 6, y: min(max(pointerY, 24), g.size.height - 24))
+                }
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    /// A small triangle pointing right, at the layer.
+    private struct Pointer: Shape {
+        func path(in r: CGRect) -> Path {
+            Path { p in
+                p.move(to: CGPoint(x: r.minX, y: r.minY))
+                p.addLine(to: CGPoint(x: r.maxX, y: r.midY))
+                p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+                p.closeSubpath()
+            }
+        }
     }
 }
 
@@ -144,22 +167,18 @@ struct SwatchDetails: View {
 
 // MARK: - Paints & mixes
 
-/// Mix from (a palette, or all your enabled paints of a medium) and Lighten
-/// with (a white, water, or nothing), then the best one-paint and two-paint
-/// recipes, as in the prototype's Paints panel.
+/// Mix from (a palette, all your enabled paints of a medium, or a classic
+/// palette) and Lighten with (a white, water, or nothing), then the best
+/// two-paint recipes, as in the prototype's Paints panel.
 struct MixesView: View {
     let swatch: Swatch
-    let allSwatches: [Swatch]
-    @State private var measuring = false
 
     @State private var library = PaintLibrary.shared
-    @AppStorage("mixFrom") private var mixFrom = ""  // "medium:oil" or "palette:<id>"
+    @AppStorage("mixFrom") private var mixFrom = ""  // "medium:oil", "palette:<id>" or "template:<key>:<medium>"
     @AppStorage("lightenWith") private var lightenWith = ""  // a paint id, "water" or "none"; "" = the first white
     @AppStorage("mixFavoritesOnly") private var favoritesOnly = false
     @State private var result: Mixing.Result? = nil
     @State private var working = false
-    @State private var importing = false
-    @State private var importError: String? = nil
 
     private var sources: [PaintLibrary.MixSource] { library.mixSources(favoritesOnly: favoritesOnly) }
     private var source: PaintLibrary.MixSource? { library.mixSource(mixFrom, favoritesOnly: favoritesOnly) }
@@ -174,7 +193,7 @@ struct MixesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if library.paints.isEmpty {
-                Text("No paints. Import your paints.json from the prototype.").font(.callout)
+                Text("No paints. Import your paints.json in the Paint library.").font(.callout)
             } else {
                 settings
                 if let note = source?.note, !note.isEmpty {
@@ -187,77 +206,60 @@ struct MixesView: View {
                 if working && result == nil {
                     ProgressView().frame(maxWidth: .infinity)
                 } else if let result {
-                    section("One paint", result.singles)
-                    section("Two paints", result.pairs)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Mixes").font(.subheadline.weight(.semibold))
+                        if result.pairs.isEmpty {
+                            Text("Nothing to mix from.").font(.caption).foregroundStyle(.secondary)
+                        }
+                        ForEach(result.pairs) { recipe in
+                            RecipeRow(swatch: swatch, recipe: recipe, lightener: lightener)
+                        }
+                    }
                 }
-                Text("Amounts are a guide, not a recipe: Mixbox, with each paint's strength. ΔE is CIEDE2000; about 1 is just visible.")
-                    .font(.caption2).foregroundStyle(.secondary)
             }
-            Divider()
-            HStack {
-                Text("\(library.paints.count) paints · \(library.origin)"
-                     + (library.measured.isEmpty ? "" : " · \(library.measured.count) strengths measured here"))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-            }
-            HStack {
-                Button("Measure strength…") { measuring = true }.font(.caption)
-                Spacer()
-                Button("Import paints…") { importing = true }.font(.caption)
-            }
-            if let importError { Text(importError).font(.caption).foregroundStyle(.red) }
         }
         .task(id: searchKey) { await search() }
-        .sheet(isPresented: $measuring) {
-            MeasureStrengthView(swatches: allSwatches) { measuring = false }
-        }
-        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { picked in
-            do {
-                try library.importFile(at: picked.get())
-                importError = nil
-            } catch {
-                importError = "That isn't a paints.json from the prototype."
-            }
-        }
     }
 
     private var settings: some View {
-        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
-            GridRow {
-                Text("Mix from").foregroundStyle(.secondary)
-                Picker("Mix from", selection: Binding(get: { source?.key ?? "" }, set: { mixFrom = $0; lightenWith = "" })) {
-                    ForEach(sources) { Text($0.title).tag($0.key) }
+        VStack(alignment: .leading, spacing: 8) {
+            menu("Mix from", title: source?.title ?? "—") {
+                ForEach(sources) { s in
+                    Button(s.title) { mixFrom = s.key; lightenWith = "" }
                 }
-                .pickerStyle(.menu)
             }
-            GridRow {
-                Text("Lighten with").foregroundStyle(.secondary)
-                Picker("Lighten with", selection: Binding(get: { lightener?.id ?? "none" }, set: { lightenWith = $0 })) {
-                    ForEach(whites) { Text("\($0.name) — \($0.brand)").tag($0.id) }
-                    Text("Water (paper white)").tag("water")
-                    Text("Nothing").tag("none")
-                }
-                .pickerStyle(.menu)
+            menu("Lighten with", title: lightener.map { $0.id == Mixing.water.id ? $0.name : "\($0.name) — \($0.brand)" } ?? "Nothing") {
+                ForEach(whites) { w in Button("\(w.name) — \(w.brand)") { lightenWith = w.id } }
+                Button("Water (paper white)") { lightenWith = "water" }
+                Button("Nothing") { lightenWith = "none" }
             }
-            GridRow {
-                Text("")
-                Toggle("Favorites only", isOn: $favoritesOnly)  // for "All … paints"
-                    .toggleStyle(.switch).controlSize(.small)
-                    .disabled(!(source?.key.hasPrefix("medium:") ?? false))
+            HStack {
+                Text("Favorites only")
+                Spacer()
+                Toggle("Favorites only", isOn: $favoritesOnly).labelsHidden()  // for "All … paints"
             }
+            .disabled(!(source?.key.hasPrefix("medium:") ?? false))
         }
         .font(.callout)
     }
 
-    private func section(_ title: String, _ recipes: [Mixing.Recipe]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.subheadline.weight(.semibold))
-            if recipes.isEmpty {
-                Text("Nothing to mix from.").font(.caption).foregroundStyle(.secondary)
+    /// A label, and under it a one-line menu as wide as the panel.
+    private func menu(_ label: String, title: String, @ViewBuilder items: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            Menu {
+                items()
+            } label: {
+                HStack {
+                    Text(title).lineLimit(1).truncationMode(.tail)
+                    Spacer(minLength: 6)
+                    Image(systemName: "chevron.up.chevron.down").font(.caption)
+                }
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.22)))
             }
-            ForEach(recipes) { recipe in
-                RecipeRow(swatch: swatch, recipe: recipe)
-            }
+            .foregroundStyle(.primary)
         }
     }
 
@@ -276,9 +278,11 @@ struct MixesView: View {
 
 /// One recipe: your color and the mix side by side (halves touching, so the
 /// shift shows), a line per paint led by its amount, then ΔE and how close.
+/// Each paint's brand, and any note about it, is behind its paint icon.
 struct RecipeRow: View {
     let swatch: Swatch
     let recipe: Mixing.Recipe
+    let lightener: Paint?
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -287,7 +291,7 @@ struct RecipeRow: View {
                 Rectangle().fill(Color(red: Double(recipe.rgb.0) / 255, green: Double(recipe.rgb.1) / 255,
                                        blue: Double(recipe.rgb.2) / 255))
             }
-            .frame(width: 76, height: 52)
+            .frame(width: 76, height: 78)  // half again as tall as before
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(alignment: .bottom) {
                 HStack {
@@ -295,32 +299,65 @@ struct RecipeRow: View {
                 }
                 .font(.system(size: 8)).foregroundStyle(.white).shadow(radius: 1).padding(.horizontal, 4).padding(.bottom, 2)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(recipe.parts.indices, id: \.self) { i in
-                    let part = recipe.parts[i]
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(Mixing.percent(part.share)).monospacedDigit().frame(width: 38, alignment: .trailing)
-                            .font(.callout.weight(.semibold))
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text(part.paint.name).font(.callout).lineLimit(1)
-                            if !part.paint.brand.isEmpty {
-                                Text(part.paint.brand).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            }
-                        }
-                    }
+                    PartRow(part: recipe.parts[i], recipe: recipe, isLightener: recipe.parts[i].paint.id == lightener?.id)
                 }
-                Text(String(format: "ΔE %.1f · %@", recipe.deltaE, Mixing.closeness(recipe.deltaE)))
+                Text(String(format: "ΔE %.1f · %@", recipe.deltaE, Mixing.closeness(recipe.deltaE).capitalizedFirst))
                     .font(.caption).foregroundStyle(recipe.deltaE < 5 ? .green : .secondary)
-                ForEach(recipe.standIns.indices, id: \.self) { i in
-                    let s = recipe.standIns[i]
-                    Text("\(s.paint.name) mixed as \(s.from.name) (\(s.from.brand))").font(.caption2).foregroundStyle(.secondary)
-                }
-                if !recipe.offScreen.isEmpty {
-                    Text("Beyond the screen's colors, shown clipped: " + recipe.offScreen.map(\.name).joined(separator: ", "))
-                        .font(.caption2).foregroundStyle(.orange)
-                }
             }
         }
         .padding(.vertical, 2)
     }
+}
+
+/// "54%  Cobalt Blue  [paint]": the icon shows the brand and any notes, and is
+/// orange when the paint was mixed with a stand-in's color or off the screen's colors.
+private struct PartRow: View {
+    let part: (paint: Paint, share: Double)
+    let recipe: Mixing.Recipe
+    let isLightener: Bool
+
+    @State private var showing = false
+
+    private var standIn: Paint? { recipe.standIns.first { $0.paint.id == part.paint.id }?.from }
+    private var offScreen: Bool { recipe.offScreen.contains { $0.id == part.paint.id } }
+    private var warned: Bool { standIn != nil || offScreen }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(Mixing.percent(part.share)).monospacedDigit().frame(width: 38, alignment: .trailing)
+                .font(.callout.weight(.semibold))
+            Text(part.paint.name).font(.callout).lineLimit(1)
+            Spacer(minLength: 4)
+            Button { showing = true } label: {
+                Image(systemName: "paintbrush.pointed.fill")
+                    .font(.caption)
+                    .foregroundStyle(warned ? Color.orange : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(warned ? "About this paint, with a note" : "About this paint")
+            .popover(isPresented: $showing) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(part.paint.name).font(.headline)
+                    Text(part.paint.brand.isEmpty ? "No brand" : part.paint.brand).foregroundStyle(.secondary)
+                    if isLightener { Text("Lightens the mix.").font(.caption) }
+                    if let standIn {
+                        Text("No color data of its own: mixed with the color of \(standIn.name) (\(standIn.brand)).")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                    if offScreen {
+                        Text("Its color is beyond what the screen can show, so it's shown and mixed clipped.")
+                            .font(.caption).foregroundStyle(.orange)
+                    }
+                }
+                .padding(14)
+                .frame(width: 280, alignment: .leading)
+            }
+        }
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

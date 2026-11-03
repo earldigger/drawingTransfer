@@ -36,8 +36,7 @@ struct WorkspaceView: View {
     @State private var shareFailed = false
     @State private var editingCorners: CornerEdit? = nil
     @State private var layerBarExpanded = false  // names, eye, blend · opacity; collapsed by default (decision H)
-    @State private var workspace = Workspace.transfer
-    @State private var pickOn = true  // Color: one finger picks
+    @State private var swatchesOn = false  // the Swatches tool: one finger picks; the swatch bar and panel show
     @State private var sampleSize = SampleSize.small
     @State private var selectedSwatchID: UUID? = nil
     @State private var probe: (pick: PickProbe, screen: CGPoint)? = nil  // while a finger is picking
@@ -47,6 +46,7 @@ struct WorkspaceView: View {
     @State private var study: StudyResult? = nil  // the selected layer, simplified or highlighted
     @State private var studyWorking = false
     @State private var colorPanelOpen = true  // Details | Paints & mixes for the selected swatch
+    @State private var paintLibraryOpen = false
 
     var body: some View {
         GeometryReader { geo in
@@ -59,7 +59,7 @@ struct WorkspaceView: View {
                 (fullScreen ? Color.black : Color(white: 0.23)).ignoresSafeArea()
                 // Under the canvas, which lets touches through except on crop handles.
                 CanvasGestureView(handlers: canvasGestures(canvas: rect.size, at: rect),
-                                  picking: workspace == .color && pickOn && !fullScreen)
+                                  picking: colorToolOn && !fullScreen)
                 canvas(size: rect.size)
                     .scaleEffect(viewScale)
                     .offset(viewOffset)
@@ -93,6 +93,7 @@ struct WorkspaceView: View {
                 capture = nil
                 if let layer {
                     session.add(layer)
+                    endTools()
                     transformOn = true  // place a new image straight away
                 }
             }
@@ -105,6 +106,9 @@ struct WorkspaceView: View {
                                   editingCorners = nil
                               }, onRetake: nil, onCancel: { editingCorners = nil })
             }
+        }
+        .fullScreenCover(isPresented: $paintLibraryOpen) {
+            PaintLibraryView { paintLibraryOpen = false }
         }
         .photosPicker(isPresented: $showPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -121,20 +125,13 @@ struct WorkspaceView: View {
             if transformOn { noteTransformStart() }
         }
         .onChange(of: selectedSwatchID) { _, id in
-            if id != nil { colorPanelOpen = true }  // choosing a swatch opens its panel again
+            // Choosing a swatch opens its panel again, on the layer it belongs to.
+            guard let id, let swatch = session.swatches.first(where: { $0.id == id }) else { return }
+            colorPanelOpen = true
+            if session.layers.contains(where: { $0.id == swatch.layerID }) { session.selectedID = swatch.layerID }
         }
         .onChange(of: transformOn) { _, on in
             if on { noteTransformStart() } else { transformStart = nil }
-        }
-        .onChange(of: workspace) { _, now in
-            // Transfer's tools close in Color, and the reverse.
-            finishCrop(keep: true)
-            transformOn = false
-            compare = nil
-            gridBarShown = false
-            probe = nil
-            colorView = .normal
-            if now == .color { pickOn = true }
         }
         // Simplify or Highlight again when what they depend on changes; a
         // moving slider settles first.
@@ -167,6 +164,23 @@ struct WorkspaceView: View {
         }
         .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
         .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
+    }
+
+    // MARK: tools
+
+    /// Swatches, Simplify or Highlight is on: one finger picks, and the swatch markers show.
+    private var colorToolOn: Bool { swatchesOn || colorView != .normal }
+
+    /// Turns every tool off, so the one being turned on is the only one
+    /// (Grid on, then Transform: Grid goes off).
+    private func endTools() {
+        finishCrop(keep: true)
+        transformOn = false
+        gridBarShown = false
+        compare = nil
+        swatchesOn = false
+        colorView = .normal
+        probe = nil
     }
 
     // MARK: crop
@@ -231,7 +245,7 @@ struct WorkspaceView: View {
             }
         }
         .overlay {
-            if workspace == .color {
+            if colorToolOn {
                 SwatchMarkers(swatches: session.swatches, layers: session.layers, canvas: size,
                               selectedID: selectedSwatchID, scale: viewScale)
             }
@@ -291,7 +305,7 @@ struct WorkspaceView: View {
     /// The result to show: for the selected layer, in the view it was made for.
     /// While a new one is made, the last one stays up.
     private var shownStudy: StudyResult? {
-        guard workspace == .color, colorView != .normal, let study,
+        guard colorView != .normal, let study,
               study.layerID == session.selectedID, study.view == colorView else { return nil }
         return study
     }
@@ -305,7 +319,7 @@ struct WorkspaceView: View {
 
     /// Everything Simplify or Highlight depends on; nil when neither is on.
     private var studyKey: String? {
-        guard workspace == .color, colorView != .normal, let layer = session.selected else { return nil }
+        guard colorView != .normal, let layer = session.selected else { return nil }
         let image = ObjectIdentifier(layer.shownImage).hashValue  // a new image after Look or Edit corners
         switch colorView {
         case .simplify:
@@ -366,17 +380,18 @@ struct WorkspaceView: View {
             HStack(alignment: .top, spacing: 0) {
                 toolStrip.padding(12)
                 Spacer()
-                if workspace == .color, colorPanelOpen,
+                if swatchesOn, colorPanelOpen,
                    let index = session.swatches.firstIndex(where: { $0.id == selectedSwatchID }) {
-                    ColorPanel(swatch: session.swatches[index], number: index + 1, allSwatches: session.swatches) {
+                    let swatch = session.swatches[index]
+                    ColorPanel(swatch: swatch, number: index + 1, pointerY: layerRowCenter(swatch.layerID)) {
                         colorPanelOpen = false
                     }
-                        .padding(.top, 12)
+                    .padding(.top, 12)
                 }
                 layerBar.padding(12)
             }
             Spacer()
-            if workspace == .color, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
+            if colorToolOn, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
                 // Pick, Simplify and Highlight read the layer's own image, not the mix on the canvas.
                 Text("Colors are read from this layer at full strength. Flatten to read what you see.")
                     .font(.footnote)
@@ -385,20 +400,7 @@ struct WorkspaceView: View {
                     .padding(.bottom, 8)
             }
             Group {
-                if workspace == .color {
-                    if gridBarShown {
-                        GridBar(session: session) { gridBarShown = false }
-                    } else if colorView == .simplify {
-                        SimplifyBar(settings: $simplifySettings, result: shownStudy?.simplified, working: studyWorking) {
-                            colorView = .normal
-                        }
-                    } else if colorView == .highlight {
-                        HighlightBar(settings: $highlightSettings, swatches: session.swatches, selectedID: $selectedSwatchID,
-                                     working: studyWorking) { colorView = .normal }
-                    } else {
-                        SwatchBar(session: session, selectedID: $selectedSwatchID, sample: $sampleSize)
-                    }
-                } else if let cropping, let layer = session.selected, layer.id == cropping.id {
+                if let cropping, let layer = session.selected, layer.id == cropping.id {
                     CropBar(layer: layer, shape: $cropShape,
                             onCancel: { finishCrop(keep: false) }, onDone: { finishCrop(keep: true) })
                 } else if compare != nil {
@@ -409,9 +411,17 @@ struct WorkspaceView: View {
                 } else if transformOn, let layer = session.selected {
                     TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
                                  onCancel: cancelTransform, onDone: { transformOn = false })
+                } else if colorView == .simplify {
+                    SimplifyBar(settings: $simplifySettings, result: shownStudy?.simplified, working: studyWorking) {
+                        colorView = .normal
+                    }
+                } else if colorView == .highlight {
+                    HighlightBar(settings: $highlightSettings, swatches: session.swatches, selectedID: $selectedSwatchID,
+                                 working: studyWorking) { colorView = .normal }
+                } else if swatchesOn {
+                    SwatchBar(session: session, selectedID: $selectedSwatchID, sample: $sampleSize) { swatchesOn = false }
                 } else if let layer = session.selected {
-                    LookBar(layer: layer, transformOn: $transformOn, canvasAspect: session.canvasAspect,
-                            onCrop: { startCrop(layer) }, onEditCorners: { editCorners(layer) })
+                    LookBar(layer: layer, canvasAspect: session.canvasAspect, onEditCorners: { editCorners(layer) })
                 }
             }
             .padding(.bottom, 12)
@@ -447,12 +457,6 @@ struct WorkspaceView: View {
         HStack {
             Text("Transfer test").font(.headline)
             Spacer()
-            Picker("Workspace", selection: $workspace) {
-                ForEach(Workspace.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 220)
-            Spacer()
             Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward") }
                 .accessibilityLabel("Undo")
                 .keyboardShortcut("z", modifiers: .command)
@@ -461,6 +465,9 @@ struct WorkspaceView: View {
                 .accessibilityLabel("Redo")
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!canRedo)
+                .padding(.trailing, 12)
+            Button { paintLibraryOpen = true } label: { Image(systemName: "books.vertical") }
+                .accessibilityLabel("Paint library")
                 .padding(.trailing, 12)
             Menu {
                 ForEach(TransferSession.canvasSizes.indices, id: \.self) { i in
@@ -500,60 +507,57 @@ struct WorkspaceView: View {
         .background(Color(white: 0.13))
     }
 
-    @ViewBuilder
+    /// One strip of tools. Each one that has a bar at the bottom turns the
+    /// others off; tapping it again turns it off.
     private var toolStrip: some View {
-        if workspace == .color {
-            VStack(spacing: 6) {
-                toolButton("eyedropper", "Pick", on: pickOn) { pickOn.toggle() }
-                    .disabled(session.layers.isEmpty)
-                toolButton("circle.lefthalf.filled", "Simplify", on: colorView == .simplify) {
-                    gridBarShown = false
-                    colorView = colorView == .simplify ? .normal : .simplify
-                }
-                .disabled(session.selected == nil)
-                toolButton("highlighter", "Highlight", on: colorView == .highlight) {
-                    gridBarShown = false
-                    colorView = colorView == .highlight ? .normal : .highlight
-                }
-                .disabled(session.selected == nil)
-                gridTool
-            }
-            .padding(6)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
-        } else {
-            transferTools
-        }
-    }
-
-    private var gridTool: some View {
-        toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
-            finishCrop(keep: true)
-            compare = nil
-            if gridBarShown {
-                gridBarShown = false
-            } else {
-                gridBarShown = true
-                session.grid.isOn = true  // opening Grid shows it
-            }
-        }
-    }
-
-    private var transferTools: some View {
         VStack(spacing: 6) {
             toolButton("camera", "Camera") { capture = Capture(picked: nil) }
             toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
             toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn) {
-                transformOn.toggle()
+                let on = transformOn
+                endTools()
+                transformOn = !on
             }
-            .disabled(session.selected == nil || cropping != nil)
-            gridTool
+            .disabled(session.selected == nil)
+            toolButton("crop", "Crop", on: cropping != nil) {
+                let on = cropping != nil
+                endTools()
+                if !on, let layer = session.selected { startCrop(layer) }
+            }
+            .disabled(session.selected == nil)
+            toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
+                let on = gridBarShown
+                endTools()
+                gridBarShown = !on
+            }
             toolButton("rectangle.split.2x1", "Compare", on: compare != nil) {
-                finishCrop(keep: true)
-                gridBarShown = false
-                blinkClock.restart()  // starts on A
-                compare = compare == nil ? CompareState(session: session) : nil
+                let on = compare != nil
+                endTools()
+                if !on {
+                    blinkClock.restart()  // starts on A
+                    compare = CompareState(session: session)
+                }
             }
             .disabled(session.layers.isEmpty)
+            Divider().frame(width: 36)
+            toolButton("eyedropper", "Swatches", on: swatchesOn) {
+                let on = swatchesOn
+                endTools()
+                swatchesOn = !on
+            }
+            .disabled(session.layers.isEmpty)
+            toolButton("circle.lefthalf.filled", "Simplify", on: colorView == .simplify) {
+                let on = colorView == .simplify
+                endTools()
+                colorView = on ? .normal : .simplify
+            }
+            .disabled(session.selected == nil)
+            toolButton("highlighter", "Highlight", on: colorView == .highlight) {
+                let on = colorView == .highlight
+                endTools()
+                colorView = on ? .normal : .highlight
+            }
+            .disabled(session.selected == nil)
         }
         .padding(6)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
@@ -593,9 +597,6 @@ struct WorkspaceView: View {
                 Divider().frame(width: 48)
                 layerBarButton("Flatten", systemImage: "square.3.layers.3d.down.right") { flatten() }
                     .disabled(!session.layers.contains(where: \.isVisible))
-                if let layer = session.selected, layer.isFlattened {
-                    layerBarButton("Update", systemImage: "arrow.triangle.2.circlepath") { update(layer) }
-                }
             }
         }
         .padding(6)
@@ -624,12 +625,14 @@ struct WorkspaceView: View {
         session.flattenVisible()
     }
 
-    /// A flattened layer rendered again from what's visible now.
-    private func update(_ layer: Layer) {
-        finishCrop(keep: true)
-        transformOn = false
-        compare = nil
-        session.update(layer)
+    /// Where a layer's thumbnail is, down from the top of the layer bar, so
+    /// the swatch panel can point at it. Matches the bar's layout: 6 pt of
+    /// padding, the 28 pt chevron, then 48 pt rows 6 pt apart, top layer first.
+    private func layerRowCenter(_ layerID: UUID) -> CGFloat? {
+        guard let index = session.layers.firstIndex(where: { $0.id == layerID }) else { return nil }
+        let row = CGFloat(session.layers.count - 1 - index)  // 0 = the top layer, shown first
+        let top: CGFloat = 6 + 28 + 6
+        return top + row * 54 + 24
     }
 
     private func layerRow(_ layer: Layer) -> some View {
@@ -649,7 +652,7 @@ struct WorkspaceView: View {
                     session.selectedID = layer.id
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(layer.isFlattened ? layer.name : "Layer \(number)")  // "Flattened 1"
+                        Text(layer.name.hasPrefix("Flattened") ? layer.name : "Layer \(number)")  // "Flattened 1"
                             .font(.subheadline.weight(selected ? .semibold : .regular))
                             .lineLimit(1)
                         Text("\(layer.blend.rawValue) · \(Int((layer.opacity * 100).rounded()))%")
@@ -683,9 +686,6 @@ struct WorkspaceView: View {
             Button("Send to back", systemImage: "square.3.layers.3d.bottom.filled") { session.move(layer, to: 0) }
                 .disabled(number == 1)
             Divider()
-            if layer.isFlattened {
-                Button("Update", systemImage: "arrow.triangle.2.circlepath") { update(layer) }
-            }
             Button("Edit corners…", systemImage: "perspective") { editCorners(layer) }
                 .disabled(layer.source == nil)
             Button("Duplicate", systemImage: "plus.square.on.square") { session.duplicate(layer) }
@@ -731,13 +731,11 @@ struct WorkspaceView: View {
 }
 
 /// The selected layer's Look, cut down: opacity first and largest, blend,
-/// Adjust (levels, hue / saturation, colorize, invert), Transform, Crop, and
-/// ⋯ for Fit, Flip and Edit corners.
+/// Adjust (levels, hue / saturation, colorize, invert), and ⋯ for Fit, Flip
+/// and Edit corners. Transform and Crop are in the left tool strip.
 struct LookBar: View {
     @Bindable var layer: Layer
-    @Binding var transformOn: Bool
     let canvasAspect: CGFloat
-    var onCrop: () -> Void
     var onEditCorners: () -> Void
 
     @Environment(History.self) private var history
@@ -751,7 +749,11 @@ struct LookBar: View {
                 if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
             }
             .frame(width: 200)
-            Text("\(Int((layer.opacity * 100).rounded()))%").monospacedDigit().frame(width: 44, alignment: .trailing)
+            Text("\(Int((layer.opacity * 100).rounded()))%")
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()  // "100%" stays on one line
+                .frame(minWidth: 48, alignment: .trailing)
             Picker("Blend", selection: $layer.blend) {
                 ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -760,16 +762,16 @@ struct LookBar: View {
             Button {
                 adjusting = true
             } label: {
-                Label("Adjust", systemImage: "slider.horizontal.3")
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 20))
                     .overlay(alignment: .topTrailing) {
                         if !layer.adjustments.isIdentity {  // this layer has adjustments
                             Circle().fill(Color.blue).frame(width: 8, height: 8).offset(x: 5, y: -3)
                         }
                     }
             }
+            .accessibilityLabel("Adjust")
             .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
-            Toggle("Transform", isOn: $transformOn).toggleStyle(.button)
-            Button("Crop", systemImage: "crop", action: onCrop)
             Menu {
                 Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
                 Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
@@ -811,20 +813,24 @@ struct ShareFile: Identifiable {
     let url: URL
 }
 
-/// The Grid tool's options: shown, rows and columns, square cells, color and opacity.
+/// The Grid tool's options: on / off, rows and columns, square cells, color and opacity.
 struct GridBar: View {
     @Bindable var session: TransferSession
     var onDone: () -> Void
 
     var body: some View {
         HStack(spacing: 16) {
-            Toggle("Grid", systemImage: "square.grid.3x3", isOn: $session.grid.isOn)
-                .toggleStyle(.button)
-            Stepper("Rows \(session.grid.rows)", value: $session.grid.rows, in: GridSettings.range)
+            Toggle(isOn: $session.grid.isOn) { Text("Grid").font(.subheadline.weight(.semibold)) }
+                .toggleStyle(.switch)
                 .fixedSize()
-            Stepper("Columns \(session.grid.columns)", value: $session.grid.columns, in: GridSettings.range)
-                .fixedSize()
-            Button("Square cells") { session.grid.squareCells(canvasAspect: session.canvasAspect) }
+            count("Rows", $session.grid.rows)
+            count("Columns", $session.grid.columns)
+            Button {
+                session.grid.squareCells(canvasAspect: session.canvasAspect)
+            } label: {
+                Image(systemName: "square.grid.3x3.square").font(.system(size: 22))
+            }
+            .accessibilityLabel("Square cells")
             HStack(spacing: 8) {
                 ForEach(GridColor.allCases) { color in
                     Button {
@@ -849,5 +855,18 @@ struct GridBar: View {
         .padding(.horizontal, 16)
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+
+    /// "Rows  4 ⌄": a menu of 1 to 10.
+    private func count(_ title: String, _ value: Binding<Int>) -> some View {
+        HStack(spacing: 6) {
+            Text(title).foregroundStyle(.secondary)
+            Picker(title, selection: value) {
+                ForEach(GridSettings.range, id: \.self) { Text("\($0)").tag($0) }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+        }
+        .fixedSize()
     }
 }
