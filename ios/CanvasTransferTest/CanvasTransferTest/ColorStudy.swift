@@ -271,11 +271,11 @@ struct HighlightSettings: Equatable {
     var selectedOnly = false
 }
 
-/// Simplify's options and the colors it found, with each one's share.
+/// Simplify's options: mode, steps, smoothing, and the swatches shown or not.
 struct SimplifyBar: View {
     @Binding var settings: SimplifySettings
-    let result: ColorStudy.Simplified?
     let working: Bool
+    @Binding var markersShown: Bool
     var onDone: () -> Void
 
     var body: some View {
@@ -286,27 +286,21 @@ struct SimplifyBar: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 270)
-            Stepper("\(settings.count)", value: $settings.count, in: 2...12).fixedSize()
+            HStack(spacing: 6) {
+                Text("Steps").foregroundStyle(.secondary)
+                Picker("Steps", selection: $settings.count) {
+                    ForEach(2...12, id: \.self) { Text("\($0)").tag($0) }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            .fixedSize()
             Text("Smoothing")
             Slider(value: Binding(get: { Double(settings.smoothing) }, set: { settings.smoothing = Int($0.rounded()) }),
                    in: 0...6, step: 1)
                 .frame(width: 110)
-            HStack(spacing: 2) {
-                if let result {
-                    ForEach(result.colors.indices, id: \.self) { i in
-                        let c = result.colors[i]
-                        Rectangle()
-                            .fill(Color(red: Double(c.0) / 255, green: Double(c.1) / 255, blue: Double(c.2) / 255))
-                            .frame(width: max(6, 180 * result.shares[i]), height: 26)
-                            .overlay(Text("\(Int((result.shares[i] * 100).rounded()))").font(.system(size: 9))
-                                .foregroundStyle(Swatch(layerID: UUID(), u: 0, v: 0, red: c.0, green: c.1, blue: c.2).labelColor)
-                                .opacity(result.shares[i] > 0.06 ? 1 : 0))
-                    }
-                }
-            }
-            .frame(width: 200, alignment: .leading)
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay(alignment: .trailing) { if working { ProgressView().controlSize(.small) } }
+            ProgressView().controlSize(.small).opacity(working ? 1 : 0)
+            SwatchMarkersToggle(isOn: $markersShown)
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
@@ -321,6 +315,7 @@ struct HighlightBar: View {
     let swatches: [Swatch]
     @Binding var selectedID: UUID?
     let working: Bool
+    @Binding var markersShown: Bool
     var onDone: () -> Void
 
     var body: some View {
@@ -359,10 +354,25 @@ struct HighlightBar: View {
                 Slider(value: $settings.tolerance, in: 2...40).frame(width: 140)
             }
             if working { ProgressView().controlSize(.small) }
+            SwatchMarkersToggle(isOn: $markersShown)
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+}
+
+/// Shows or hides the numbered swatch markers on the image, to see the
+/// simplified or highlighted colors without them.
+struct SwatchMarkersToggle: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle(isOn: $isOn) {
+            Label("Swatches", systemImage: isOn ? "mappin.circle.fill" : "mappin.slash.circle")
+        }
+        .toggleStyle(.button)
+        .accessibilityLabel(isOn ? "Hide swatches on the image" : "Show swatches on the image")
     }
 }

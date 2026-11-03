@@ -80,9 +80,11 @@ automatically.
   format; the Mac's paints.json isn't changed.
 - **Share swatch sheet (PDF)** (top right): the canvas with its numbered
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
-- **Simplify** (left strip): Colors, Values or Value scale, 2–12, smoothing;
-  the colors found with their shares. Pick reads the flat color you see.
-  **Highlight**: each swatch's range in its own bright color over gray.
+- **Simplify** (left strip): Colors, Values or Value scale, Steps 2–12,
+  smoothing. Pick reads the flat color you see. **Highlight**: each swatch's
+  range in its own bright color over gray. Both bars have a **Swatches**
+  toggle to hide the numbered markers and see the colors alone.
+- A small yellow triangle on a layer's thumbnail means it has swatches.
 - **Transform**: a bar with Proportional, Free, Skew and Distort for the
   corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
   pinch and twist in every mode. Placement is four corners, as in the prototype.

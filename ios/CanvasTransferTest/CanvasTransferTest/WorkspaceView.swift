@@ -47,6 +47,7 @@ struct WorkspaceView: View {
     @State private var studyWorking = false
     @State private var colorPanelOpen = true  // Details | Paints & mixes for the selected swatch
     @State private var paintLibraryOpen = false
+    @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
     var body: some View {
         GeometryReader { geo in
@@ -245,7 +246,8 @@ struct WorkspaceView: View {
             }
         }
         .overlay {
-            if colorToolOn {
+            // Always while picking; in Simplify and Highlight, unless hidden to see the colors alone.
+            if swatchesOn || (colorView != .normal && studyMarkersShown) {
                 SwatchMarkers(swatches: session.swatches, layers: session.layers, canvas: size,
                               selectedID: selectedSwatchID, scale: viewScale)
             }
@@ -412,12 +414,12 @@ struct WorkspaceView: View {
                     TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
                                  onCancel: cancelTransform, onDone: { transformOn = false })
                 } else if colorView == .simplify {
-                    SimplifyBar(settings: $simplifySettings, result: shownStudy?.simplified, working: studyWorking) {
+                    SimplifyBar(settings: $simplifySettings, working: studyWorking, markersShown: $studyMarkersShown) {
                         colorView = .normal
                     }
                 } else if colorView == .highlight {
                     HighlightBar(settings: $highlightSettings, swatches: session.swatches, selectedID: $selectedSwatchID,
-                                 working: studyWorking) { colorView = .normal }
+                                 working: studyWorking, markersShown: $studyMarkersShown) { colorView = .normal }
                 } else if swatchesOn {
                     SwatchBar(session: session, selectedID: $selectedSwatchID, sample: $sampleSize) { swatchesOn = false }
                 } else if let layer = session.selected {
@@ -672,6 +674,16 @@ struct WorkspaceView: View {
                     .opacity(layer.isVisible ? 1 : 0.35)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue, lineWidth: selected ? 3 : 0))
                     .overlay(alignment: .bottomLeading) { compareBadge(layer) }
+                    .overlay(alignment: .topTrailing) {
+                        if session.swatches.contains(where: { $0.layerID == layer.id }) {  // this layer has swatches
+                            SwatchCorner()
+                                .fill(Color.yellow)
+                                .overlay(SwatchCorner().stroke(Color.black.opacity(0.5), lineWidth: 0.5))
+                                .frame(width: 14, height: 14)
+                                .clipShape(UnevenRoundedRectangle(topTrailingRadius: 6))
+                                .accessibilityLabel("Has swatches")
+                        }
+                    }
             }
             .accessibilityLabel("Layer \(number)")
         }
@@ -805,6 +817,18 @@ struct CornerEdit: Identifiable {
     let layer: Layer
     let detected: Corners?
     var id: UUID { layer.id }
+}
+
+/// The small triangle in a layer thumbnail's top-right corner: it has swatches.
+struct SwatchCorner: Shape {
+    func path(in r: CGRect) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: r.minX, y: r.minY))
+            p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+            p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+            p.closeSubpath()
+        }
+    }
 }
 
 /// One rendered image on its way to the share sheet.
