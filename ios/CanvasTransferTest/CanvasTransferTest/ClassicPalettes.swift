@@ -93,7 +93,12 @@ enum ClassicPalettes {
     /// Each role filled with the best-fitting paint you own in `medium` that
     /// has color data and is enabled; no paint is used twice.
     static func fill(_ t: Template, library: PaintLibrary, medium: String) -> [Filled] {
-        let candidates = library.paints.filter { $0.medium == medium && $0.enabled && library.color(of: $0) != nil }
+        fill(t, paints: library.paints, medium: medium) { library.color(of: $0) != nil }
+    }
+
+    /// The same, from any list of paints (the Paint library's working copy).
+    static func fill(_ t: Template, paints: [Paint], medium: String, hasColor: (Paint) -> Bool) -> [Filled] {
+        let candidates = paints.filter { $0.medium == medium && $0.enabled && hasColor($0) }
         var used = Set<String>()
         return t.roles.map { role in
             var best: (score: Double, sub: Bool, paint: Paint)? = nil

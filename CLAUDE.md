@@ -65,11 +65,11 @@ libdbus-1-3 are needed). Keep them passing.
   Measured against Mixbox: Old Delft Blue ×3 (1:3 with white looks like
   the model's 1:1), Brown Ochre Deep ×1. Get more from the owner's tints:
   paint + white at a known ratio, RAW photo, compare at matching lightness.
-- **Strength from a photo** is in the iPad app (`Strength.swift`): tint +
-  white swatches from one photo, the white cancels exposure and cast, then
-  lightness is matched in Mixbox. Measured strengths stay on the iPad
-  (measured-strengths.json, applied over paints.json, never written back);
-  the owner copies them into the prototype by hand. Not yet tried on real tints.
+- **Strength from a photo** (`Strength.swift`) is written but tabled by the
+  owner (Nov 2026): its buttons are removed; the code stays. Not tried on real tints.
+- **The iPad's paint library is its own copy.** The Paint library edits it
+  and saves it on the iPad in the prototype's format; the Mac's paints.json
+  isn't changed, and Import paints… (in the Paint library) brings in a newer one.
 - Possible next step (not started): replacing a paint's library color with
   one measured from the owner's own masstone.
 
@@ -79,5 +79,7 @@ libdbus-1-3 are needed). Keep them passing.
 
 ## iPad app — done
 
-- **Flatten** and **Update** (Oct 2026, `Flatten.swift`): visible layers as shown into "Flattened n", sources hidden; Update re-renders and re-reads its swatches.
+- **Flatten** (`Flatten.swift`): visible layers as shown into an ordinary "Flattened n", sources hidden. Update was removed (Nov 2026).
+- **One workspace** (Nov 2026): no Color tab; Swatches, Simplify and Highlight are in the tool strip, one tool at a time.
+- **Paint library** (Nov 2026, `PaintLibraryView.swift`): Paints and Palettes editors like the prototype's.
 - **Paints & mixes** (Oct 2026, `Mixbox.swift`, `Mixing.swift`, `Paints.swift`, `ColorPanel.swift`): Mixbox and mixing.py ported, matching the prototype's recipes; paints from its paints.json (Import paints… for a newer one); classic palettes and Favorites only too; swatch sheet PDF in Share. No Kubelka-Munk (not wanted) or Munsell.

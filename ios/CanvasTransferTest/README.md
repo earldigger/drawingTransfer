@@ -43,43 +43,45 @@ automatically.
   Note when it fails.
 - Take the photo: are the corners already right? Drag them — is the loupe
   where you need it, with finger and with Pencil?
-- **Whole photo** puts the corners at the photo's edges; **Detected outline**
+- **Reset** puts the corners at the photo's edges; **Detected outline**
   brings back what Vision found. **Find rectangle** (on the camera, and in
   Adjust corners) turns detection off; it's remembered.
 - **Add layer**: every image lands at Multiply 60 % with auto levels and
   Transform on: one finger moves it, pinch scales, twist rotates.
-- **Crop** (bottom bar): drag the corners or edge middles, or inside the frame
-  to slide it; what's cut off shows faintly. Free, Original or Square; Reset;
-  Cancel or Done. The crop moves, scales and turns with the image, and Crop
-  again brings back what you cut.
-- **Color** (top bar): Pick is on; touch the canvas for a loupe on the
-  selected layer and lift to add a numbered swatch. Two fingers pan and zoom.
-  The Swatch bar shows hex, RGB and value; long-press a chip to delete it.
+- **Crop** (left strip, below Transform): drag the corners or edge middles, or
+  inside the frame to slide it; what's cut off shows faintly. Free, Original
+  or Square; Reset; Cancel or Done. The crop moves, scales and turns with the
+  image, and Crop again brings back what you cut.
+- The left strip's tools each have a bar at the bottom; turning one on turns
+  the others off.
+- **Swatches** (left strip): touch the canvas for a loupe on the selected
+  layer and lift to add a numbered swatch; two fingers pan and zoom. The bar
+  has the chips (long-press to delete one), sample size (1, 5 or 11 px) and
+  Clear. Choosing a swatch selects its layer and opens its panel, which
+  points at that layer.
 - **Flatten** (bottom of the layer bar): the visible layers exactly as shown
-  (opacity, blend, Look, crop, transform) become one new layer, "Flattened 1",
-  on top at Normal 100 %, filling the canvas; the layers in it are hidden,
-  not deleted. Pick, Simplify and Highlight on it read what you see. In Color,
-  a layer that isn't at Normal 100 % shows a hint to flatten.
-- **Update** (layer bar, or long-press a flattened layer): show the layers you
-  want and Update. The flattened layer is hidden, rendered again from what's
-  visible, and its swatches are read again at the same spots.
-- **Details | Paints & mixes** (Color, opens when you select a swatch):
-  hex, RGB, Lab, value, warm or cool, complement, and Mixbox tints, shades
-  and tones; then Mix from (a palette or all your paints of a medium) and
-  Lighten with (a white, water or nothing), and the best one-paint and
-  two-paint recipes with ΔE. Mix from also offers the classic palettes (Zorn,
-  Sargent, …) filled from your paints, and Favorites only. Your paints come
-  from the prototype's paints.json; **Import paints…** loads a newer one.
-- **Measure strength…** (Paints & mixes): mix a paint with white at a known
-  ratio (say 1 : 3), photograph the tint next to a dab of the same white in
-  even light, add it as a layer, and pick a swatch on each. The white cancels
-  the photo's exposure and cast; the strength is where Mixbox's tint has your
-  lightness, with how far the hue is off. Strengths measured here are used in
-  the iPad's mixes and listed to copy into the prototype by hand.
+  (opacity, blend, Look, crop, transform) become one new, ordinary layer,
+  "Flattened 1", on top at Normal 100 %, filling the canvas; the layers in it
+  are hidden, not deleted. Swatches, Simplify and Highlight on it read what
+  you see; on a layer that isn't at Normal 100 % they show a hint to flatten.
+- **Details | Paints & mixes** (the swatch panel): hex, RGB, Lab, value, warm
+  or cool, complement, and Mixbox tints, shades and tones; then Mix from (a
+  palette, all your paints of a medium, or a classic palette filled from your
+  paints), Lighten with (a white, water or nothing), Favorites only, and the
+  best two-paint mixes with ΔE. Each paint's brand and notes are behind its
+  paint icon, orange when there's a note (a stand-in's color, or off screen).
+- **Paint library** (top bar, after Redo): Paints and Palettes, full screen,
+  Cancel or Done. Paints: the table with ★ and Use, Add Paint…, Edit… (the
+  prototype's Edit Paint: group, brand, name, series, pigments, opacity,
+  lightfastness, drying, strength, Lab color, stand-in), Delete, Revert to
+  Site Data, Open Web Page, Import paints… (a newer paints.json from the
+  prototype). Palettes: yours and the classic ones; New, Edit, Duplicate as
+  My Palette, Delete. Done keeps the library on the iPad, in the prototype's
+  format; the Mac's paints.json isn't changed.
 - **Share swatch sheet (PDF)** (top right): the canvas with its numbered
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
-- **Simplify** (Color): Colors, Values or Value scale, 2–12, smoothing; the
-  colors found with their shares. Pick reads the flat color you see.
+- **Simplify** (left strip): Colors, Values or Value scale, 2–12, smoothing;
+  the colors found with their shares. Pick reads the flat color you see.
   **Highlight**: each swatch's range in its own bright color over gray.
 - **Transform**: a bar with Proportional, Free, Skew and Distort for the
   corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
@@ -98,7 +100,8 @@ automatically.
   duplicate, hide or delete it. The Look bar's **⋯** has Fit, Flip
   horizontal / vertical, and **Edit corners…**, which reopens Adjust corners
   on the original photo (kept since this build) and keeps the placement.
-- **Grid** (left strip): rows and columns, Square cells, color and opacity.
+- **Grid** (left strip): on / off, rows and columns (1–10), Square cells,
+  color and opacity.
   It's saved with the session but isn't an undo step.
 - **Share** (top right): the canvas as a full-resolution JPEG, with or
   without the grid, through the share sheet (AirDrop to the Mac, Files).
@@ -122,6 +125,7 @@ automatically.
 | `ImageOps.swift` | Upright photos, perspective correction, auto levels, rectangle detection |
 | `Camera.swift` | Live camera with detection overlay; Capture screen |
 | `CornersScreen.swift` | Adjust corners (handles, loupe); the capture flow |
+| `PaintLibraryView.swift` | The Paint library: Paints table and editor, Palettes and editor |
 | `Paints.swift`, `paints.json` | Your paint library from the prototype, its stand-ins and whites; Import paints… |
 | `Strength.swift` | Paint strength from a photo of a tint, kept on the iPad; Measure strength sheet |
 | `SwatchSheet.swift` | The swatch sheet PDF |

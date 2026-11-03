@@ -1,22 +1,69 @@
 import Foundation
 import Observation
 
+/// Any JSON value, kept as it was read: the paint's `site` record.
+indirect enum JSONValue: Codable, Equatable {
+    case string(String), number(Double), bool(Bool), array([JSONValue]), object([String: JSONValue]), null
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null }
+        else if let v = try? c.decode(Bool.self) { self = .bool(v) }
+        else if let v = try? c.decode(Double.self) { self = .number(v) }
+        else if let v = try? c.decode(String.self) { self = .string(v) }
+        else if let v = try? c.decode([JSONValue].self) { self = .array(v) }
+        else { self = .object(try c.decode([String: JSONValue].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        switch self {
+        case .string(let v): try c.encode(v)
+        case .number(let v): try c.encode(v)
+        case .bool(let v): try c.encode(v)
+        case .array(let v): try c.encode(v)
+        case .object(let v): try c.encode(v)
+        case .null: try c.encodeNil()
+        }
+    }
+
+    var string: String? { if case .string(let v) = self { v } else { nil } }
+    var strings: [String]? { if case .array(let v) = self { v.compactMap(\.string) } else { nil } }
+    var numbers: [Double]? {
+        if case .array(let v) = self { v.compactMap { if case .number(let n) = $0 { n } else { nil } } } else { nil }
+    }
+}
+
 /// A paint from the prototype's library (Paint in canvastransfer/paints.py),
-/// read from its paints.json. Only what mixing needs is kept.
+/// with every field its paints.json has, so editing here keeps them all.
 struct Paint: Codable, Identifiable, Equatable {
     var id: String
     var medium: String
     var brand: String
     var name: String
+    var code = ""  // the maker's catalog number
+    var series = ""  // the maker's price series
     var pigments: [String] = []
+    var opacity = ""  // "T", "ST", "SO", "O" or ""
+    var lightfastness = ""  // as the site shows it: "ASTM I", "I", or stars "★★★"
     var lab: [Double]? = nil  // CIELAB D50 of the masstone; nil = no color data
+    var source = ""  // where the color came from: "Chart", "Entered by hand", …
+    var url = ""
+    var drying = ""
     var strength: Double = 1  // tinting strength: 3 = one part does what three parts of an average paint do
     var favorite: Bool = false
     var enabled: Bool = true  // offered in matches and mixes
     var standIn: String? = nil  // nil: automatic, "": none, else a paint id
+    var edited: [String] = []  // site fields changed by hand
+    var site: [String: JSONValue] = [:]  // the site's values at the last import
+
+    /// Fields the editor can change that come from the site (EDITABLE_FIELDS).
+    static let siteFields = ["medium", "brand", "name", "series", "pigments", "opacity", "lightfastness", "lab"]
+    static let opacityLabels = ["T": "Transparent", "ST": "Semi-Transparent", "SO": "Semi-Opaque", "O": "Opaque"]
 
     enum CodingKeys: String, CodingKey {
-        case id, medium, brand, name, pigments, lab, strength, favorite, enabled
+        case id, medium, brand, name, code, series, pigments, opacity, lightfastness, lab, source, url, drying
+        case strength, favorite, enabled, edited, site
         case standIn = "stand_in"
     }
 
@@ -24,24 +71,78 @@ struct Paint: Codable, Identifiable, Equatable {
         self.id = id; self.medium = medium; self.brand = brand; self.name = name; self.lab = lab
     }
 
-    // Tolerant: the prototype's file has more fields, and older ones fewer.
+    // Tolerant: older files have fewer fields.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        func string(_ k: CodingKeys) -> String { (try? c.decode(String.self, forKey: k)) ?? "" }
         id = try c.decode(String.self, forKey: .id)
-        medium = (try? c.decode(String.self, forKey: .medium)) ?? ""
-        brand = (try? c.decode(String.self, forKey: .brand)) ?? ""
-        name = (try? c.decode(String.self, forKey: .name)) ?? id
+        medium = string(.medium); brand = string(.brand); name = (try? c.decode(String.self, forKey: .name)) ?? id
+        code = string(.code); series = string(.series); opacity = string(.opacity); lightfastness = string(.lightfastness)
+        source = string(.source); url = string(.url); drying = string(.drying)
         pigments = (try? c.decode([String].self, forKey: .pigments)) ?? []
         lab = (try? c.decodeIfPresent([Double].self, forKey: .lab)).flatMap { $0?.count == 3 ? $0 : nil }
         strength = (try? c.decode(Double.self, forKey: .strength)) ?? 1
         favorite = (try? c.decode(Bool.self, forKey: .favorite)) ?? false
         enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? true
         standIn = try? c.decodeIfPresent(String.self, forKey: .standIn)
+        edited = (try? c.decode([String].self, forKey: .edited)) ?? []
+        site = (try? c.decode([String: JSONValue].self, forKey: .site)) ?? [:]
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id); try c.encode(medium, forKey: .medium); try c.encode(brand, forKey: .brand)
+        try c.encode(name, forKey: .name); try c.encode(code, forKey: .code); try c.encode(series, forKey: .series)
+        try c.encode(pigments, forKey: .pigments); try c.encode(opacity, forKey: .opacity)
+        try c.encode(lightfastness, forKey: .lightfastness)
+        if let lab { try c.encode(lab, forKey: .lab) } else { try c.encodeNil(forKey: .lab) }
+        try c.encode(source, forKey: .source); try c.encode(url, forKey: .url); try c.encode(drying, forKey: .drying)
+        try c.encode(strength, forKey: .strength); try c.encode(favorite, forKey: .favorite)
+        try c.encode(enabled, forKey: .enabled)
+        if let standIn { try c.encode(standIn, forKey: .standIn) } else { try c.encodeNil(forKey: .standIn) }
+        try c.encode(edited, forKey: .edited); try c.encode(site, forKey: .site)
     }
 
     /// Every pigment a white (PW…).
     var isWhite: Bool { !pigments.isEmpty && pigments.allSatisfy { $0.uppercased().hasPrefix("PW") } }
     var pigmentSet: Set<String> { Set(pigments.map { $0.uppercased() }) }
+    var isManual: Bool { id.hasPrefix("manual-") }
+
+    /// Notes which site fields now differ from the site's values (for ✎ and Revert).
+    mutating func updateEdited() {
+        guard !site.isEmpty else { return }
+        edited = Self.siteFields.filter { field in
+            guard let original = site[field] else { return false }
+            switch field {
+            case "medium": return original.string != medium
+            case "brand": return original.string != brand
+            case "name": return original.string != name
+            case "series": return original.string != series
+            case "opacity": return original.string != opacity
+            case "lightfastness": return original.string != lightfastness
+            case "pigments": return (original.strings ?? []) != pigments
+            case "lab":
+                let o = original.numbers, l = lab
+                if o == nil || o?.count != 3 { return l != nil }
+                guard let l else { return true }
+                return zip(o!, l).contains { abs($0 - $1) > 0.0005 }
+            default: return false
+            }
+        }
+    }
+
+    /// Back to the site's values for the site fields.
+    mutating func revertToSite() {
+        if let v = site["medium"]?.string { medium = v }
+        if let v = site["brand"]?.string { brand = v }
+        if let v = site["name"]?.string { name = v }
+        if let v = site["series"]?.string { series = v }
+        if let v = site["opacity"]?.string { opacity = v }
+        if let v = site["lightfastness"]?.string { lightfastness = v }
+        if let v = site["pigments"]?.strings { pigments = v }
+        if let v = site["lab"] { lab = v.numbers.flatMap { $0.count == 3 ? $0 : nil } }
+        edited = []
+    }
 }
 
 struct Palette: Codable, Identifiable, Equatable {
@@ -75,8 +176,24 @@ final class PaintLibrary {
     @ObservationIgnored private var standIns: [String: Paint] = [:]
 
     private struct File: Codable {
+        var version: Int? = 1
         var paints: [Paint]
         var palettes: [Palette]?
+    }
+
+    /// The library as edited in the Paint library, kept on the iPad in the
+    /// prototype's format (so it can go back to the Mac by hand). Strengths
+    /// measured here are now part of the paints themselves.
+    func replace(paints newPaints: [Paint], palettes newPalettes: [Palette]) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(File(version: 1, paints: newPaints, palettes: newPalettes))
+        try FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
+        try data.write(to: Self.importedURL, options: .atomic)
+        measured = [:]
+        try? FileManager.default.removeItem(at: Self.strengthsURL)
+        load(data)
+        origin = "Edited on the iPad \(Date().formatted(date: .abbreviated, time: .shortened))"
     }
 
     private static var importedURL: URL {
@@ -253,21 +370,29 @@ final class PaintLibrary {
 
     // MARK: stand-ins (stand_in_for and auto_stand_in in paints.py)
 
-    private func standIn(for paint: Paint) -> Paint? {
+    private func standIn(for paint: Paint) -> Paint? { Self.standIn(for: paint, among: paints) }
+
+    /// The paint whose color `paint` borrows, chosen from `paints`: by hand,
+    /// or automatically. Works on any list, so the editor can show it live.
+    static func standIn(for paint: Paint, among paints: [Paint]) -> Paint? {
         if paint.lab != nil || paint.standIn == "" { return nil }
         if let id = paint.standIn {  // chosen by hand: any medium
-            return self.paint(id).flatMap { $0.lab != nil ? $0 : nil }
+            return paints.first { $0.id == id }.flatMap { $0.lab != nil ? $0 : nil }
         }
-        // Automatic, within the medium: the same pigments (closest name wins),
-        // then a near-identical name, then a similar name sharing a pigment.
+        return autoStandIn(for: paint, among: paints)
+    }
+
+    /// Automatic, within the medium: the same pigments (closest name wins),
+    /// then a near-identical name, then a similar name sharing a pigment.
+    static func autoStandIn(for paint: Paint, among paints: [Paint]) -> Paint? {
         let candidates = paints.filter { $0.medium == paint.medium && $0.lab != nil && $0.id != paint.id }
         guard !candidates.isEmpty else { return nil }
         let pigments = paint.pigmentSet
         let same = candidates.filter { !pigments.isEmpty && $0.pigmentSet == pigments }
         if !same.isEmpty {
-            return same.max { Self.nameSimilarity(paint.name, $0.name) < Self.nameSimilarity(paint.name, $1.name) }
+            return same.max { nameSimilarity(paint.name, $0.name) < nameSimilarity(paint.name, $1.name) }
         }
-        let scored = candidates.map { ($0, Self.nameSimilarity(paint.name, $0.name), pigments.intersection($0.pigmentSet).count) }
+        let scored = candidates.map { ($0, nameSimilarity(paint.name, $0.name), pigments.intersection($0.pigmentSet).count) }
         let good = scored.filter { $0.1 >= 0.8 || ($0.1 >= 0.6 && $0.2 > 0) }
         return good.max { ($0.1, $0.2) < ($1.1, $1.2) }?.0
     }
