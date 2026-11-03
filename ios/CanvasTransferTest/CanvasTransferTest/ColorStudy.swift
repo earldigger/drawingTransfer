@@ -298,7 +298,7 @@ struct SimplifyBar: View {
             Text("Smoothing")
             Slider(value: Binding(get: { Double(settings.smoothing) }, set: { settings.smoothing = Int($0.rounded()) }),
                    in: 0...6, step: 1)
-                .frame(width: 110)
+                .frame(width: 190)
             ProgressView().controlSize(.small).opacity(working ? 1 : 0)
             SwatchMarkersToggle(isOn: $markersShown)
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
@@ -351,7 +351,7 @@ struct HighlightBar: View {
                 .pickerStyle(.segmented)
                 .frame(width: 150)
                 Text("Range \(Int(settings.tolerance.rounded()))").monospacedDigit().frame(width: 74, alignment: .leading)
-                Slider(value: $settings.tolerance, in: 2...40).frame(width: 140)
+                Slider(value: $settings.tolerance, in: 2...40).frame(width: 220)
             }
             if working { ProgressView().controlSize(.small) }
             SwatchMarkersToggle(isOn: $markersShown)
@@ -371,6 +371,8 @@ struct SwatchMarkersToggle: View {
     var body: some View {
         Toggle(isOn: $isOn) {
             Label("Swatches", systemImage: isOn ? "mappin.circle.fill" : "mappin.slash.circle")
+                .labelStyle(.iconOnly)  // no text, so the sliders get the room
+                .font(.system(size: 20))
         }
         .toggleStyle(.button)
         .accessibilityLabel(isOn ? "Hide swatches on the image" : "Show swatches on the image")
