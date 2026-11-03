@@ -65,13 +65,21 @@ libdbus-1-3 are needed). Keep them passing.
   Measured against Mixbox: Old Delft Blue ×3 (1:3 with white looks like
   the model's 1:1), Brown Ochre Deep ×1. Get more from the owner's tints:
   paint + white at a known ratio, RAW photo, compare at matching lightness.
-- Possible next steps (not started): strength from a photo inside the app;
-  replacing a paint's library color with one measured from the owner's own
-  masstone.
+- **Strength from a photo** (`Strength.swift`) is written but tabled by the
+  owner (Nov 2026): its buttons are removed; the code stays. Not tried on real tints.
+- **The iPad's paint library is its own copy.** The Paint library edits it
+  and saves it on the iPad in the prototype's format; the Mac's paints.json
+  isn't changed, and Import paints… (in the Paint library) brings in a newer one.
+- Possible next step (not started): replacing a paint's library color with
+  one measured from the owner's own masstone.
 
 ## iPad app — open work
 
-- **Flatten** (asked for, Oct 2026): render the visible layers as shown into
-  a new layer so Pick/Simplify/Highlight read what you see; hide the
-  originals; **Update** re-renders and refreshes its swatches. No masks,
-  painting or merge-down: it isn't an image editor.
+- Nothing open.
+
+## iPad app — done
+
+- **Flatten** (`Flatten.swift`): visible layers as shown into an ordinary "Flattened n", sources hidden. Update was removed (Nov 2026).
+- **One workspace** (Nov 2026): no Color tab; Swatches, Simplify and Highlight are in the tool strip, one tool at a time.
+- **Paint library** (Nov 2026, `PaintLibraryView.swift`): Paints and Palettes editors like the prototype's.
+- **Paints & mixes** (Oct 2026, `Mixbox.swift`, `Mixing.swift`, `Paints.swift`, `ColorPanel.swift`): Mixbox and mixing.py ported, matching the prototype's recipes; paints from its paints.json (Import paints… for a newer one); classic palettes and Favorites only too; swatch sheet PDF in Share. No Kubelka-Munk (not wanted) or Munsell.
