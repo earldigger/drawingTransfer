@@ -164,8 +164,8 @@ struct SplitHandle: View {
         Text(text)
             .font(.caption.weight(.bold))
             .frame(width: 24, height: 24)
-            .background(Circle().fill(Color.blue))
-            .foregroundStyle(.white)
+            .background(Circle().fill(Theme.accent))
+            .foregroundStyle(Theme.onAccent)
             .allowsHitTesting(false)
     }
 }
@@ -199,11 +199,11 @@ struct CompareBar: View {
                 }
                 .labelStyle(.iconOnly)
             }
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Button("Done", action: onDone).buttonStyle(.accent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 
     /// Layers by position, 1 at the bottom, as numbered in the layer bar while comparing.

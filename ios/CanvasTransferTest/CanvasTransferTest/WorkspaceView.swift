@@ -60,7 +60,7 @@ struct WorkspaceView: View {
             let fitted = fitRect(session.canvasSize, in: area, margin: fullScreen ? 0 : 12)
             let rect = fitted.offsetBy(dx: margins.leading, dy: margins.top)
             ZStack {
-                (fullScreen ? Color.black : Color(white: 0.23)).ignoresSafeArea()
+                (fullScreen ? Color.black : Theme.canvasSurround).ignoresSafeArea()
                 // Under the canvas, which lets touches through except on crop handles.
                 CanvasGestureView(handlers: canvasGestures(canvas: rect.size, at: rect),
                                   picking: colorToolOn && !fullScreen)
@@ -80,11 +80,11 @@ struct WorkspaceView: View {
                 if exporting {
                     ProgressView("Preparing image…")
                         .padding(24)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+                        .themedBar()
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
         .statusBarHidden(fullScreen)
         .sheet(item: $shareFile) { file in
             ShareSheet(items: [file.url]) { shareFile = nil }
@@ -506,7 +506,7 @@ struct WorkspaceView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 52)
-        .background(Color(white: 0.13))
+        .background(Theme.background)
     }
 
     /// One strip of tools. Each one that has a bar at the bottom turns the
@@ -562,7 +562,7 @@ struct WorkspaceView: View {
             .disabled(session.selected == nil)
         }
         .padding(6)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 
     private func toolButton(_ symbol: String, _ label: String, on: Bool = false, action: @escaping () -> Void) -> some View {
@@ -573,8 +573,9 @@ struct WorkspaceView: View {
         Image(systemName: symbol)
             .font(.system(size: 20))
             .frame(width: 44, height: 44)
-            .background(RoundedRectangle(cornerRadius: 10).fill(on ? Color.blue : Color.clear))
-            .foregroundStyle(.white)
+            .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .fill(on ? Theme.accent : Color.clear))
+            .foregroundStyle(on ? Theme.onAccent : Color.white)
     }
 
     /// Thumbnails, top layer first. Expanded (‹), each row also shows its
@@ -602,7 +603,7 @@ struct WorkspaceView: View {
             }
         }
         .padding(6)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 
     /// An icon in the collapsed bar; icon and title expanded.
@@ -672,7 +673,7 @@ struct WorkspaceView: View {
                     .frame(width: 48, height: 48)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .opacity(layer.isVisible ? 1 : 0.35)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue, lineWidth: selected ? 3 : 0))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.accent, lineWidth: selected ? 3 : 0))
                     .overlay(alignment: .bottomLeading) { compareBadge(layer) }
                     .overlay(alignment: .leading) {
                         if session.swatches.contains(where: { $0.layerID == layer.id }) {  // this layer has swatches
@@ -711,7 +712,7 @@ struct WorkspaceView: View {
             Text(role.map { "\(index + 1) \($0)" } ?? "\(index + 1)")
                 .font(.caption2.weight(.bold))
                 .padding(.horizontal, 4)
-                .background(RoundedRectangle(cornerRadius: 4).fill(role == nil ? Color.black.opacity(0.6) : Color.blue))
+                .background(RoundedRectangle(cornerRadius: 4).fill(role == nil ? Color.black.opacity(0.6) : Theme.accent))
                 .foregroundStyle(.white)
                 .padding(2)
         }
@@ -773,7 +774,7 @@ struct LookBar: View {
                     .font(.system(size: 20))
                     .overlay(alignment: .topTrailing) {
                         if !layer.adjustments.isIdentity {  // this layer has adjustments
-                            Circle().fill(Color.blue).frame(width: 8, height: 8).offset(x: 5, y: -3)
+                            Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: 5, y: -3)
                         }
                     }
             }
@@ -793,7 +794,7 @@ struct LookBar: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 }
 
@@ -862,7 +863,7 @@ struct GridBar: View {
                             .frame(width: 26, height: 26)
                             .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
                             .padding(3)
-                            .overlay(Circle().stroke(Color.blue, lineWidth: session.grid.color == color ? 3 : 0))
+                            .overlay(Circle().stroke(Theme.accent, lineWidth: session.grid.color == color ? 3 : 0))
                             .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel(color.rawValue.capitalized)
@@ -871,11 +872,11 @@ struct GridBar: View {
             }
             Text("Opacity")
             Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Button("Done", action: onDone).buttonStyle(.accent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 
     /// "Rows  4 ⌄": a menu of 1 to 10.

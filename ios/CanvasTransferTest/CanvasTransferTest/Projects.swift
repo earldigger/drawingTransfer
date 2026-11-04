@@ -253,27 +253,26 @@ struct GalleryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            HStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        sizesSection
-                        projectsSection
-                    }
-                    .padding(32)
+        HStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 36) {
+                    header
+                    sizesSection
+                    projectsSection
                 }
-                if let current = draft {
-                    Divider()
-                    NewProjectPanel(draft: Binding(get: { draft ?? current }, set: { draft = $0 }),
-                                    onCreate: create, onClose: { withAnimation { draft = nil } })
-                        .frame(width: 360)
-                        .transition(.move(edge: .trailing))
-                }
+                .padding(.horizontal, 40)
+                .padding(.vertical, 32)
             }
-            .navigationTitle("Gallery")
-            .background(Color(white: 0.11))
+            if let current = draft {
+                NewProjectPanel(draft: Binding(get: { draft ?? current }, set: { draft = $0 }),
+                                onCreate: create, onClose: { withAnimation { draft = nil } })
+                    .frame(width: 380)
+                    .padding([.vertical, .trailing], 16)
+                    .transition(.move(edge: .trailing))
+            }
         }
-        .environment(\.colorScheme, .dark)
+        .background(Theme.background.ignoresSafeArea())
+        .themed()
         .onAppear { if store.projects.isEmpty { tab = .saved } }
         .alert("Rename", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
@@ -292,18 +291,21 @@ struct GalleryView: View {
         } message: { Text("Its layers and swatches are deleted from this iPad.") }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Gallery").font(.largeTitle.weight(.bold))
+            Text(store.projects.isEmpty ? "Let's start a painting" : "Pick up a painting, or start a new one")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+        .padding(.top, 8)
+    }
+
     // MARK: sizes
 
     private var sizesSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 20) {
-                Text("New project").font(.title2.weight(.semibold))
-                Picker("Sizes", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-            }
+        VStack(alignment: .leading, spacing: 18) {
+            Text("New project").font(.title2.weight(.semibold))
+            UnderlineTabs(tabs: Tab.allCases, selection: $tab) { $0.rawValue }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
                     customCard
@@ -312,7 +314,7 @@ struct GalleryView: View {
                         if recent.isEmpty {
                             Text("Sizes of the paintings you make show here.")
                                 .font(.callout).foregroundStyle(.secondary)
-                                .frame(height: 120)
+                                .frame(height: Self.cardSize.height)
                         }
                         ForEach(recent) { choice in
                             sizeCard(choice) {
@@ -343,49 +345,60 @@ struct GalleryView: View {
         }
     }
 
-    private static let cardSize = CGSize(width: 150, height: 120)
+    private static let cardSize = CGSize(width: 168, height: 150)
 
+    /// Custom size: a round sky-blue +, like the screenshots' add button.
     private var customCard: some View {
-        Button { start(nil) } label: {
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(white: 0.18))
-                    .overlay(Image(systemName: "plus").font(.system(size: 30, weight: .light)))
-                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-                    .overlay(selected(nil) ? RoundedRectangle(cornerRadius: 10).strokeBorder(Color.blue, lineWidth: 2) : nil)
-                Text("Custom size").font(.subheadline.weight(.medium))
-                Text(" ").font(.caption)
+        let on = selected(nil)
+        return Button { start(nil) } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(systemName: "plus")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(on ? Theme.accent : Theme.onAccent)
+                    .frame(width: 48, height: 48)
+                    .background(Circle().fill(on ? Color.white : Theme.accent))
+                Spacer()
+                Text("Custom size").font(.headline)
+                Text("Any width and height").font(.caption).opacity(0.7)
             }
+            .sizeCardStyle(selected: on)
         }
         .buttonStyle(.plain)
     }
 
-    /// A size: its shape, its name with a ⌄ menu, and its dimensions.
+    /// A size card: its shape in a tile, its name with a ⌄ menu, and its
+    /// dimensions. The chosen one is filled sky blue.
     private func sizeCard<Items: View>(_ choice: CanvasSizeChoice, @ViewBuilder menu: () -> Items) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button { start(choice) } label: {
-                let fit = fitRect(choice.size, in: CGSize(width: 80, height: 80))
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(white: 0.18))
-                    .overlay(Rectangle().fill(Color(white: 0.85)).frame(width: fit.width, height: fit.height))
-                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
-                    .overlay(selected(choice.id) ? RoundedRectangle(cornerRadius: 10).strokeBorder(Color.blue, lineWidth: 2) : nil)
-            }
-            .buttonStyle(.plain)
-            Menu {
-                menu()
-            } label: {
-                HStack(spacing: 4) {
-                    Text(choice.name).lineLimit(1)
-                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+        let on = selected(choice.id)
+        let fit = fitRect(choice.size, in: CGSize(width: 26, height: 26))
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(on ? Theme.accent : Color(white: 0.9))
+                    .frame(width: fit.width, height: fit.height)
+                    .frame(width: 48, height: 48)
+                    .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                        .fill(on ? Color.white : Theme.raised))
+                Spacer()
+                Menu {
+                    menu()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.footnote.weight(.semibold))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
+                .tint(on ? Theme.onAccent : Color.white)
+                .accessibilityLabel("\(choice.name) options")
             }
-            .tint(.primary)
-            .frame(maxWidth: Self.cardSize.width, alignment: .leading)
-            Text(choice.unit.text(choice.size)).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Text(choice.name).font(.headline).lineLimit(1)
+            Text(choice.unit.text(choice.size)).font(.caption).opacity(0.7)
         }
+        .sizeCardStyle(selected: on)
+        .contentShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .onTapGesture { start(choice) }
+        .accessibilityAddTraits(.isButton)
     }
 
     private func selected(_ id: UUID?) -> Bool {
@@ -421,30 +434,37 @@ struct GalleryView: View {
             if store.projects.isEmpty {
                 Text("None yet. Pick a size above to start one.").font(.callout).foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 28) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 24) {
                 ForEach(store.projects) { project in card(project) }
             }
         }
     }
 
+    /// A painting: its picture on a navy card, then its name, size and date.
     private func card(_ project: ProjectInfo) -> some View {
         Button { onOpen(project.id) } label: {
-            VStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12).fill(Color(white: 0.18))
                     if let thumb = store.thumbnails[project.id] {
-                        Image(uiImage: thumb).resizable().scaledToFit().padding(12).shadow(radius: 4)
+                        Image(uiImage: thumb).resizable().scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .shadow(color: .black.opacity(0.4), radius: 6, y: 3)
                     } else {
-                        let fit = fitRect(project.canvasSize, in: CGSize(width: 180, height: 196))
-                        Rectangle().fill(Color.white).frame(width: fit.width, height: fit.height).shadow(radius: 4)
+                        let fit = fitRect(project.canvasSize, in: CGSize(width: 160, height: 170))
+                        RoundedRectangle(cornerRadius: 4).fill(Color.white).frame(width: fit.width, height: fit.height)
                     }
                 }
-                .frame(height: 220)
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+                .padding(.bottom, 10)
                 Text(project.name).font(.headline).lineLimit(1)
                 Text("\(SizeUnit.inches.text(project.canvasSize)) · "
-                     + project.modified.formatted(date: .abbreviated, time: .shortened))
+                     + project.modified.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption).foregroundStyle(.secondary)
             }
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
+            .contentShape(RoundedRectangle(cornerRadius: Theme.cardRadius))
         }
         .buttonStyle(.plain)
         .contextMenu {
@@ -499,11 +519,14 @@ struct NewProjectPanel: View {
                 Spacer()
                 Button("Close", systemImage: "xmark", action: onClose)
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.raised))
             }
             field("Name") {
                 TextField("Name", text: $draft.name, prompt: Text(ProjectDraft.defaultName()))
-                    .textFieldStyle(.roundedBorder)
+                    .boxed()
             }
             field("Unit") {
                 Picker("Unit", selection: unit) {
@@ -511,15 +534,16 @@ struct NewProjectPanel: View {
                 }
                 .pickerStyle(.menu)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.2)))
+                .padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.raised))
             }
             HStack(alignment: .bottom, spacing: 10) {
                 field("Width") { number(width) }
                 Button(draft.locked ? "Unlock proportions" : "Lock proportions",
                        systemImage: draft.locked ? "lock.fill" : "lock.open") { draft.locked.toggle() }
                     .labelStyle(.iconOnly)
-                    .foregroundStyle(draft.locked ? Color.blue : Color.secondary)
-                    .frame(width: 30, height: 34)
+                    .foregroundStyle(draft.locked ? Theme.accent : Color.secondary)
+                    .frame(width: 30, height: 44)
                 field("Height") { number(height) }
             }
             field("Orientation") {
@@ -539,27 +563,24 @@ struct NewProjectPanel: View {
                     .pickerStyle(.menu)
                     Spacer()
                 }
-                .padding(.leading, 8)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.2)))
+                .padding(.leading, 12)
+                .padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.raised))
             }
-            Button { draft.saveSize.toggle() } label: {
-                Label("Save this size", systemImage: draft.saveSize ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(.plain)
+            Toggle("Save this size", isOn: $draft.saveSize)
             if !draft.isValid {
                 Text("Width and height must be more than 0 and at most \(SizeUnit.number(ProjectDraft.maxInches * draft.unit.perInch)) \(draft.unit.symbol).")
                     .font(.caption).foregroundStyle(.orange)
             }
             Spacer()
             Button(action: onCreate) {
-                Text("Create project").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+                Text("Create project").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 8)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.accent)
             .disabled(!draft.isValid)
         }
         .padding(24)
-        .background(Color(white: 0.14))
+        .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous).fill(Theme.surface))
     }
 
     private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
@@ -572,8 +593,8 @@ struct NewProjectPanel: View {
     private func number(_ value: Binding<Double>) -> some View {
         TextField("", value: value, format: .number.precision(.fractionLength(0...1)))
             .keyboardType(.decimalPad)
-            .textFieldStyle(.roundedBorder)
             .monospacedDigit()
+            .boxed()
     }
 
     private func orientation(landscape: Bool, icon: String) -> some View {
@@ -583,9 +604,10 @@ struct NewProjectPanel: View {
         } label: {
             Image(systemName: icon)
                 .font(.title2)
-                .frame(width: 52, height: 40)
-                .background(RoundedRectangle(cornerRadius: 8).fill(on ? Color.blue.opacity(0.35) : Color(white: 0.2)))
-                .overlay(on ? RoundedRectangle(cornerRadius: 8).strokeBorder(Color.blue, lineWidth: 1.5) : nil)
+                .foregroundStyle(on ? Theme.onAccent : Color.white)
+                .frame(width: 64, height: 48)
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                    .fill(on ? Theme.accent : Theme.raised))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(landscape ? "Landscape" : "Portrait")

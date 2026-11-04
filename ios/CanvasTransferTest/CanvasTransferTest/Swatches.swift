@@ -197,7 +197,7 @@ struct SwatchMarkers: View {
                         .foregroundStyle(swatch.labelColor)
                         .frame(width: 22, height: 22)
                         .background(Circle().fill(swatch.color))
-                        .overlay(Circle().stroke(selected ? Color.blue : Color.white, lineWidth: selected ? 3 : 2))
+                        .overlay(Circle().stroke(selected ? Theme.accent : Color.white, lineWidth: selected ? 3 : 2))
                         .shadow(color: .black.opacity(0.5), radius: 2)
                         .scaleEffect(1 / scale)
                         .position(point)
@@ -252,12 +252,12 @@ struct SwatchBar: View {
             }
             .accessibilityLabel("Clear all swatches")
             .disabled(session.swatches.isEmpty)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Button("Done", action: onDone).buttonStyle(.accent)
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)  // the whole width of the screen
         .frame(height: 64)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 
     private func chip(_ swatch: Swatch, number: Int) -> some View {
@@ -270,7 +270,7 @@ struct SwatchBar: View {
                 .foregroundStyle(swatch.labelColor)
                 .frame(width: 44, height: 44)
                 .background(RoundedRectangle(cornerRadius: 8).fill(swatch.color))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color.blue : Color.white.opacity(0.4),
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.accent : Color.white.opacity(0.4),
                                                                   lineWidth: selected ? 3 : 1))
         }
         .contextMenu {

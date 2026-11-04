@@ -106,7 +106,7 @@ struct CropFrame: View {
                 p.addLines(corners)
                 p.closeSubpath()
             }
-            .stroke(Color.blue, lineWidth: 2)
+            .stroke(Theme.accent, lineWidth: 2)
             .allowsHitTesting(false)
             if ratio == nil {
                 let edges = (0..<4).map { i in
@@ -116,7 +116,7 @@ struct CropFrame: View {
                     let a = corners[i], b = corners[(i + 1) % 4]
                     Capsule()
                         .fill(Color.white)
-                        .overlay(Capsule().stroke(Color.blue, lineWidth: 2))
+                        .overlay(Capsule().stroke(Theme.accent, lineWidth: 2))
                         .frame(width: 30, height: 8)
                         .rotationEffect(.radians(atan2(b.y - a.y, b.x - a.x)))  // along its edge
                         .contentShape(Rectangle().inset(by: -16))  // 40 pt or more to touch
@@ -127,7 +127,7 @@ struct CropFrame: View {
             ForEach(0..<4, id: \.self) { i in
                 Circle()
                     .fill(Color.white)
-                    .overlay(Circle().stroke(Color.blue, lineWidth: 3))
+                    .overlay(Circle().stroke(Theme.accent, lineWidth: 3))
                     .frame(width: 24, height: 24)
                     .contentShape(Circle().inset(by: -11))  // 46 pt to touch
                     .position(corners[i])
@@ -171,11 +171,11 @@ struct CropBar: View {
             .frame(width: 260)
             Button("Reset") { layer.crop = reshaped(Crop.full) }
             Button("Cancel", action: onCancel)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Button("Done", action: onDone).buttonStyle(.accent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
         .onChange(of: shape) { layer.crop = reshaped(layer.crop) }
     }
 

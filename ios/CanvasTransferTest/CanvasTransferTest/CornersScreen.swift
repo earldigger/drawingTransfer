@@ -61,11 +61,11 @@ struct CornersScreen: View {
                         p.addLines(points)
                         p.closeSubpath()
                     }
-                    .stroke(Color.blue, lineWidth: 2)
+                    .stroke(Theme.accent, lineWidth: 2)
                     ForEach(0..<4, id: \.self) { i in
                         Circle()
                             .fill(Color.white.opacity(dragging == i ? 1 : 0.3))
-                            .overlay(Circle().stroke(Color.blue, lineWidth: 3))
+                            .overlay(Circle().stroke(Theme.accent, lineWidth: 3))
                             .frame(width: 30, height: 30)
                             .contentShape(Circle().inset(by: -8))  // 46 pt to touch
                             .position(points[i])
@@ -88,11 +88,11 @@ struct CornersScreen: View {
                 }
                 .coordinateSpace(.named("photo"))
             }
-            .background(Color(white: 0.09))
+            .background(Theme.background)
 
             sidePanel
         }
-        .background(Color(white: 0.09).ignoresSafeArea())
+        .background(Theme.background.ignoresSafeArea())
     }
 
     private func loupe(at point: CGPoint, rect: CGRect) -> some View {
@@ -107,7 +107,7 @@ struct CornersScreen: View {
                 p.move(to: CGPoint(x: size / 2, y: 6)); p.addLine(to: CGPoint(x: size / 2, y: size - 6))
                 p.move(to: CGPoint(x: 6, y: size / 2)); p.addLine(to: CGPoint(x: size - 6, y: size / 2))
             }
-            .stroke(Color.blue, lineWidth: 1.5)
+            .stroke(Theme.accent, lineWidth: 1.5)
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
@@ -143,12 +143,12 @@ struct CornersScreen: View {
             } label: {
                 Text(addTitle).frame(maxWidth: .infinity).padding(.vertical, 6)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.accent)
         }
         .padding(20)
         .frame(width: 300)
-        .background(Color(white: 0.13))
-        .environment(\.colorScheme, .dark)
+        .background(Theme.surface)
+        .themed()
     }
 }
 

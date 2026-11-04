@@ -16,7 +16,7 @@ struct ColorPanel: View {
     }
 
     @AppStorage("colorPanelTab") private var tab = Tab.mixes
-    private static let fill = Color(white: 0.13).opacity(0.97)
+    private static let fill = Theme.bar
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -32,10 +32,8 @@ struct ColorPanel: View {
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Close")
             }
-            Picker("Tab", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
+            UnderlineTabs(tabs: Tab.allCases, selection: $tab) { $0.rawValue }
+                .padding(.top, 4)
             ScrollView {
                 switch tab {
                 case .details: SwatchDetails(swatch: swatch)
@@ -46,7 +44,7 @@ struct ColorPanel: View {
         .padding(14)
         .frame(width: 350)
         .frame(maxHeight: .infinity, alignment: .top)  // as tall as the space above the bottom bar
-        .background(RoundedRectangle(cornerRadius: 14).fill(Self.fill))
+        .background(RoundedRectangle(cornerRadius: Theme.barRadius, style: .continuous).fill(Self.fill))
         .overlay(alignment: .topTrailing) {
             if let pointerY {
                 GeometryReader { g in

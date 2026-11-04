@@ -301,12 +301,12 @@ struct SimplifyBar: View {
                 .frame(minWidth: 190, maxWidth: .infinity)  // takes the room the bar has
             ProgressView().controlSize(.small).opacity(working ? 1 : 0)
             SwatchMarkersToggle(isOn: $markersShown)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Button("Done", action: onDone).buttonStyle(.accent)
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)  // the whole width of the screen
         .frame(height: 64)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 }
 
@@ -357,12 +357,12 @@ struct HighlightBar: View {
             }
             if working { ProgressView().controlSize(.small) }
             SwatchMarkersToggle(isOn: $markersShown)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Button("Done", action: onDone).buttonStyle(.accent)
         }
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity)  // the whole width of the screen
         .frame(height: 64)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 }
 

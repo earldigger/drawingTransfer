@@ -24,11 +24,7 @@ struct PaintLibraryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                Picker("Tab", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 260)
+                UnderlineTabs(tabs: Tab.allCases, selection: $tab) { $0.rawValue }
                 switch tab {
                 case .paints: PaintsTab(paints: $paints, palettes: $palettes, onImport: { importing = true })
                 case .palettes: PalettesTab(paints: paints, palettes: $palettes)
@@ -36,6 +32,7 @@ struct PaintLibraryView: View {
                 footer
             }
             .padding(16)
+            .background(Theme.background)
             .navigationTitle("Paint library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -64,7 +61,7 @@ struct PaintLibraryView: View {
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
         .onAppear {
             guard !loaded else { return }
             paints = library.paints
@@ -170,12 +167,12 @@ private struct PaintsTab: View {
                         } header: {
                             Text("\(medium.capitalized) (\(list.count))").font(.headline)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 6).background(Color(white: 0.11))
+                                .padding(.vertical, 6).background(Theme.surface)
                         }
                     }
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.11)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface))
         }
         .sheet(item: $editing) { draft in
             PaintEditor(draft: draft, paints: paints) { saved in
@@ -229,7 +226,7 @@ private struct PaintsTab: View {
             Button {
                 if let index { paints[index].enabled.toggle() }
             } label: {
-                Image(systemName: paint.enabled ? "checkmark.square.fill" : "square").foregroundStyle(paint.enabled ? .blue : .secondary)
+                Image(systemName: paint.enabled ? "checkmark.square.fill" : "square").foregroundStyle(paint.enabled ? Theme.accent : Color.secondary)
             }
             .buttonStyle(.plain).frame(width: widths[1])
             .accessibilityLabel(paint.enabled ? "Used in mixes" : "Not used in mixes")
@@ -244,7 +241,7 @@ private struct PaintsTab: View {
         }
         .font(.callout)
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(isSelected ? Color.blue.opacity(0.55) : Color.clear)
+        .background(isSelected ? Theme.accent.opacity(0.35) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { editing = PaintDraft(paint: paint, isNew: false) }
         .onTapGesture { selectedID = paint.id }
@@ -384,7 +381,7 @@ private struct PaintEditor: View {
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
     }
 
     private var autoTitle: String {
@@ -456,7 +453,7 @@ private struct PalettesTab: View {
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.11)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface))
             }
         }
         .sheet(item: $editing) { palette in
@@ -565,7 +562,7 @@ private struct PaletteEditor: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: palette.paintIDs.contains(p.id) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(palette.paintIDs.contains(p.id) ? .blue : .secondary)
+                                    .foregroundStyle(palette.paintIDs.contains(p.id) ? Theme.accent : Color.secondary)
                                 PaintChip(lab: color(of: p, among: paints))
                                 Text("\(p.name) — \(p.brand)").foregroundStyle(.primary)
                             }
@@ -588,6 +585,6 @@ private struct PaletteEditor: View {
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
     }
 }
