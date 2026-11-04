@@ -2,10 +2,11 @@ import SwiftUI
 
 /// What the Transform handles do (TransformMode in canvastransfer/geometry.py).
 enum TransformMode: String, CaseIterable, Identifiable {
+    // In the bar's order.
     case proportional = "Proportional"  // corners and edges scale evenly
+    case distort = "Distort"  // every corner moves on its own: perspective
     case free = "Free"  // corners scale width and height apart; edges stretch one way
     case skew = "Skew"  // edges slide along themselves; corners as Free
-    case distort = "Distort"  // every corner moves on its own: perspective
 
     var id: String { rawValue }
 }
@@ -299,8 +300,10 @@ struct TransformBar: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 380)
-            Button("Flip H", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
-            Button("Flip V", systemImage: "arrow.up.and.down") { layer.flipVertical() }
+            Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
+                .labelStyle(.iconOnly)
+            Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipVertical() }
+                .labelStyle(.iconOnly)
             Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
             Button("Cancel", action: onCancel)
             Button("Done", action: onDone).buttonStyle(.borderedProminent)

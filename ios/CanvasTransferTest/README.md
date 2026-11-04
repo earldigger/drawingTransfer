@@ -39,9 +39,13 @@ automatically.
 
 ## What to try
 
-- **Gallery**: your paintings as cards, the most recent first. **New project**:
-  a name, a canvas size (8 × 10 to 36 × 48, or your own in inches or cm) and
-  orientation. Long-press a card to rename, duplicate or delete it. **‹ Gallery**
+- **Gallery**: at the top, sizes to start from: **Recent** (your paintings'
+  sizes) or **Saved** (yours, then the standard 8 × 10 to 36 × 48), and
+  **Custom size**; each card's ⌄ menu saves, renames or deletes it. Tapping
+  one opens **New project** on the right: name, unit (inches or cm), width and
+  height with a lock, orientation, background (white, black or medium gray,
+  under the layers everywhere) and Save this size. Below, your paintings, the
+  most recent first; long-press one to rename, duplicate or delete it. **‹ Gallery**
   in the top bar goes back; each project keeps its own layers, swatches and grid.
 
 - **Camera** (left strip): point at the canvas on the easel. Does the blue
@@ -55,8 +59,8 @@ automatically.
 - **Add layer**: every image lands at Multiply 60 % with auto levels and
   Transform on: one finger moves it, pinch scales, twist rotates.
 - **Crop** (left strip, below Transform): drag the corners or edge middles, or
-  inside the frame to slide it; what's cut off shows faintly. Free, Original
-  or Square; Reset; Cancel or Done. The crop moves, scales and turns with the
+  inside the frame to slide it; what's cut off shows faintly. Free or
+  Original; Reset; Cancel or Done. The crop moves, scales and turns with the
   image, and Crop again brings back what you cut.
 - The left strip's tools each have a bar at the bottom; turning one on turns
   the others off.
@@ -74,7 +78,9 @@ automatically.
   or cool, complement, and Mixbox tints, shades and tones; then Mix from (a
   palette, all your paints of a medium, or a classic palette filled from your
   paints), Lighten with (a white, water or nothing), Favorites only, and the
-  best two-paint mixes with ΔE. Each paint's brand and notes are behind its
+  three best two-paint mixes and three best of three paints plus the
+  lightener, each with ΔE and a thin bar showing the amounts in the paints'
+  colors. Each paint's brand and notes are behind its
   paint icon, orange when there's a note (a stand-in's color, or off screen).
 - **Paint library** (top bar, after Redo): Paints and Palettes, full screen,
   Cancel or Done. Paints: the table with ★ and Use, Add Paint…, Edit… (the
@@ -86,12 +92,12 @@ automatically.
   format; the Mac's paints.json isn't changed.
 - **Share swatch sheet (PDF)** (top right): the canvas with its numbered
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
-- **Simplify** (left strip): Colors, Values or Value scale, Steps 2–12,
+- **Simplify** (left strip): Colors, Values or Value scale, Steps 1–24,
   smoothing. Pick reads the flat color you see. **Highlight**: each swatch's
   range in its own bright color over gray. Both bars have a **Swatches**
   toggle to hide the numbered markers and see the colors alone.
-- A small yellow triangle on a layer's thumbnail means it has swatches.
-- **Transform**: a bar with Proportional, Free, Skew and Distort for the
+- A small eyedropper circle on a layer thumbnail's left edge means it has swatches.
+- **Transform**: a bar with Proportional, Distort, Free and Skew for the
   corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
   pinch and twist in every mode. Placement is four corners, as in the prototype.
 - **Undo / redo**: the top-bar buttons, a two-finger tap to undo, a

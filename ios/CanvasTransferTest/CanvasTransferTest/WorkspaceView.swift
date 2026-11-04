@@ -297,11 +297,12 @@ struct WorkspaceView: View {
         let lineWidth = 1.5 / viewScale  // the same thickness on screen at any zoom
         if let compare {
             CompareCanvas(state: compare, clock: blinkClock, layers: session.layers, size: size,
-                          grid: grid, gridLineWidth: lineWidth)
+                          grid: grid, gridLineWidth: lineWidth, background: session.background.color)
         } else {
             CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
                           faintFullImageOf: cropping?.id,
-                          replacements: shownStudy.map { [$0.layerID: $0.image] } ?? [:])
+                          replacements: shownStudy.map { [$0.layerID: $0.image] } ?? [:],
+                          background: session.background.color)
         }
     }
 
@@ -395,7 +396,7 @@ struct WorkspaceView: View {
                 }
                 layerBar.padding(12)
             }
-            Spacer()
+            .frame(maxHeight: .infinity, alignment: .top)  // the swatch panel can run down to the bottom bar
             if colorToolOn, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
                 // Pick, Simplify and Highlight read the layer's own image, not the mix on the canvas.
                 Text("Colors are read from this layer at full strength. Flatten to read what you see.")
@@ -429,6 +430,7 @@ struct WorkspaceView: View {
                     LookBar(layer: layer, canvasAspect: session.canvasAspect, onEditCorners: { editCorners(layer) })
                 }
             }
+            .padding(.horizontal, 12)  // full-width bars keep a margin
             .padding(.bottom, 12)
         }
     }
@@ -480,18 +482,7 @@ struct WorkspaceView: View {
             Button { paintLibraryOpen = true } label: { Image(systemName: "books.vertical") }
                 .accessibilityLabel("Paint library")
                 .padding(.trailing, 12)
-            Menu {
-                ForEach(TransferSession.canvasSizes.indices, id: \.self) { i in
-                    let size = TransferSession.canvasSizes[i]
-                    Button("\(Int(size.width)) × \(Int(size.height)) in") { session.canvasSize = size }
-                }
-                Button("Landscape / portrait") {
-                    session.canvasSize = CGSize(width: session.canvasSize.height, height: session.canvasSize.width)
-                }
-            } label: {
-                Label("\(Int(session.canvasSize.width)) × \(Int(session.canvasSize.height)) in", systemImage: "rectangle.portrait")
-            }
-            Button {
+            Button {  // the canvas size is chosen when the project is made
                 finishCrop(keep: true)  // the crop bar is hidden in full screen
                 withAnimation { fullScreen = true }
             } label: {
@@ -683,14 +674,9 @@ struct WorkspaceView: View {
                     .opacity(layer.isVisible ? 1 : 0.35)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue, lineWidth: selected ? 3 : 0))
                     .overlay(alignment: .bottomLeading) { compareBadge(layer) }
-                    .overlay(alignment: .topTrailing) {
+                    .overlay(alignment: .leading) {
                         if session.swatches.contains(where: { $0.layerID == layer.id }) {  // this layer has swatches
-                            SwatchCorner()
-                                .fill(Color.yellow)
-                                .overlay(SwatchCorner().stroke(Color.black.opacity(0.5), lineWidth: 0.5))
-                                .frame(width: 14, height: 14)
-                                .clipShape(UnevenRoundedRectangle(topTrailingRadius: 6))
-                                .accessibilityLabel("Has swatches")
+                            SwatchBadge().offset(x: -11)  // half over the thumbnail's left edge
                         }
                     }
             }
@@ -828,15 +814,17 @@ struct CornerEdit: Identifiable {
     var id: UUID { layer.id }
 }
 
-/// The small triangle in a layer thumbnail's top-right corner: it has swatches.
-struct SwatchCorner: Shape {
-    func path(in r: CGRect) -> Path {
-        Path { p in
-            p.move(to: CGPoint(x: r.minX, y: r.minY))
-            p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
-            p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
-            p.closeSubpath()
-        }
+/// The small circle on a layer thumbnail's left edge: it has swatches.
+struct SwatchBadge: View {
+    var body: some View {
+        Image(systemName: "eyedropper")
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(Color(white: 0.25))
+            .frame(width: 22, height: 22)
+            .background(Circle().fill(Color.white))
+            .overlay(Circle().stroke(Color(white: 0.55), lineWidth: 1))
+            .shadow(color: .black.opacity(0.3), radius: 1)
+            .accessibilityLabel("Has swatches")
     }
 }
 

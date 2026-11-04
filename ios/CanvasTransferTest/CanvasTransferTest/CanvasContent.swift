@@ -13,10 +13,11 @@ struct CanvasContent: View {
     var only: Set<UUID>? = nil  // Compare: exactly these layers, hidden or not; nil = the visible ones
     var fades: [UUID: Double] = [:]  // Compare: a layer's opacity times this, while it fades in and out
     var replacements: [UUID: UIImage] = [:]  // Color: a layer shown simplified or highlighted instead
+    var background: Color = .white  // the canvas under the layers
 
     var body: some View {
         ZStack {
-            Rectangle().fill(Color.white)
+            Rectangle().fill(background)
             ForEach(layers) { layer in
                 if only?.contains(layer.id) ?? layer.isVisible { layerView(layer) }
             }
@@ -110,7 +111,8 @@ enum CanvasExport {
         let points = CGSize(width: 1000, height: (1000 / session.canvasAspect).rounded())
         let content = CanvasContent(layers: session.layers, size: points,
                                     grid: withGrid ? session.grid : nil,
-                                    gridLineWidth: max(points.width, points.height) * 0.0015)
+                                    gridLineWidth: max(points.width, points.height) * 0.0015,
+                                    background: session.background.color)
         let renderer = ImageRenderer(content: content)
         renderer.scale = pixels.width / points.width
         guard let image = renderer.uiImage, let jpeg = image.jpegData(compressionQuality: 0.95) else { return nil }

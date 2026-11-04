@@ -32,6 +32,7 @@ struct SessionSnapshot: Codable, Equatable {
     var selectedID: UUID?
     var grid: GridSettings?  // optional, so sessions saved before the grid still open
     var swatches: [Swatch]?  // optional, so sessions saved before Color still open
+    var background: CanvasBackground?  // optional; nil = white, as before
 }
 
 extension TransferSession {
@@ -45,7 +46,8 @@ extension TransferSession {
             },
             selectedID: selectedID,
             grid: grid,
-            swatches: swatches)
+            swatches: swatches,
+            background: background)
     }
 
     /// Makes the session match `snapshot`. Layers that are already here are
@@ -55,6 +57,7 @@ extension TransferSession {
         canvasSize = snapshot.canvasSize
         if let saved = snapshot.grid { grid = saved }
         swatches = snapshot.swatches ?? []
+        background = snapshot.background ?? .white
         let existing = Dictionary(uniqueKeysWithValues: layers.map { ($0.id, $0) })
         layers = snapshot.layers.compactMap { state in
             let imageID = state.imageID ?? state.id

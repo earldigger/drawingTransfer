@@ -289,7 +289,7 @@ struct SimplifyBar: View {
             HStack(spacing: 6) {
                 Text("Steps").foregroundStyle(.secondary)
                 Picker("Steps", selection: $settings.count) {
-                    ForEach(2...12, id: \.self) { Text("\($0)").tag($0) }
+                    ForEach(1...24, id: \.self) { Text("\($0)").tag($0) }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
@@ -298,13 +298,14 @@ struct SimplifyBar: View {
             Text("Smoothing")
             Slider(value: Binding(get: { Double(settings.smoothing) }, set: { settings.smoothing = Int($0.rounded()) }),
                    in: 0...6, step: 1)
-                .frame(width: 190)
+                .frame(minWidth: 190, maxWidth: .infinity)  // takes the room the bar has
             ProgressView().controlSize(.small).opacity(working ? 1 : 0)
             SwatchMarkersToggle(isOn: $markersShown)
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
-        .frame(height: 56)
+        .frame(maxWidth: .infinity)  // the whole width of the screen
+        .frame(height: 64)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
 }
@@ -323,6 +324,7 @@ struct HighlightBar: View {
             Label("Highlight", systemImage: "highlighter").font(.subheadline.weight(.semibold))
             if swatches.isEmpty {
                 Text("Pick a swatch first.").font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -343,7 +345,7 @@ struct HighlightBar: View {
                     }
                     .padding(.vertical, 2)
                 }
-                .frame(maxWidth: 300)
+                .frame(maxWidth: .infinity)  // the chips take the room the bar has
                 Picker("Show", selection: $settings.selectedOnly) {
                     Text("All").tag(false)
                     Text("Selected").tag(true)
@@ -358,7 +360,8 @@ struct HighlightBar: View {
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
-        .frame(height: 56)
+        .frame(maxWidth: .infinity)  // the whole width of the screen
+        .frame(height: 64)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
 }

@@ -4,7 +4,6 @@ import SwiftUI
 enum CropShape: String, CaseIterable, Identifiable {
     case free = "Free"
     case original = "Original"  // the photo's own proportions
-    case square = "Square"
 
     var id: String { rawValue }
 }
@@ -28,7 +27,6 @@ enum Crop {
         switch shape {
         case .free: nil
         case .original: 1  // same fraction of width and height
-        case .square: 1 / max(imageAspect, 0.01)  // equal pixels across and down
         }
     }
 

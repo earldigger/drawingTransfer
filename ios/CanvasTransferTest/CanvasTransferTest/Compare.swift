@@ -81,6 +81,7 @@ struct CompareCanvas: View {
     let size: CGSize
     let grid: GridSettings?
     let gridLineWidth: CGFloat
+    var background: Color = .white
 
     var body: some View {
         let roles = state.roles(in: layers)
@@ -105,7 +106,8 @@ struct CompareCanvas: View {
     }
 
     private func content(only: Set<UUID>, fades: [UUID: Double] = [:]) -> CanvasContent {
-        CanvasContent(layers: layers, size: size, grid: grid, gridLineWidth: gridLineWidth, only: only, fades: fades)
+        CanvasContent(layers: layers, size: size, grid: grid, gridLineWidth: gridLineWidth, only: only, fades: fades,
+                      background: background)
     }
 }
 
@@ -196,24 +198,12 @@ struct CompareBar: View {
                     state.paused.toggle()
                 }
                 .labelStyle(.iconOnly)
-                TimelineView(.animation(paused: state.paused)) { context in
-                    Text(showing(clock.level(at: context.date, interval: state.interval)))
-                        .font(.caption).foregroundStyle(.secondary).frame(width: 74, alignment: .leading)
-                }
             }
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
         .frame(height: 56)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
-    }
-
-    private func showing(_ level: Double) -> String {
-        switch state.mode {
-        case .blinkA: level == 1 ? "A shown" : (level == 0 ? "A hidden" : "Fading")
-        case .blinkAB: level == 1 ? "Showing A" : (level == 0 ? "Showing B" : "Fading")
-        case .split: ""
-        }
     }
 
     /// Layers by position, 1 at the bottom, as numbered in the layer bar while comparing.

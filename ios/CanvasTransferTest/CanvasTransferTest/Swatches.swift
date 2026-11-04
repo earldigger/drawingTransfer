@@ -223,6 +223,7 @@ struct SwatchBar: View {
             if session.swatches.isEmpty {
                 Text("Touch the canvas to pick a color from the selected layer.")
                     .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -232,7 +233,7 @@ struct SwatchBar: View {
                     }
                     .padding(.vertical, 4)
                 }
-                .frame(maxWidth: 520)
+                .frame(maxWidth: .infinity)  // the chips take the room the bar has
             }
             HStack(spacing: 6) {
                 Image(systemName: "eyedropper.halffull").foregroundStyle(.secondary)
@@ -254,7 +255,8 @@ struct SwatchBar: View {
             Button("Done", action: onDone).buttonStyle(.borderedProminent)
         }
         .padding(.horizontal, 16)
-        .frame(height: 56)
+        .frame(maxWidth: .infinity)  // the whole width of the screen
+        .frame(height: 64)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
 
@@ -266,7 +268,7 @@ struct SwatchBar: View {
             Text("\(number)")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(swatch.labelColor)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(RoundedRectangle(cornerRadius: 8).fill(swatch.color))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color.blue : Color.white.opacity(0.4),
                                                                   lineWidth: selected ? 3 : 1))

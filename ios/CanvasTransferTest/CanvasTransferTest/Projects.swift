@@ -79,11 +79,12 @@ final class ProjectStore {
     // MARK: changes
 
     /// A new, empty project, saved at once.
-    func create(name: String, canvasSize: CGSize) -> ProjectInfo {
+    func create(name: String, canvasSize: CGSize, background: CanvasBackground) -> ProjectInfo {
         let info = ProjectInfo(id: UUID(), name: name, created: Date(), modified: Date(), canvasSize: canvasSize)
         write(info)
         let session = TransferSession()
         session.canvasSize = canvasSize
+        session.background = background
         SessionStore.save(session.snapshot, images: [:], sources: [:], to: folder(info.id))
         projects.insert(info, at: 0)
         return info
@@ -136,7 +137,8 @@ final class ProjectStore {
     @MainActor
     func saveThumbnail(_ id: UUID, session: TransferSession) {
         let size = fitRect(session.canvasSize, in: CGSize(width: 300, height: 300)).size
-        let renderer = ImageRenderer(content: CanvasContent(layers: session.layers, size: size))
+        let renderer = ImageRenderer(content: CanvasContent(layers: session.layers, size: size,
+                                                            background: session.background.color))
         renderer.scale = 2
         guard let image = renderer.uiImage else { return }
         thumbnails[id] = image
@@ -144,61 +146,285 @@ final class ProjectStore {
     }
 }
 
+// MARK: - sizes
+
+/// How sizes are shown and typed. Sizes are kept in inches.
+enum SizeUnit: String, CaseIterable, Codable, Identifiable {
+    case inches, centimeters
+
+    var id: String { rawValue }
+    var title: String { self == .inches ? "Inches" : "Centimeters" }
+    var symbol: String { self == .inches ? "in" : "cm" }
+    var perInch: Double { self == .inches ? 1 : 2.54 }
+
+    /// "16 x 20 in"
+    func text(_ inches: CGSize) -> String {
+        "\(Self.number(inches.width * perInch)) x \(Self.number(inches.height * perInch)) \(symbol)"
+    }
+
+    static func number(_ value: Double) -> String { value.formatted(.number.precision(.fractionLength(0...1))) }
+}
+
+/// A canvas size to start from: a standard one, one you saved, or a recent project's.
+struct CanvasSizeChoice: Codable, Identifiable, Equatable {
+    var id = UUID()
+    var name: String
+    var size: CGSize  // inches, as it should be (portrait or landscape)
+    var unit = SizeUnit.inches
+}
+
+/// The sizes saved with "Save this size", kept on this iPad.
+@Observable
+final class SavedSizes {
+    static let shared = SavedSizes()
+    private static let key = "savedCanvasSizes"
+
+    private(set) var sizes: [CanvasSizeChoice] = []
+
+    /// The standard canvases, portrait.
+    static let standard = TransferSession.canvasSizes.map {
+        CanvasSizeChoice(name: "Canvas", size: $0)
+    }
+
+    private init() {
+        if let data = UserDefaults.standard.data(forKey: Self.key),
+           let saved = try? JSONDecoder().decode([CanvasSizeChoice].self, from: data) {
+            sizes = saved
+        }
+    }
+
+    func add(_ choice: CanvasSizeChoice) {
+        sizes.insert(choice, at: 0)
+        persist()
+    }
+
+    func rename(_ id: UUID, to name: String) {
+        let name = name.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty, let i = sizes.firstIndex(where: { $0.id == id }) else { return }
+        sizes[i].name = name
+        persist()
+    }
+
+    func delete(_ id: UUID) {
+        sizes.removeAll { $0.id == id }
+        persist()
+    }
+
+    private func persist() {
+        if let data = try? JSONEncoder().encode(sizes) { UserDefaults.standard.set(data, forKey: Self.key) }
+    }
+}
+
 // MARK: - Gallery
 
-/// The Gallery: your paintings as cards, the most recent first, and New.
-/// Long-press a card to rename, duplicate or delete it.
+/// The Gallery, laid out like a new-document screen: at the top, sizes to
+/// start a painting from (Recent or Saved, and Custom size); tap one and the
+/// New project panel opens on the right. Below, your paintings, the most
+/// recent first; long-press one to rename, duplicate or delete it.
 struct GalleryView: View {
     @Bindable var store: ProjectStore
     var onOpen: (UUID) -> Void
 
-    @State private var creating = false
+    enum Tab: String, CaseIterable, Identifiable {
+        case recent = "Recent", saved = "Saved"
+        var id: String { rawValue }
+    }
+
+    @State private var saved = SavedSizes.shared
+    @State private var tab = Tab.recent
+    @State private var draft: ProjectDraft? = nil
     @State private var renaming: ProjectInfo? = nil
+    @State private var renamingSize: CanvasSizeChoice? = nil
     @State private var newName = ""
     @State private var deleting: ProjectInfo? = nil
 
-    private let columns = [GridItem(.adaptive(minimum: 220, maximum: 260), spacing: 24)]
+    private let columns = [GridItem(.adaptive(minimum: 200, maximum: 240), spacing: 24)]
+
+    /// The sizes of your recent paintings, each once, newest first.
+    private var recent: [CanvasSizeChoice] {
+        var seen = Set<String>(), result: [CanvasSizeChoice] = []
+        for p in store.projects {
+            let key = "\(p.canvasSize.width)x\(p.canvasSize.height)"
+            guard seen.insert(key).inserted else { continue }
+            result.append(CanvasSizeChoice(id: p.id, name: p.name, size: p.canvasSize))
+            if result.count == 8 { break }
+        }
+        return result
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 28) {
-                    Button { creating = true } label: {
-                        VStack(spacing: 10) {
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [8]))
-                                .foregroundStyle(.secondary)
-                                .frame(height: 240)
-                                .overlay(Image(systemName: "plus").font(.system(size: 40)).foregroundStyle(.secondary))
-                            Text("New project").font(.headline)
-                            Text(" ").font(.caption)
-                        }
+            HStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        sizesSection
+                        projectsSection
                     }
-                    .buttonStyle(.plain)
-                    ForEach(store.projects) { project in card(project) }
+                    .padding(32)
                 }
-                .padding(32)
+                if let current = draft {
+                    Divider()
+                    NewProjectPanel(draft: Binding(get: { draft ?? current }, set: { draft = $0 }),
+                                    onCreate: create, onClose: { withAnimation { draft = nil } })
+                        .frame(width: 360)
+                        .transition(.move(edge: .trailing))
+                }
             }
             .navigationTitle("Gallery")
             .background(Color(white: 0.11))
         }
         .environment(\.colorScheme, .dark)
-        .sheet(isPresented: $creating) {
-            NewProjectSheet(defaultName: "Painting \(store.projects.count + 1)") { name, size in
-                creating = false
-                onOpen(store.create(name: name, canvasSize: size).id)
-            } onCancel: { creating = false }
-        }
+        .onAppear { if store.projects.isEmpty { tab = .saved } }
         .alert("Rename", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}
             Button("Rename") { if let r = renaming { store.rename(r.id, to: newName) } }
+        }
+        .alert("Rename size", isPresented: Binding(get: { renamingSize != nil }, set: { if !$0 { renamingSize = nil } })) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { if let r = renamingSize { saved.rename(r.id, to: newName) } }
         }
         .confirmationDialog("Delete \(deleting?.name ?? "this project")?",
                             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible) {
             Button("Delete", role: .destructive) { if let d = deleting { store.delete(d.id) } }
         } message: { Text("Its layers and swatches are deleted from this iPad.") }
+    }
+
+    // MARK: sizes
+
+    private var sizesSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 20) {
+                Text("New project").font(.title2.weight(.semibold))
+                Picker("Sizes", selection: $tab) {
+                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .top, spacing: 16) {
+                    customCard
+                    switch tab {
+                    case .recent:
+                        if recent.isEmpty {
+                            Text("Sizes of the paintings you make show here.")
+                                .font(.callout).foregroundStyle(.secondary)
+                                .frame(height: 120)
+                        }
+                        ForEach(recent) { choice in
+                            sizeCard(choice) {
+                                Button("Save this size", systemImage: "square.and.arrow.down") {
+                                    saved.add(CanvasSizeChoice(name: choice.name, size: choice.size))
+                                }
+                            }
+                        }
+                    case .saved:
+                        ForEach(saved.sizes) { choice in
+                            sizeCard(choice) {
+                                Button("Rename", systemImage: "pencil") { newName = choice.name; renamingSize = choice }
+                                Button("Delete", systemImage: "trash", role: .destructive) { saved.delete(choice.id) }
+                            }
+                        }
+                        ForEach(SavedSizes.standard) { choice in
+                            sizeCard(choice) {
+                                Button("Landscape", systemImage: "rectangle") {
+                                    start(CanvasSizeChoice(name: choice.name,
+                                                           size: CGSize(width: choice.size.height, height: choice.size.width)))
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private static let cardSize = CGSize(width: 150, height: 120)
+
+    private var customCard: some View {
+        Button { start(nil) } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(white: 0.18))
+                    .overlay(Image(systemName: "plus").font(.system(size: 30, weight: .light)))
+                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
+                    .overlay(selected(nil) ? RoundedRectangle(cornerRadius: 10).strokeBorder(Color.blue, lineWidth: 2) : nil)
+                Text("Custom size").font(.subheadline.weight(.medium))
+                Text(" ").font(.caption)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// A size: its shape, its name with a ⌄ menu, and its dimensions.
+    private func sizeCard<Items: View>(_ choice: CanvasSizeChoice, @ViewBuilder menu: () -> Items) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button { start(choice) } label: {
+                let fit = fitRect(choice.size, in: CGSize(width: 80, height: 80))
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(white: 0.18))
+                    .overlay(Rectangle().fill(Color(white: 0.85)).frame(width: fit.width, height: fit.height))
+                    .frame(width: Self.cardSize.width, height: Self.cardSize.height)
+                    .overlay(selected(choice.id) ? RoundedRectangle(cornerRadius: 10).strokeBorder(Color.blue, lineWidth: 2) : nil)
+            }
+            .buttonStyle(.plain)
+            Menu {
+                menu()
+            } label: {
+                HStack(spacing: 4) {
+                    Text(choice.name).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.primary)
+            }
+            .tint(.primary)
+            .frame(maxWidth: Self.cardSize.width, alignment: .leading)
+            Text(choice.unit.text(choice.size)).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func selected(_ id: UUID?) -> Bool {
+        guard let draft else { return false }
+        return draft.sourceID == id
+    }
+
+    /// Opens New project with a size, or (Custom size) the last one used.
+    private func start(_ choice: CanvasSizeChoice?) {
+        let size = choice?.size ?? store.projects.first?.canvasSize ?? CGSize(width: 16, height: 20)
+        withAnimation {
+            draft = ProjectDraft(size: size, unit: choice?.unit ?? draft?.unit ?? .inches, sourceID: choice?.id)
+        }
+    }
+
+    private func create() {
+        guard let draft, draft.isValid else { return }
+        let name = draft.name.trimmingCharacters(in: .whitespaces)
+        if draft.saveSize {
+            saved.add(CanvasSizeChoice(name: "Saved \(saved.sizes.count + 1)", size: draft.inches, unit: draft.unit))
+        }
+        let info = store.create(name: name.isEmpty ? ProjectDraft.defaultName() : name,
+                                canvasSize: draft.inches, background: draft.background)
+        self.draft = nil
+        onOpen(info.id)
+    }
+
+    // MARK: projects
+
+    private var projectsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Your paintings").font(.title2.weight(.semibold))
+            if store.projects.isEmpty {
+                Text("None yet. Pick a size above to start one.").font(.callout).foregroundStyle(.secondary)
+            }
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 28) {
+                ForEach(store.projects) { project in card(project) }
+            }
+        }
     }
 
     private func card(_ project: ProjectInfo) -> some View {
@@ -209,13 +435,13 @@ struct GalleryView: View {
                     if let thumb = store.thumbnails[project.id] {
                         Image(uiImage: thumb).resizable().scaledToFit().padding(12).shadow(radius: 4)
                     } else {
-                        let fit = fitRect(project.canvasSize, in: CGSize(width: 200, height: 216))
+                        let fit = fitRect(project.canvasSize, in: CGSize(width: 180, height: 196))
                         Rectangle().fill(Color.white).frame(width: fit.width, height: fit.height).shadow(radius: 4)
                     }
                 }
-                .frame(height: 240)
+                .frame(height: 220)
                 Text(project.name).font(.headline).lineLimit(1)
-                Text("\(Int(project.canvasSize.width)) × \(Int(project.canvasSize.height)) in · "
+                Text("\(SizeUnit.inches.text(project.canvasSize)) · "
                      + project.modified.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -229,80 +455,165 @@ struct GalleryView: View {
     }
 }
 
-/// New project: name, canvas size (the presets, or your own in inches or
-/// centimeters) and orientation. Saved at once.
-struct NewProjectSheet: View {
-    let defaultName: String
-    var onCreate: (String, CGSize) -> Void
-    var onCancel: () -> Void
+/// What New project will make. Width and height are in `unit`.
+struct ProjectDraft: Equatable {
+    var name = ProjectDraft.defaultName()
+    var unit: SizeUnit
+    var width: Double
+    var height: Double
+    var locked = false
+    var background = CanvasBackground.white
+    var saveSize = false
+    var sourceID: UUID?  // the size card it came from; nil = Custom size
 
-    enum Units: String, CaseIterable, Identifiable {
-        case inches = "in", centimeters = "cm"
-        var id: String { rawValue }
+    static let maxInches = 120.0
+
+    init(size: CGSize, unit: SizeUnit, sourceID: UUID?) {
+        self.unit = unit
+        width = Self.rounded(size.width * unit.perInch)
+        height = Self.rounded(size.height * unit.perInch)
+        self.sourceID = sourceID
     }
 
-    @State private var name = ""
-    @State private var preset = 4  // 16 × 20
-    @State private var custom = false
-    @State private var units = Units.inches
-    @State private var width = 16.0
-    @State private var height = 20.0
-    @State private var landscape = false
+    static func defaultName() -> String { "Untitled - " + Date().formatted(date: .abbreviated, time: .shortened) }
+    static func rounded(_ v: Double) -> Double { (v * 10).rounded() / 10 }
 
-    /// The size in inches, portrait or landscape.
-    private var size: CGSize {
-        var s = custom ? CGSize(width: width, height: height) : TransferSession.canvasSizes[preset]
-        if custom && units == .centimeters { s = CGSize(width: s.width / 2.54, height: s.height / 2.54) }
-        let short = min(s.width, s.height), long = max(s.width, s.height)
-        return landscape ? CGSize(width: long, height: short) : CGSize(width: short, height: long)
+    var inches: CGSize { CGSize(width: width / unit.perInch, height: height / unit.perInch) }
+    var landscape: Bool { width > height }
+    var isValid: Bool {
+        width > 0 && height > 0 && max(inches.width, inches.height) <= Self.maxInches
     }
+}
+
+/// The New project panel: name, unit, width and height (lockable),
+/// orientation, background, and Save this size.
+struct NewProjectPanel: View {
+    @Binding var draft: ProjectDraft
+    var onCreate: () -> Void
+    var onClose: () -> Void
 
     var body: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $name, prompt: Text(defaultName))
-                Section("Canvas") {
-                    Picker("Size", selection: $preset) {
-                        ForEach(TransferSession.canvasSizes.indices, id: \.self) { i in
-                            let s = TransferSession.canvasSizes[i]
-                            Text("\(Int(s.width)) × \(Int(s.height)) in").tag(i)
-                        }
-                    }
-                    .disabled(custom)
-                    Toggle("Custom size", isOn: $custom)
-                    if custom {
-                        Picker("Units", selection: $units) {
-                            ForEach(Units.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        LabeledContent("Width") {
-                            TextField("Width", value: $width, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
-                        }
-                        LabeledContent("Height") {
-                            TextField("Height", value: $height, format: .number).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
-                        }
-                    }
-                    Picker("Orientation", selection: $landscape) {
-                        Text("Portrait").tag(false)
-                        Text("Landscape").tag(true)
-                    }
-                    .pickerStyle(.segmented)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("New project").font(.title3.weight(.semibold))
+                Spacer()
+                Button("Close", systemImage: "xmark", action: onClose)
+                    .labelStyle(.iconOnly)
+                    .font(.title3)
+            }
+            field("Name") {
+                TextField("Name", text: $draft.name, prompt: Text(ProjectDraft.defaultName()))
+                    .textFieldStyle(.roundedBorder)
+            }
+            field("Unit") {
+                Picker("Unit", selection: unit) {
+                    ForEach(SizeUnit.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.2)))
+            }
+            HStack(alignment: .bottom, spacing: 10) {
+                field("Width") { number(width) }
+                Button(draft.locked ? "Unlock proportions" : "Lock proportions",
+                       systemImage: draft.locked ? "lock.fill" : "lock.open") { draft.locked.toggle() }
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(draft.locked ? Color.blue : Color.secondary)
+                    .frame(width: 30, height: 34)
+                field("Height") { number(height) }
+            }
+            field("Orientation") {
+                HStack(spacing: 12) {
+                    orientation(landscape: false, icon: "rectangle.portrait")
+                    orientation(landscape: true, icon: "rectangle")
                 }
             }
-            .navigationTitle("New project")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        let trimmed = name.trimmingCharacters(in: .whitespaces)
-                        onCreate(trimmed.isEmpty ? defaultName : trimmed, size)
+            field("Background") {
+                HStack {
+                    Circle().fill(draft.background.color)
+                        .overlay(Circle().strokeBorder(Color.gray, lineWidth: 1))
+                        .frame(width: 20, height: 20)
+                    Picker("Background", selection: $draft.background) {
+                        ForEach(CanvasBackground.allCases) { Text($0.label).tag($0) }
                     }
-                    .disabled(custom && (width <= 0 || height <= 0))
+                    .pickerStyle(.menu)
+                    Spacer()
                 }
+                .padding(.leading, 8)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.2)))
             }
+            Button { draft.saveSize.toggle() } label: {
+                Label("Save this size", systemImage: draft.saveSize ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+            if !draft.isValid {
+                Text("Width and height must be more than 0 and at most \(SizeUnit.number(ProjectDraft.maxInches * draft.unit.perInch)) \(draft.unit.symbol).")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            Spacer()
+            Button(action: onCreate) {
+                Text("Create project").font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!draft.isValid)
         }
-        .environment(\.colorScheme, .dark)
+        .padding(24)
+        .background(Color(white: 0.14))
+    }
+
+    private func field<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func number(_ value: Binding<Double>) -> some View {
+        TextField("", value: value, format: .number.precision(.fractionLength(0...1)))
+            .keyboardType(.decimalPad)
+            .textFieldStyle(.roundedBorder)
+            .monospacedDigit()
+    }
+
+    private func orientation(landscape: Bool, icon: String) -> some View {
+        let on = draft.landscape == landscape
+        return Button {
+            if !on { (draft.width, draft.height) = (draft.height, draft.width) }
+        } label: {
+            Image(systemName: icon)
+                .font(.title2)
+                .frame(width: 52, height: 40)
+                .background(RoundedRectangle(cornerRadius: 8).fill(on ? Color.blue.opacity(0.35) : Color(white: 0.2)))
+                .overlay(on ? RoundedRectangle(cornerRadius: 8).strokeBorder(Color.blue, lineWidth: 1.5) : nil)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(landscape ? "Landscape" : "Portrait")
+    }
+
+    // Changing the unit converts the numbers; with the lock on, one side follows the other.
+
+    private var unit: Binding<SizeUnit> {
+        Binding(get: { draft.unit }, set: { new in
+            let scale = new.perInch / draft.unit.perInch
+            draft.width = ProjectDraft.rounded(draft.width * scale)
+            draft.height = ProjectDraft.rounded(draft.height * scale)
+            draft.unit = new
+        })
+    }
+
+    private var width: Binding<Double> {
+        Binding(get: { draft.width }, set: { new in
+            if draft.locked, draft.width > 0 { draft.height = ProjectDraft.rounded(new * draft.height / draft.width) }
+            draft.width = new
+        })
+    }
+
+    private var height: Binding<Double> {
+        Binding(get: { draft.height }, set: { new in
+            if draft.locked, draft.height > 0 { draft.width = ProjectDraft.rounded(new * draft.width / draft.height) }
+            draft.height = new
+        })
     }
 }
 
@@ -358,3 +669,4 @@ struct RootView: View {
         lastProject = ""
     }
 }
+
