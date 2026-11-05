@@ -45,10 +45,14 @@ automatically.
   one opens **New project** on the right: name, unit (inches or cm), width and
   height with a lock, orientation, background (white, black or medium gray,
   under the layers everywhere) and Save this size. Below, your paintings, the
-  most recent first; long-press one to rename, duplicate or delete it. **‹ Gallery**
-  in the top bar goes back; each project keeps its own layers, swatches and grid.
+  most recent first; long-press one to rename, duplicate or delete it. The
+  **house** at the top left goes back; each project keeps its own layers, swatches and grid.
+- **Top bar**: the house; in the middle the tools (Camera, Photos,
+  Transform, Crop, Grid, Compare, the color tool); on the right undo and
+  redo, Paint library, Share and Full screen. Each tool with a bar at the
+  bottom turns the others off.
 
-- **Camera** (left strip): point at the canvas on the easel. Does the blue
+- **Camera** (top bar): point at the canvas on the easel. Does the blue
   outline find it — in studio light, at an angle, with a busy background?
   Note when it fails.
 - Take the photo: are the corners already right? Drag them — is the loupe
@@ -58,17 +62,23 @@ automatically.
   Adjust corners) turns detection off; it's remembered.
 - **Add layer**: every image lands at Multiply 60 % with auto levels and
   Transform on: one finger moves it, pinch scales, twist rotates.
-- **Crop** (left strip, below Transform): drag the corners or edge middles, or
+- **Crop** (top bar): drag the corners or edge middles, or
   inside the frame to slide it; what's cut off shows faintly. Free or
   Original; Reset; Cancel or Done. The crop moves, scales and turns with the
   image, and Crop again brings back what you cut.
-- The left strip's tools each have a bar at the bottom; turning one on turns
-  the others off.
-- **Swatches** (left strip): touch the canvas for a loupe on the selected
-  layer and lift to add a numbered swatch; two fingers pan and zoom. The bar
-  has the chips (long-press to delete one), sample size (1, 5 or 11 px) and
-  Clear. Choosing a swatch selects its layer and opens its panel, which
-  points at that layer.
+- **The color tool** (eyedropper, top bar) opens the color bar. On its left,
+  three tools, each on (lavender) until tapped again, with its options in a
+  pop-up above it:
+  **Eyedropper** (sample size 1, 5 or 11 px): touch the canvas for a loupe on
+  the selected layer and lift to add a numbered swatch; two fingers pan and zoom.
+  **Simplify**: upright Steps (1–24) and Smoothing sliders, Colors or Values;
+  the eyedropper then reads the flat color you see.
+  **Highlight**: each swatch's range in its own bright color over gray, with
+  an upright Range slider and All or Selected.
+  Then the chips (long-press to delete one); on the right, the pin hides or
+  shows the swatch markers, the trash deletes all swatches (asks first), and
+  Done. Choosing a swatch selects its layer and opens its panel, which points
+  at that layer.
 - **Flatten** (bottom of the layer bar): the visible layers exactly as shown
   (opacity, blend, Look, crop, transform) become one new, ordinary layer,
   "Flattened 1", on top at Normal 100 %, filling the canvas; the layers in it
@@ -92,11 +102,7 @@ automatically.
   format; the Mac's paints.json isn't changed.
 - **Share swatch sheet (PDF)** (top right): the canvas with its numbered
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
-- **Simplify** (left strip): Colors, Values or Value scale, Steps 1–24,
-  smoothing. Pick reads the flat color you see. **Highlight**: each swatch's
-  range in its own bright color over gray. Both bars have a **Swatches**
-  toggle to hide the numbered markers and see the colors alone.
-- A small eyedropper circle on a layer thumbnail's left edge means it has swatches.
+- A small purple circle on a layer thumbnail's left edge means it has swatches.
 - **Transform**: a bar with Proportional, Distort, Free and Skew for the
   corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
   pinch and twist in every mode. Placement is four corners, as in the prototype.
@@ -106,7 +112,7 @@ automatically.
 - **Adjust** (bottom bar): invert, levels, hue / saturation or colorize,
   lightness, as in the prototype; live, saved and undoable. Blend has Normal,
   Multiply and Screen.
-- **Compare** (left strip): Blink A (A fades in and out), Blink A / B (a
+- **Compare** (top bar): Blink A (A fades in and out), Blink A / B (a
   crossfade), or Split with a draggable line; A and B, swap, speed, pause. The layer bar numbers the layers and
   marks A and B.
 - **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
@@ -114,7 +120,7 @@ automatically.
   duplicate, hide or delete it. The Look bar's **⋯** has Fit, Flip
   horizontal / vertical, and **Edit corners…**, which reopens Adjust corners
   on the original photo (kept since this build) and keeps the placement.
-- **Grid** (left strip): on / off, rows and columns (1–10), Square cells,
+- **Grid** (top bar): on / off, rows and columns (1–10), Square cells,
   color and opacity.
   It's saved with the session but isn't an undo step.
 - **Share** (top right): the canvas as a full-resolution JPEG, with or
@@ -122,7 +128,7 @@ automatically.
 - Compare the colors with the Mac prototype and with the real canvas.
 - **Full screen** (top right) for working at the easel; the faint button
   top-left comes back.
-- Photos (left strip) adds an image from your library.
+- Photos (top bar) adds an image from your library.
 
 ## Files
 
