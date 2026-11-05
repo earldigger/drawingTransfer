@@ -284,7 +284,7 @@ struct WorkspaceView: View {
                 let swatch = Swatch(layerID: layer.id, u: found.u, v: found.v, red: rgb.0, green: rgb.1, blue: rgb.2,
                                     radius: sampleSize.rawValue)
                 session.swatches.append(swatch)  // one undo step
-                selectedSwatchID = swatch.id
+                selectedSwatchID = nil  // its panel opens when you choose its chip, not now
             }
         case false?:
             probe = nil  // a second finger: panning or zooming instead
@@ -475,6 +475,7 @@ struct WorkspaceView: View {
                     .accessibilityLabel("Undo")
                     .keyboardShortcut("z", modifiers: .command)
                     .disabled(!canUndo)
+                    .padding(.trailing, 16)
                 Button { history.redo() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 28, height: 44) }
                     .accessibilityLabel("Redo")
                     .keyboardShortcut("z", modifiers: [.command, .shift])
@@ -710,22 +711,25 @@ struct WorkspaceView: View {
     }
 
     private var exitFullScreenButton: some View {
+        // Where Full screen is in the top bar: top right, 12 pt in, the top bar's height.
         VStack {
             HStack {
+                Spacer()
                 Button {
                     withAnimation { fullScreen = false }
                 } label: {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .frame(width: 40, height: 40)
+                        .font(.system(size: 20))
+                        .frame(width: 44, height: 44)
                         .background(Circle().fill(Color.white.opacity(0.12)))
                 }
                 .opacity(0.6)
                 .accessibilityLabel("Exit full screen")
-                Spacer()
             }
+            .frame(height: 56)
             Spacer()
         }
-        .padding(16)
+        .padding(.horizontal, 12)
     }
 }
 
@@ -831,19 +835,22 @@ struct GridBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Toggle(isOn: $session.grid.isOn) { Text("Grid").font(.subheadline.weight(.semibold)) }
-                .toggleStyle(.switch)
-                .fixedSize()
+        HStack(spacing: BarSpacing.group) {
+            HStack(spacing: 24) {
+                BarTitle("Grid", symbol: "square.grid.3x3")
+                Toggle("Grid", isOn: $session.grid.isOn)
+                    .labelsHidden()
+                    .fixedSize()
+            }
             count("Rows", $session.grid.rows)
             count("Columns", $session.grid.columns)
             Button {
                 session.grid.squareCells(canvasAspect: session.canvasAspect)
             } label: {
-                Image(systemName: "square.grid.3x3.square").font(.system(size: 22))
+                Image(systemName: "square.grid.3x3.square").font(.system(size: 24)).frame(width: 44, height: 44)
             }
             .accessibilityLabel("Square cells")
-            HStack(spacing: 8) {
+            HStack(spacing: 3) {
                 ForEach(GridColor.allCases) { color in
                     Button {
                         session.grid.color = color
@@ -860,18 +867,19 @@ struct GridBar: View {
                     .accessibilityAddTraits(session.grid.color == color ? .isSelected : [])
                 }
             }
-            Text("Opacity")
-            Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
-            Button("Done", action: onDone).buttonStyle(.accent)
+            HStack(spacing: 16) {
+                Text("Opacity")
+                Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
+            }
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .themedBar()
+        .bottomBar()
     }
 
     /// "Rows  4 ⌄": a menu of 1 to 10.
     private func count(_ title: String, _ value: Binding<Int>) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             Text(title).foregroundStyle(.secondary)
             Picker(title, selection: value) {
                 ForEach(GridSettings.range, id: \.self) { Text("\($0)").tag($0) }

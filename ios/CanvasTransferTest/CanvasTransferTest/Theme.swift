@@ -34,6 +34,14 @@ extension View {
         background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Theme.bar))
     }
 
+    /// A tool's bar at the bottom: the whole width, 64 pt tall, navy.
+    func bottomBar() -> some View {
+        padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
+            .frame(height: 64)
+            .themedBar()
+    }
+
     /// A text field in a raised navy box.
     func boxed() -> some View {
         padding(.horizontal, 12)
@@ -48,6 +56,42 @@ extension View {
             .foregroundStyle(selected ? Theme.onAccent : Color.white)
             .background(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                 .fill(selected ? Theme.accent : Theme.surface))
+    }
+}
+
+/// Spacing in the bottom bars: between groups of controls, and between icon
+/// buttons in a group (as in the top bar).
+enum BarSpacing {
+    static let group: CGFloat = 32
+    static let icon: CGFloat = 16
+}
+
+/// A bottom bar's title: its tool's icon and name.
+struct BarTitle: View {
+    let title: String
+    let symbol: String
+
+    init(_ title: String, symbol: String) {
+        self.title = title
+        self.symbol = symbol
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: symbol).font(.system(size: 20))
+            Text(title).font(.headline)
+        }
+        .fixedSize()
+    }
+}
+
+/// A bottom bar's Done, the same width in every bar.
+struct DoneButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) { Text("Done").frame(width: 42) }
+            .buttonStyle(.accent)
     }
 }
 

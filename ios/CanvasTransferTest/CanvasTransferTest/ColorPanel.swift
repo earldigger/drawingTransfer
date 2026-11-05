@@ -224,11 +224,8 @@ struct MixesView: View {
                 Button("Water (paper white)") { lightenWith = "water" }
                 Button("Nothing") { lightenWith = "none" }
             }
-            HStack {
-                Text("Favorites only")
-                Spacer()
-                Toggle("Favorites only", isOn: $favoritesOnly).labelsHidden()  // for "All … paints"
-            }
+            Toggle("Favorites only", isOn: $favoritesOnly)  // for "All … paints"
+                .padding(.trailing, 8)  // the switch's edge clear of the scroll view's
             .disabled(!(source?.key.hasPrefix("medium:") ?? false))
         }
         .font(.callout)

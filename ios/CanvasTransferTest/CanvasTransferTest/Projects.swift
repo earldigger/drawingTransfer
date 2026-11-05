@@ -231,7 +231,7 @@ struct GalleryView: View {
     }
 
     @State private var saved = SavedSizes.shared
-    @State private var tab = Tab.recent
+    @State private var tab = Tab.saved
     @State private var draft: ProjectDraft? = nil
     @State private var renaming: ProjectInfo? = nil
     @State private var renamingSize: CanvasSizeChoice? = nil
@@ -273,7 +273,6 @@ struct GalleryView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .themed()
-        .onAppear { if store.projects.isEmpty { tab = .saved } }
         .alert("Rename", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}
@@ -305,7 +304,11 @@ struct GalleryView: View {
     private var sizesSection: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("New project").font(.title2.weight(.semibold))
-            UnderlineTabs(tabs: Tab.allCases, selection: $tab) { $0.rawValue }
+            Picker("Sizes", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 16) {
                     customCard
@@ -525,8 +528,17 @@ struct NewProjectPanel: View {
                     .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous).fill(Theme.raised))
             }
             field("Name") {
-                TextField("Name", text: $draft.name, prompt: Text(ProjectDraft.defaultName()))
-                    .boxed()
+                HStack(spacing: 8) {
+                    TextField("Name", text: $draft.name, prompt: Text("Untitled"))
+                    if !draft.name.isEmpty {
+                        Button { draft.name = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear name")
+                    }
+                }
+                .boxed()
             }
             field("Unit") {
                 Picker("Unit", selection: unit) {

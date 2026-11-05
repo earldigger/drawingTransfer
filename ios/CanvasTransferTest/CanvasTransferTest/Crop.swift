@@ -162,20 +162,19 @@ struct CropBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Label("Crop", systemImage: "crop").font(.subheadline.weight(.semibold))
+        HStack(spacing: BarSpacing.group) {
+            BarTitle("Crop", symbol: "crop")
             Picker("Shape", selection: $shape) {
                 ForEach(CropShape.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 260)
+            .frame(width: 200)
             Button("Reset") { layer.crop = reshaped(Crop.full) }
             Button("Cancel", action: onCancel)
-            Button("Done", action: onDone).buttonStyle(.accent)
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .themedBar()
+        .bottomBar()
         .onChange(of: shape) { layer.crop = reshaped(layer.crop) }
     }
 

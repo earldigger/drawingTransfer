@@ -210,7 +210,7 @@ final class Layer: Identifiable {
 @Observable
 final class TransferSession {
     static let canvasSizes: [CGSize] = [
-        CGSize(width: 8, height: 10), CGSize(width: 9, height: 12), CGSize(width: 11, height: 14),
+        CGSize(width: 5, height: 7), CGSize(width: 8, height: 10), CGSize(width: 9, height: 12), CGSize(width: 11, height: 14),
         CGSize(width: 12, height: 16), CGSize(width: 16, height: 20), CGSize(width: 18, height: 24),
         CGSize(width: 24, height: 30), CGSize(width: 24, height: 36), CGSize(width: 30, height: 40),
         CGSize(width: 36, height: 48),

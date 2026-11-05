@@ -178,32 +178,38 @@ struct CompareBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            Label("Compare", systemImage: "rectangle.split.2x1").font(.subheadline.weight(.semibold))
+        HStack(spacing: BarSpacing.group) {
+            BarTitle("Compare", symbol: "rectangle.split.2x1")
             Picker("Mode", selection: $state.mode) {
                 ForEach(CompareMode.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .frame(width: 300)
-            layerPicker("A", $state.a)
-            if state.mode.needsB {
-                layerPicker("B", $state.b)
-                Button("Swap", systemImage: "arrow.left.arrow.right") { (state.a, state.b) = (state.b, state.a) }
-                    .labelStyle(.iconOnly)
+            HStack(spacing: BarSpacing.icon) {
+                layerPicker("A", $state.a)
+                if state.mode.needsB {
+                    layerPicker("B", $state.b)
+                    Button { (state.a, state.b) = (state.b, state.a) } label: {
+                        Image(systemName: "arrow.left.arrow.right").font(.system(size: 20)).frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Swap")
+                }
             }
             if state.mode.blinks {
-                Text(String(format: "%.1f s", state.interval)).monospacedDigit().frame(width: 44)
-                Slider(value: $state.interval, in: CompareState.intervalRange).frame(width: 120)
-                Button(state.paused ? "Play" : "Pause", systemImage: state.paused ? "play.fill" : "pause.fill") {
-                    state.paused.toggle()
+                HStack(spacing: BarSpacing.icon) {
+                    Text(String(format: "%.1f s", state.interval)).monospacedDigit().frame(width: 44)
+                    Slider(value: $state.interval, in: CompareState.intervalRange).frame(width: 120)
+                    Button { state.paused.toggle() } label: {
+                        Image(systemName: state.paused ? "play.fill" : "pause.fill").font(.system(size: 20))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel(state.paused ? "Play" : "Pause")
                 }
-                .labelStyle(.iconOnly)
             }
-            Button("Done", action: onDone).buttonStyle(.accent)
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .themedBar()
+        .bottomBar()
     }
 
     /// Layers by position, 1 at the bottom, as numbered in the layer bar while comparing.

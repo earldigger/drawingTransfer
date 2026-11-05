@@ -293,23 +293,30 @@ struct TransformBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            Label("Transform", systemImage: "arrow.up.and.down.and.arrow.left.and.right").font(.subheadline.weight(.semibold))
+        HStack(spacing: BarSpacing.group) {
+            BarTitle("Transform", symbol: "arrow.up.and.down.and.arrow.left.and.right")
             Picker("Mode", selection: $mode) {
                 ForEach(TransformMode.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .frame(width: 380)
-            Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
-                .labelStyle(.iconOnly)
-            Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipVertical() }
-                .labelStyle(.iconOnly)
-            Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
-            Button("Cancel", action: onCancel)
-            Button("Done", action: onDone).buttonStyle(.accent)
+            HStack(spacing: BarSpacing.icon) {
+                Button { layer.flipHorizontal() } label: {
+                    Image(systemName: "arrow.left.and.right").font(.system(size: 20)).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Flip horizontal")
+                Button { layer.flipVertical() } label: {
+                    Image(systemName: "arrow.up.and.down").font(.system(size: 20)).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Flip vertical")
+            }
+            HStack(spacing: BarSpacing.group) {
+                Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
+                Button("Cancel", action: onCancel)
+            }
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .themedBar()
+        .bottomBar()
     }
 }
