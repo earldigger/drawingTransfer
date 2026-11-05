@@ -210,7 +210,7 @@ final class Layer: Identifiable {
 @Observable
 final class TransferSession {
     static let canvasSizes: [CGSize] = [
-        CGSize(width: 8, height: 10), CGSize(width: 9, height: 12), CGSize(width: 11, height: 14),
+        CGSize(width: 5, height: 7), CGSize(width: 8, height: 10), CGSize(width: 9, height: 12), CGSize(width: 11, height: 14),
         CGSize(width: 12, height: 16), CGSize(width: 16, height: 20), CGSize(width: 18, height: 24),
         CGSize(width: 24, height: 30), CGSize(width: 24, height: 36), CGSize(width: 30, height: 40),
         CGSize(width: 36, height: 48),
@@ -221,6 +221,7 @@ final class TransferSession {
     var selectedID: UUID?
     var grid = GridSettings()
     var swatches: [Swatch] = []  // numbered in this order
+    var background = CanvasBackground.white  // under the layers; chosen in New project
 
     var canvasAspect: CGFloat { canvasSize.width / canvasSize.height }
     var selected: Layer? { layers.first { $0.id == selectedID } }
@@ -260,6 +261,27 @@ final class TransferSession {
         copy.adjustments = layer.adjustments
         layers.insert(copy, at: i + 1)
         selectedID = copy.id
+    }
+}
+
+/// The canvas's color under the layers.
+enum CanvasBackground: String, CaseIterable, Codable, Identifiable {
+    case white, black, gray
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .white: "White"
+        case .black: "Black"
+        case .gray: "Medium gray"
+        }
+    }
+    var color: Color {
+        switch self {
+        case .white: .white
+        case .black: .black
+        case .gray: Color(white: 0.5)
+        }
     }
 }
 

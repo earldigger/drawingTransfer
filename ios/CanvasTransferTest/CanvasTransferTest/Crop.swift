@@ -4,7 +4,6 @@ import SwiftUI
 enum CropShape: String, CaseIterable, Identifiable {
     case free = "Free"
     case original = "Original"  // the photo's own proportions
-    case square = "Square"
 
     var id: String { rawValue }
 }
@@ -28,7 +27,6 @@ enum Crop {
         switch shape {
         case .free: nil
         case .original: 1  // same fraction of width and height
-        case .square: 1 / max(imageAspect, 0.01)  // equal pixels across and down
         }
     }
 
@@ -108,7 +106,7 @@ struct CropFrame: View {
                 p.addLines(corners)
                 p.closeSubpath()
             }
-            .stroke(Color.blue, lineWidth: 2)
+            .stroke(Theme.accent, lineWidth: 2)
             .allowsHitTesting(false)
             if ratio == nil {
                 let edges = (0..<4).map { i in
@@ -118,7 +116,7 @@ struct CropFrame: View {
                     let a = corners[i], b = corners[(i + 1) % 4]
                     Capsule()
                         .fill(Color.white)
-                        .overlay(Capsule().stroke(Color.blue, lineWidth: 2))
+                        .overlay(Capsule().stroke(Theme.accent, lineWidth: 2))
                         .frame(width: 30, height: 8)
                         .rotationEffect(.radians(atan2(b.y - a.y, b.x - a.x)))  // along its edge
                         .contentShape(Rectangle().inset(by: -16))  // 40 pt or more to touch
@@ -129,7 +127,7 @@ struct CropFrame: View {
             ForEach(0..<4, id: \.self) { i in
                 Circle()
                     .fill(Color.white)
-                    .overlay(Circle().stroke(Color.blue, lineWidth: 3))
+                    .overlay(Circle().stroke(Theme.accent, lineWidth: 3))
                     .frame(width: 24, height: 24)
                     .contentShape(Circle().inset(by: -11))  // 46 pt to touch
                     .position(corners[i])
@@ -164,20 +162,19 @@ struct CropBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Label("Crop", systemImage: "crop").font(.subheadline.weight(.semibold))
+        HStack(spacing: BarSpacing.group) {
+            BarTitle("Crop", symbol: "crop")
             Picker("Shape", selection: $shape) {
                 ForEach(CropShape.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
-            .frame(width: 260)
+            .frame(width: 200)
             Button("Reset") { layer.crop = reshaped(Crop.full) }
             Button("Cancel", action: onCancel)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .bottomBar()
         .onChange(of: shape) { layer.crop = reshaped(layer.crop) }
     }
 

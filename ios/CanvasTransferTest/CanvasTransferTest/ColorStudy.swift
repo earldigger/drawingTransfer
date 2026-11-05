@@ -271,110 +271,19 @@ struct HighlightSettings: Equatable {
     var selectedOnly = false
 }
 
-/// Simplify's options: mode, steps, smoothing, and the swatches shown or not.
-struct SimplifyBar: View {
-    @Binding var settings: SimplifySettings
-    let working: Bool
-    @Binding var markersShown: Bool
-    var onDone: () -> Void
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Label("Simplify", systemImage: "circle.lefthalf.filled").font(.subheadline.weight(.semibold))
-            Picker("Mode", selection: $settings.mode) {
-                ForEach(ColorStudy.SimplifyMode.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 270)
-            HStack(spacing: 6) {
-                Text("Steps").foregroundStyle(.secondary)
-                Picker("Steps", selection: $settings.count) {
-                    ForEach(2...12, id: \.self) { Text("\($0)").tag($0) }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-            }
-            .fixedSize()
-            Text("Smoothing")
-            Slider(value: Binding(get: { Double(settings.smoothing) }, set: { settings.smoothing = Int($0.rounded()) }),
-                   in: 0...6, step: 1)
-                .frame(width: 190)
-            ProgressView().controlSize(.small).opacity(working ? 1 : 0)
-            SwatchMarkersToggle(isOn: $markersShown)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
-    }
-}
-
-/// Highlight's options and which highlight color is whose.
-struct HighlightBar: View {
-    @Binding var settings: HighlightSettings
-    let swatches: [Swatch]
-    @Binding var selectedID: UUID?
-    let working: Bool
-    @Binding var markersShown: Bool
-    var onDone: () -> Void
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Label("Highlight", systemImage: "highlighter").font(.subheadline.weight(.semibold))
-            if swatches.isEmpty {
-                Text("Pick a swatch first.").font(.caption).foregroundStyle(.secondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(swatches.enumerated()), id: \.element.id) { i, swatch in
-                            Button {
-                                selectedID = swatch.id
-                            } label: {
-                                Text("\(i + 1)")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(swatch.labelColor)
-                                    .frame(width: 30, height: 30)
-                                    .background(RoundedRectangle(cornerRadius: 7).fill(swatch.color))
-                                    .padding(3)
-                                    .overlay(RoundedRectangle(cornerRadius: 9)  // its highlight color
-                                        .stroke(ColorStudy.highlightColor(i), lineWidth: swatch.id == selectedID ? 4 : 2))
-                            }
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-                .frame(maxWidth: 300)
-                Picker("Show", selection: $settings.selectedOnly) {
-                    Text("All").tag(false)
-                    Text("Selected").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 150)
-                Text("Range \(Int(settings.tolerance.rounded()))").monospacedDigit().frame(width: 74, alignment: .leading)
-                Slider(value: $settings.tolerance, in: 2...40).frame(width: 220)
-            }
-            if working { ProgressView().controlSize(.small) }
-            SwatchMarkersToggle(isOn: $markersShown)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
-    }
-}
-
 /// Shows or hides the numbered swatch markers on the image, to see the
 /// simplified or highlighted colors without them.
 struct SwatchMarkersToggle: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        Toggle(isOn: $isOn) {
-            Label("Swatches", systemImage: isOn ? "mappin.circle.fill" : "mappin.slash.circle")
-                .labelStyle(.iconOnly)  // no text, so the sliders get the room
-                .font(.system(size: 20))
+        Button { isOn.toggle() } label: {
+            Image(systemName: isOn ? "mappin.circle.fill" : "mappin.slash.circle")
+                .font(.system(size: 24))
+                .foregroundStyle(isOn ? Theme.accent : Color.secondary)
+                .frame(width: 46, height: 46)
+                .background(Circle().fill(Theme.raised))
         }
-        .toggleStyle(.button)
         .accessibilityLabel(isOn ? "Hide swatches on the image" : "Show swatches on the image")
     }
 }

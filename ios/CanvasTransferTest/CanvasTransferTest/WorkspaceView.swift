@@ -12,6 +12,9 @@ struct Capture: Identifiable {
 /// layers on the right, the selected layer's look at the bottom, and the
 /// canvas fitted between them.
 struct WorkspaceView: View {
+    var projectName = ""
+    var onGallery: () -> Void = {}
+
     @Environment(TransferSession.self) private var session
     @Environment(History.self) private var history
 
@@ -36,7 +39,8 @@ struct WorkspaceView: View {
     @State private var shareFailed = false
     @State private var editingCorners: CornerEdit? = nil
     @State private var layerBarExpanded = false  // names, eye, blend · opacity; collapsed by default (decision H)
-    @State private var swatchesOn = false  // the Swatches tool: one finger picks; the swatch bar and panel show
+    @State private var colorBarShown = false  // the color tool: its bar, the swatch panel and markers show
+    @State private var swatchesOn = false  // its Eyedropper: one finger picks
     @State private var sampleSize = SampleSize.small
     @State private var selectedSwatchID: UUID? = nil
     @State private var probe: (pick: PickProbe, screen: CGPoint)? = nil  // while a finger is picking
@@ -51,16 +55,16 @@ struct WorkspaceView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let margins = fullScreen ? EdgeInsets() : EdgeInsets(top: 64, leading: 84, bottom: 84, trailing: 96)
+            let margins = fullScreen ? EdgeInsets() : EdgeInsets(top: 68, leading: 24, bottom: 84, trailing: 96)
             let area = CGSize(width: geo.size.width - margins.leading - margins.trailing,
                               height: geo.size.height - margins.top - margins.bottom)
             let fitted = fitRect(session.canvasSize, in: area, margin: fullScreen ? 0 : 12)
             let rect = fitted.offsetBy(dx: margins.leading, dy: margins.top)
             ZStack {
-                (fullScreen ? Color.black : Color(white: 0.23)).ignoresSafeArea()
+                (fullScreen ? Color.black : Theme.canvasSurround).ignoresSafeArea()
                 // Under the canvas, which lets touches through except on crop handles.
                 CanvasGestureView(handlers: canvasGestures(canvas: rect.size, at: rect),
-                                  picking: colorToolOn && !fullScreen)
+                                  picking: swatchesOn && !fullScreen)
                 canvas(size: rect.size)
                     .scaleEffect(viewScale)
                     .offset(viewOffset)
@@ -77,11 +81,11 @@ struct WorkspaceView: View {
                 if exporting {
                     ProgressView("Preparing image…")
                         .padding(24)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13)))
+                        .themedBar()
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
         .statusBarHidden(fullScreen)
         .sheet(item: $shareFile) { file in
             ShareSheet(items: [file.url]) { shareFile = nil }
@@ -169,7 +173,7 @@ struct WorkspaceView: View {
 
     // MARK: tools
 
-    /// Swatches, Simplify or Highlight is on: one finger picks, and the swatch markers show.
+    /// The Eyedropper, Simplify or Highlight is on: colors are read from the selected layer.
     private var colorToolOn: Bool { swatchesOn || colorView != .normal }
 
     /// Turns every tool off, so the one being turned on is the only one
@@ -179,6 +183,7 @@ struct WorkspaceView: View {
         transformOn = false
         gridBarShown = false
         compare = nil
+        colorBarShown = false
         swatchesOn = false
         colorView = .normal
         probe = nil
@@ -246,8 +251,8 @@ struct WorkspaceView: View {
             }
         }
         .overlay {
-            // Always while picking; in Simplify and Highlight, unless hidden to see the colors alone.
-            if swatchesOn || (colorView != .normal && studyMarkersShown) {
+            // While the color tool is open, unless hidden to see the colors alone.
+            if colorBarShown && studyMarkersShown {
                 SwatchMarkers(swatches: session.swatches, layers: session.layers, canvas: size,
                               selectedID: selectedSwatchID, scale: viewScale)
             }
@@ -279,7 +284,7 @@ struct WorkspaceView: View {
                 let swatch = Swatch(layerID: layer.id, u: found.u, v: found.v, red: rgb.0, green: rgb.1, blue: rgb.2,
                                     radius: sampleSize.rawValue)
                 session.swatches.append(swatch)  // one undo step
-                selectedSwatchID = swatch.id
+                selectedSwatchID = nil  // its panel opens when you choose its chip, not now
             }
         case false?:
             probe = nil  // a second finger: panning or zooming instead
@@ -294,11 +299,12 @@ struct WorkspaceView: View {
         let lineWidth = 1.5 / viewScale  // the same thickness on screen at any zoom
         if let compare {
             CompareCanvas(state: compare, clock: blinkClock, layers: session.layers, size: size,
-                          grid: grid, gridLineWidth: lineWidth)
+                          grid: grid, gridLineWidth: lineWidth, background: session.background.color)
         } else {
             CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
                           faintFullImageOf: cropping?.id,
-                          replacements: shownStudy.map { [$0.layerID: $0.image] } ?? [:])
+                          replacements: shownStudy.map { [$0.layerID: $0.image] } ?? [:],
+                          background: session.background.color)
         }
     }
 
@@ -380,25 +386,24 @@ struct WorkspaceView: View {
         VStack(spacing: 0) {
             topBar
             HStack(alignment: .top, spacing: 0) {
-                toolStrip.padding(12)
                 Spacer()
-                if swatchesOn, colorPanelOpen,
+                if colorBarShown, colorPanelOpen,
                    let index = session.swatches.firstIndex(where: { $0.id == selectedSwatchID }) {
                     let swatch = session.swatches[index]
                     ColorPanel(swatch: swatch, number: index + 1, pointerY: layerRowCenter(swatch.layerID)) {
                         colorPanelOpen = false
                     }
-                    .padding(.top, 12)
+                    .padding(.vertical, 16)  // from under the top bar to just above the bottom bar
                 }
                 layerBar.padding(12)
             }
-            Spacer()
+            .frame(maxHeight: .infinity, alignment: .top)  // the swatch panel can run down to the bottom bar
             if colorToolOn, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
                 // Pick, Simplify and Highlight read the layer's own image, not the mix on the canvas.
                 Text("Colors are read from this layer at full strength. Flatten to read what you see.")
                     .font(.footnote)
                     .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Capsule().fill(Color(white: 0.13).opacity(0.95)))
+                    .background(Capsule().fill(Theme.bar))
                     .padding(.bottom, 8)
             }
             Group {
@@ -413,19 +418,15 @@ struct WorkspaceView: View {
                 } else if transformOn, let layer = session.selected {
                     TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
                                  onCancel: cancelTransform, onDone: { transformOn = false })
-                } else if colorView == .simplify {
-                    SimplifyBar(settings: $simplifySettings, working: studyWorking, markersShown: $studyMarkersShown) {
-                        colorView = .normal
-                    }
-                } else if colorView == .highlight {
-                    HighlightBar(settings: $highlightSettings, swatches: session.swatches, selectedID: $selectedSwatchID,
-                                 working: studyWorking, markersShown: $studyMarkersShown) { colorView = .normal }
-                } else if swatchesOn {
-                    SwatchBar(session: session, selectedID: $selectedSwatchID, sample: $sampleSize) { swatchesOn = false }
+                } else if colorBarShown {
+                    ColorBar(session: session, selectedID: $selectedSwatchID, picking: $swatchesOn, view: $colorView,
+                             sample: $sampleSize, simplify: $simplifySettings, highlight: $highlightSettings,
+                             markersShown: $studyMarkersShown, working: studyWorking) { endTools() }
                 } else if let layer = session.selected {
                     LookBar(layer: layer, canvasAspect: session.canvasAspect, onEditCorners: { editCorners(layer) })
                 }
             }
+            .padding(.horizontal, 12)  // full-width bars keep a margin
             .padding(.bottom, 12)
         }
     }
@@ -455,64 +456,70 @@ struct WorkspaceView: View {
         }
     }
 
+    /// Home on the left; the tools in the middle; undo and redo, the paint
+    /// library, share and full screen on the right.
     private var topBar: some View {
-        HStack {
-            Text("Transfer test").font(.headline)
-            Spacer()
-            Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward") }
-                .accessibilityLabel("Undo")
-                .keyboardShortcut("z", modifiers: .command)
-                .disabled(!canUndo)
-            Button { history.redo() } label: { Image(systemName: "arrow.uturn.forward") }
-                .accessibilityLabel("Redo")
-                .keyboardShortcut("z", modifiers: [.command, .shift])
-                .disabled(!canRedo)
-                .padding(.trailing, 12)
-            Button { paintLibraryOpen = true } label: { Image(systemName: "books.vertical") }
-                .accessibilityLabel("Paint library")
-                .padding(.trailing, 12)
-            Menu {
-                ForEach(TransferSession.canvasSizes.indices, id: \.self) { i in
-                    let size = TransferSession.canvasSizes[i]
-                    Button("\(Int(size.width)) × \(Int(size.height)) in") { session.canvasSize = size }
+        ZStack {
+            tools
+            HStack(spacing: 0) {
+                Button {
+                    endTools()
+                    onGallery()
+                } label: {
+                    Image(systemName: "house.fill").font(.system(size: 20)).frame(width: 44, height: 44)
                 }
-                Button("Landscape / portrait") {
-                    session.canvasSize = CGSize(width: session.canvasSize.height, height: session.canvasSize.width)
+                .foregroundStyle(.white)
+                .accessibilityLabel("Gallery")
+                Spacer()
+                Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 28, height: 44) }
+                    .accessibilityLabel("Undo")
+                    .keyboardShortcut("z", modifiers: .command)
+                    .disabled(!canUndo)
+                    .padding(.trailing, 16)
+                Button { history.redo() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 28, height: 44) }
+                    .accessibilityLabel("Redo")
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .disabled(!canRedo)
+                    .padding(.trailing, 32)
+                HStack(spacing: 16) {
+                    Button { paintLibraryOpen = true } label: { topIcon("books.vertical") }
+                        .accessibilityLabel("Paint library")
+                    Menu {
+                        Button("Share image", systemImage: "photo") { share(withGrid: false) }
+                        if session.grid.isOn {
+                            Button("Share image with grid", systemImage: "square.grid.3x3") { share(withGrid: true) }
+                        }
+                        Button("Share swatch sheet (PDF)", systemImage: "doc.richtext") { shareSwatchSheet() }
+                            .disabled(session.swatches.isEmpty)
+                    } label: {
+                        topIcon("square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share")
+                    .disabled(exporting)
+                    Button {
+                        finishCrop(keep: true)  // the crop bar is hidden in full screen
+                        withAnimation { fullScreen = true }
+                    } label: {
+                        topIcon("arrow.up.left.and.arrow.down.right")
+                    }
+                    .accessibilityLabel("Full screen")
                 }
-            } label: {
-                Label("\(Int(session.canvasSize.width)) × \(Int(session.canvasSize.height)) in", systemImage: "rectangle.portrait")
             }
-            Button {
-                finishCrop(keep: true)  // the crop bar is hidden in full screen
-                withAnimation { fullScreen = true }
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-            }
-            .accessibilityLabel("Full screen")
-            .padding(.leading, 12)
-            Menu {
-                Button("Share image", systemImage: "photo") { share(withGrid: false) }
-                if session.grid.isOn {
-                    Button("Share image with grid", systemImage: "square.grid.3x3") { share(withGrid: true) }
-                }
-                Button("Share swatch sheet (PDF)", systemImage: "doc.richtext") { shareSwatchSheet() }
-                    .disabled(session.swatches.isEmpty)
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-            }
-            .accessibilityLabel("Share")
-            .disabled(exporting)
-            .padding(.leading, 12)
+            .font(.system(size: 20))
         }
-        .padding(.horizontal, 16)
-        .frame(height: 52)
-        .background(Color(white: 0.13))
+        .padding(.horizontal, 12)
+        .frame(height: 56)
+        .background(Theme.background)
     }
 
-    /// One strip of tools. Each one that has a bar at the bottom turns the
-    /// others off; tapping it again turns it off.
-    private var toolStrip: some View {
-        VStack(spacing: 6) {
+    private func topIcon(_ symbol: String) -> some View {
+        Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
+    }
+
+    /// The tools, in the middle of the top bar. Each one that has a bar at
+    /// the bottom turns the others off; tapping it again turns it off.
+    private var tools: some View {
+        HStack(spacing: 16) {
             toolButton("camera", "Camera") { capture = Capture(picked: nil) }
             toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
             toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn) {
@@ -541,28 +548,13 @@ struct WorkspaceView: View {
                 }
             }
             .disabled(session.layers.isEmpty)
-            Divider().frame(width: 36)
-            toolButton("eyedropper", "Swatches", on: swatchesOn) {
-                let on = swatchesOn
+            toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
+                let on = colorBarShown
                 endTools()
-                swatchesOn = !on
+                colorBarShown = !on
             }
             .disabled(session.layers.isEmpty)
-            toolButton("circle.lefthalf.filled", "Simplify", on: colorView == .simplify) {
-                let on = colorView == .simplify
-                endTools()
-                colorView = on ? .normal : .simplify
-            }
-            .disabled(session.selected == nil)
-            toolButton("highlighter", "Highlight", on: colorView == .highlight) {
-                let on = colorView == .highlight
-                endTools()
-                colorView = on ? .normal : .highlight
-            }
-            .disabled(session.selected == nil)
         }
-        .padding(6)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
     }
 
     private func toolButton(_ symbol: String, _ label: String, on: Bool = false, action: @escaping () -> Void) -> some View {
@@ -571,10 +563,11 @@ struct WorkspaceView: View {
 
     private func toolIcon(_ symbol: String, on: Bool) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 20))
+            .font(.system(size: 22))
             .frame(width: 44, height: 44)
-            .background(RoundedRectangle(cornerRadius: 10).fill(on ? Color.blue : Color.clear))
-            .foregroundStyle(.white)
+            .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                .fill(on ? Theme.accent : Color.clear))
+            .foregroundStyle(on ? Theme.onAccent : Color.white)
     }
 
     /// Thumbnails, top layer first. Expanded (‹), each row also shows its
@@ -602,7 +595,7 @@ struct WorkspaceView: View {
             }
         }
         .padding(6)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .themedBar()
     }
 
     /// An icon in the collapsed bar; icon and title expanded.
@@ -672,16 +665,11 @@ struct WorkspaceView: View {
                     .frame(width: 48, height: 48)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .opacity(layer.isVisible ? 1 : 0.35)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.blue, lineWidth: selected ? 3 : 0))
+                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.accent, lineWidth: selected ? 3 : 0))
                     .overlay(alignment: .bottomLeading) { compareBadge(layer) }
-                    .overlay(alignment: .topTrailing) {
+                    .overlay(alignment: .leading) {
                         if session.swatches.contains(where: { $0.layerID == layer.id }) {  // this layer has swatches
-                            SwatchCorner()
-                                .fill(Color.yellow)
-                                .overlay(SwatchCorner().stroke(Color.black.opacity(0.5), lineWidth: 0.5))
-                                .frame(width: 14, height: 14)
-                                .clipShape(UnevenRoundedRectangle(topTrailingRadius: 6))
-                                .accessibilityLabel("Has swatches")
+                            SwatchBadge().offset(x: -8)  // half over the thumbnail's left edge
                         }
                     }
             }
@@ -716,29 +704,32 @@ struct WorkspaceView: View {
             Text(role.map { "\(index + 1) \($0)" } ?? "\(index + 1)")
                 .font(.caption2.weight(.bold))
                 .padding(.horizontal, 4)
-                .background(RoundedRectangle(cornerRadius: 4).fill(role == nil ? Color.black.opacity(0.6) : Color.blue))
+                .background(RoundedRectangle(cornerRadius: 4).fill(role == nil ? Color.black.opacity(0.6) : Theme.accent))
                 .foregroundStyle(.white)
                 .padding(2)
         }
     }
 
     private var exitFullScreenButton: some View {
+        // Where Full screen is in the top bar: top right, 12 pt in, the top bar's height.
         VStack {
             HStack {
+                Spacer()
                 Button {
                     withAnimation { fullScreen = false }
                 } label: {
                     Image(systemName: "arrow.down.right.and.arrow.up.left")
-                        .frame(width: 40, height: 40)
+                        .font(.system(size: 20))
+                        .frame(width: 44, height: 44)
                         .background(Circle().fill(Color.white.opacity(0.12)))
                 }
                 .opacity(0.6)
                 .accessibilityLabel("Exit full screen")
-                Spacer()
             }
+            .frame(height: 56)
             Spacer()
         }
-        .padding(16)
+        .padding(.horizontal, 12)
     }
 }
 
@@ -754,51 +745,63 @@ struct LookBar: View {
     @State private var adjusting = false
 
     var body: some View {
-        HStack(spacing: 14) {
-            Text(layer.name).font(.subheadline.weight(.semibold)).lineLimit(1).frame(maxWidth: 110, alignment: .leading)
-            Text("Opacity")
-            Slider(value: $layer.opacity, in: 0...1) { editing in
-                if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+        HStack(spacing: BarSpacing.group) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.2.layers.3d").font(.system(size: 20))
+                Text(layer.name).font(.headline).lineLimit(1)
             }
-            .frame(width: 200)
-            Text("\(Int((layer.opacity * 100).rounded()))%")
-                .monospacedDigit()
-                .lineLimit(1)
-                .fixedSize()  // "100%" stays on one line
-                .frame(minWidth: 48, alignment: .trailing)
+            .frame(maxWidth: 180, alignment: .leading)
+            HStack(spacing: BarSpacing.icon) {
+                Text("Opacity")
+                Slider(value: $layer.opacity, in: 0...1) { editing in
+                    if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+                }
+                .frame(width: 200)
+                Text("\(Int((layer.opacity * 100).rounded()))%")
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()  // "100%" stays on one line
+                    .frame(minWidth: 48, alignment: .trailing)
+            }
             Picker("Blend", selection: $layer.blend) {
                 ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .frame(width: 250)
-            Button {
-                adjusting = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 20))
-                    .overlay(alignment: .topTrailing) {
-                        if !layer.adjustments.isIdentity {  // this layer has adjustments
-                            Circle().fill(Color.blue).frame(width: 8, height: 8).offset(x: 5, y: -3)
+            HStack(spacing: BarSpacing.icon) {
+                Button {
+                    adjusting = true
+                } label: {
+                    icon("slider.horizontal.3")
+                        .overlay(alignment: .topTrailing) {
+                            if !layer.adjustments.isIdentity {  // this layer has adjustments
+                                Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: -6, y: 8)
+                            }
                         }
-                    }
+                }
+                .accessibilityLabel("Adjust")
+                .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
+                Button { layer.flipHorizontal() } label: { icon("arrow.left.and.right") }
+                    .accessibilityLabel("Flip horizontal")
+                Button { layer.flipVertical() } label: { icon("arrow.up.and.down") }
+                    .accessibilityLabel("Flip vertical")
+                Menu {
+                    Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
+                    Divider()
+                    Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
+                        .disabled(layer.source == nil)  // added before photos were kept
+                } label: {
+                    icon("ellipsis.circle")
+                }
+                .accessibilityLabel("More")
             }
-            .accessibilityLabel("Adjust")
-            .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
-            Menu {
-                Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
-                Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
-                Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipVertical() }
-                Divider()
-                Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
-                    .disabled(layer.source == nil)  // added before photos were kept
-            } label: {
-                Image(systemName: "ellipsis.circle").font(.system(size: 20))
-            }
-            .accessibilityLabel("More")
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .bottomBar()
+    }
+
+    private func icon(_ symbol: String) -> some View {
+        Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
     }
 }
 
@@ -819,15 +822,16 @@ struct CornerEdit: Identifiable {
     var id: UUID { layer.id }
 }
 
-/// The small triangle in a layer thumbnail's top-right corner: it has swatches.
-struct SwatchCorner: Shape {
-    func path(in r: CGRect) -> Path {
-        Path { p in
-            p.move(to: CGPoint(x: r.minX, y: r.minY))
-            p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
-            p.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
-            p.closeSubpath()
-        }
+/// The small circle on a layer thumbnail's left edge: it has swatches.
+struct SwatchBadge: View {
+    var body: some View {
+        Image(systemName: "eyedropper")
+            .font(.system(size: 7, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 16, height: 16)
+            .background(Circle().fill(Theme.purple))
+            .shadow(color: .black.opacity(0.3), radius: 1)
+            .accessibilityLabel("Has swatches")
     }
 }
 
@@ -843,19 +847,22 @@ struct GridBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 16) {
-            Toggle(isOn: $session.grid.isOn) { Text("Grid").font(.subheadline.weight(.semibold)) }
-                .toggleStyle(.switch)
-                .fixedSize()
+        HStack(spacing: BarSpacing.group) {
+            HStack(spacing: 24) {
+                BarTitle("Grid", symbol: "square.grid.3x3")
+                Toggle("Grid", isOn: $session.grid.isOn)
+                    .labelsHidden()
+                    .fixedSize()
+            }
             count("Rows", $session.grid.rows)
             count("Columns", $session.grid.columns)
             Button {
                 session.grid.squareCells(canvasAspect: session.canvasAspect)
             } label: {
-                Image(systemName: "square.grid.3x3.square").font(.system(size: 22))
+                Image(systemName: "square.grid.3x3.square").font(.system(size: 24)).frame(width: 44, height: 44)
             }
             .accessibilityLabel("Square cells")
-            HStack(spacing: 8) {
+            HStack(spacing: 3) {
                 ForEach(GridColor.allCases) { color in
                     Button {
                         session.grid.color = color
@@ -865,25 +872,26 @@ struct GridBar: View {
                             .frame(width: 26, height: 26)
                             .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
                             .padding(3)
-                            .overlay(Circle().stroke(Color.blue, lineWidth: session.grid.color == color ? 3 : 0))
+                            .overlay(Circle().stroke(Theme.accent, lineWidth: session.grid.color == color ? 3 : 0))
                             .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel(color.rawValue.capitalized)
                     .accessibilityAddTraits(session.grid.color == color ? .isSelected : [])
                 }
             }
-            Text("Opacity")
-            Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            HStack(spacing: 16) {
+                Text("Opacity")
+                Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
+            }
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .bottomBar()
     }
 
     /// "Rows  4 ⌄": a menu of 1 to 10.
     private func count(_ title: String, _ value: Binding<Int>) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             Text(title).foregroundStyle(.secondary)
             Picker(title, selection: value) {
                 ForEach(GridSettings.range, id: \.self) { Text("\($0)").tag($0) }

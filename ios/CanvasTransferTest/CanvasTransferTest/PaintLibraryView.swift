@@ -24,11 +24,7 @@ struct PaintLibraryView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
-                Picker("Tab", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 260)
+                UnderlineTabs(tabs: Tab.allCases, selection: $tab) { $0.rawValue }
                 switch tab {
                 case .paints: PaintsTab(paints: $paints, palettes: $palettes, onImport: { importing = true })
                 case .palettes: PalettesTab(paints: paints, palettes: $palettes)
@@ -36,12 +32,13 @@ struct PaintLibraryView: View {
                 footer
             }
             .padding(16)
+            .background(Theme.background)
             .navigationTitle("Paint library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onClose) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Save") {
                         do {
                             try library.replace(paints: paints, palettes: palettes)
                             onClose()
@@ -64,7 +61,7 @@ struct PaintLibraryView: View {
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
         .onAppear {
             guard !loaded else { return }
             paints = library.paints
@@ -170,12 +167,12 @@ private struct PaintsTab: View {
                         } header: {
                             Text("\(medium.capitalized) (\(list.count))").font(.headline)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 6).background(Color(white: 0.11))
+                                .padding(.vertical, 6).background(Theme.surface)
                         }
                     }
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.11)))
+            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface))
         }
         .sheet(item: $editing) { draft in
             PaintEditor(draft: draft, paints: paints) { saved in
@@ -229,7 +226,7 @@ private struct PaintsTab: View {
             Button {
                 if let index { paints[index].enabled.toggle() }
             } label: {
-                Image(systemName: paint.enabled ? "checkmark.square.fill" : "square").foregroundStyle(paint.enabled ? .blue : .secondary)
+                Image(systemName: paint.enabled ? "checkmark.square.fill" : "square").foregroundStyle(paint.enabled ? Theme.accent : Color.secondary)
             }
             .buttonStyle(.plain).frame(width: widths[1])
             .accessibilityLabel(paint.enabled ? "Used in mixes" : "Not used in mixes")
@@ -244,7 +241,7 @@ private struct PaintsTab: View {
         }
         .font(.callout)
         .padding(.horizontal, 8).padding(.vertical, 6)
-        .background(isSelected ? Color.blue.opacity(0.55) : Color.clear)
+        .background(isSelected ? Theme.accent.opacity(0.35) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { editing = PaintDraft(paint: paint, isNew: false) }
         .onTapGesture { selectedID = paint.id }
@@ -283,6 +280,7 @@ private struct PaintEditor: View {
     @State private var paint: Paint
     @State private var pigments: String
     @State private var labText: String
+    @State private var hexText: String
 
     init(draft: PaintDraft, paints: [Paint], onSave: @escaping (Paint) -> Void, onCancel: @escaping () -> Void) {
         self.draft = draft
@@ -291,7 +289,26 @@ private struct PaintEditor: View {
         self.onCancel = onCancel
         _paint = State(initialValue: draft.paint)
         _pigments = State(initialValue: draft.paint.pigments.joined(separator: ", "))
-        _labText = State(initialValue: draft.paint.lab.map { $0.map { String(format: "%.2f", $0) }.joined(separator: "  ") } ?? "")
+        _labText = State(initialValue: draft.paint.lab.map(Self.labString) ?? "")
+        _hexText = State(initialValue: draft.paint.lab.map(Self.hex) ?? "")
+    }
+
+    private static func labString(_ lab: [Double]) -> String {
+        lab.map { String(format: "%.2f", $0) }.joined(separator: "  ")
+    }
+
+    /// The screen color of a Lab, as #RRGGBB.
+    private static func hex(_ lab: [Double]) -> String {
+        let c = PaintColor.srgb(lab).rgb
+        return String(format: "#%02X%02X%02X", c.0, c.1, c.2)
+    }
+
+    /// The Lab of a typed hex color (with or without #), or nil until it's six hex digits.
+    private static func lab(fromHex text: String) -> [Double]? {
+        let digits = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
+        guard digits.count == 6, let v = Int(digits, radix: 16) else { return nil }
+        let lab = PaintColor.lab(((v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF))
+        return [lab.0, lab.1, lab.2].map { ($0 * 100).rounded() / 100 }
     }
 
     /// Three numbers, or nothing (then a stand-in's color is borrowed); nil if it doesn't read.
@@ -345,6 +362,22 @@ private struct PaintEditor: View {
                         PaintChip(lab: (parsedLab ?? nil) ?? color(of: paint, among: paints), size: 36)
                     }
                     .labeled("Color")
+                    // Hex and Lab follow each other: type either one.
+                    TextField("#RRGGBB", text: $hexText)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .monospacedDigit()
+                        .labeled("Hex")
+                        .onChange(of: hexText) { _, text in
+                            if let lab = Self.lab(fromHex: text), Self.hex(lab) != ((parsedLab ?? nil).map(Self.hex) ?? "") {
+                                labText = Self.labString(lab)
+                            }
+                        }
+                        .onChange(of: labText) { _, _ in
+                            if let lab = parsedLab ?? nil, Self.lab(fromHex: hexText).map(Self.hex) != Self.hex(lab) {
+                                hexText = Self.hex(lab)
+                            }
+                        }
                     if let lab = parsedLab ?? nil {
                         let screen = PaintColor.srgb(lab)
                         Text(String(format: "L* %.2f   a* %.2f   b* %.2f   screen #%02X%02X%02X", lab[0], lab[1], lab[2],
@@ -364,7 +397,7 @@ private struct PaintEditor: View {
                     }
                     .disabled((parsedLab ?? nil) != nil)  // only used without color data
                 } footer: {
-                    Text("On a paint's artistpigments.org page, open *All color measurement details* and copy the CIELAB D50 values. Leave Color empty to borrow a similar paint's color (stand-in).")
+                    Text("On a paint's artistpigments.org page, open *All color measurement details* and copy the CIELAB D50 values; they're more exact than a hex color, which is only a screen color. Or type a hex color (e.g. from a photo of your masstone) and the Lab follows. Leave Color empty to borrow a similar paint's color (stand-in).")
                 }
             }
             .navigationTitle(draft.isNew ? "Add Paint" : "Edit Paint")
@@ -384,7 +417,7 @@ private struct PaintEditor: View {
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
     }
 
     private var autoTitle: String {
@@ -456,7 +489,7 @@ private struct PalettesTab: View {
                 detail
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color(white: 0.11)))
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface))
             }
         }
         .sheet(item: $editing) { palette in
@@ -565,7 +598,7 @@ private struct PaletteEditor: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: palette.paintIDs.contains(p.id) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(palette.paintIDs.contains(p.id) ? .blue : .secondary)
+                                    .foregroundStyle(palette.paintIDs.contains(p.id) ? Theme.accent : Color.secondary)
                                 PaintChip(lab: color(of: p, among: paints))
                                 Text("\(p.name) — \(p.brand)").foregroundStyle(.primary)
                             }
@@ -588,6 +621,6 @@ private struct PaletteEditor: View {
                 }
             }
         }
-        .environment(\.colorScheme, .dark)
+        .themed()
     }
 }

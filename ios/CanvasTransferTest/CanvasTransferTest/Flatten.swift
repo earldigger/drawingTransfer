@@ -45,7 +45,8 @@ enum Flatten {
         let aspect = session.canvasAspect
         let points = aspect >= 1 ? CGSize(width: 1000, height: (1000 / aspect).rounded())
                                  : CGSize(width: (1000 * aspect).rounded(), height: 1000)
-        let renderer = ImageRenderer(content: CanvasContent(layers: session.layers, size: points, only: layers))
+        let renderer = ImageRenderer(content: CanvasContent(layers: session.layers, size: points, only: layers,
+                                                            background: session.background.color))
         renderer.scale = longEdge / max(points.width, points.height)
         renderer.isOpaque = true
         guard let cg = renderer.cgImage else { return nil }

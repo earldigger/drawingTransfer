@@ -64,7 +64,7 @@ enum SwatchSheet {
     private static func canvasPicture(_ session: TransferSession) -> UIImage? {
         let size = fitRect(session.canvasSize, in: CGSize(width: 520, height: 300)).size
         let view = ZStack {
-            CanvasContent(layers: session.layers, size: size)
+            CanvasContent(layers: session.layers, size: size, background: session.background.color)
             SwatchMarkers(swatches: session.swatches, layers: session.layers, canvas: size, selectedID: nil, scale: 1)
         }
         .frame(width: size.width, height: size.height)

@@ -197,7 +197,7 @@ struct SwatchMarkers: View {
                         .foregroundStyle(swatch.labelColor)
                         .frame(width: 22, height: 22)
                         .background(Circle().fill(swatch.color))
-                        .overlay(Circle().stroke(selected ? Color.blue : Color.white, lineWidth: selected ? 3 : 2))
+                        .overlay(Circle().stroke(selected ? Theme.accent : Color.white, lineWidth: selected ? 3 : 2))
                         .shadow(color: .black.opacity(0.5), radius: 2)
                         .scaleEffect(1 / scale)
                         .position(point)
@@ -209,67 +209,252 @@ struct SwatchMarkers: View {
     }
 }
 
-/// The Swatches tool's bottom bar: the swatches as numbered chips, the
-/// sample size, and Clear. A chip's numbers are in the swatch panel.
-struct SwatchBar: View {
+/// The color tool's bottom bar (the eyedropper in the top bar). Left: the
+/// Eyedropper (touch the canvas to add swatches), Simplify and Highlight,
+/// each on until tapped again, with its options in a pop-up above it. Then
+/// the swatches as numbered chips; right: hide or show the swatch markers,
+/// delete all (asks first), and Done.
+struct ColorBar: View {
     @Bindable var session: TransferSession
     @Binding var selectedID: UUID?
+    @Binding var picking: Bool
+    @Binding var view: ColorView
     @Binding var sample: SampleSize
+    @Binding var simplify: SimplifySettings
+    @Binding var highlight: HighlightSettings
+    @Binding var markersShown: Bool
+    let working: Bool
     var onDone: () -> Void
 
+    enum Tool { case pick, simplify, highlight }
+
+    @State private var popup: Tool? = nil  // the options shown: the tool last turned on
+    @State private var confirmingDelete = false
+
+    // The layout, as in the design: tiles 44 pt, 11 apart, 10 in from the bar's edge.
+    private static let tile: CGFloat = 44, tileSpacing: CGFloat = 11, inset: CGFloat = 10
+    private static let arrowInset: CGFloat = 38  // a pop-up's arrow, from its leading edge
+    private static let doneWidth: CGFloat = 78, trailingSpacing: CGFloat = 14
+    private static let barHeight: CGFloat = 64
+
     var body: some View {
-        HStack(spacing: 14) {
-            Label("Swatches", systemImage: "eyedropper").font(.subheadline.weight(.semibold))
-            if session.swatches.isEmpty {
-                Text("Touch the canvas to pick a color from the selected layer.")
-                    .font(.caption).foregroundStyle(.secondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(session.swatches.enumerated()), id: \.element.id) { index, swatch in
-                            chip(swatch, number: index + 1)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                .frame(maxWidth: 520)
+        HStack(spacing: 0) {
+            HStack(spacing: Self.tileSpacing) {
+                toolTile("eyedropper", "Eyedropper", tool: .pick, on: picking)
+                toolTile("circle.lefthalf.filled", "Simplify", tool: .simplify, on: view == .simplify)
+                toolTile("pencil.line", "Highlight", tool: .highlight, on: view == .highlight)
             }
-            HStack(spacing: 6) {
-                Image(systemName: "eyedropper.halffull").foregroundStyle(.secondary)
-                Picker("Sample size", selection: $sample) {
-                    ForEach(SampleSize.allCases) { Text($0.label).tag($0) }
+            .padding(.leading, Self.inset)
+            .padding(.trailing, 9)
+            Divider()
+            chips
+            if working { ProgressView().controlSize(.small).padding(.horizontal, 8) }
+            Divider()
+            HStack(spacing: Self.trailingSpacing) {
+                SwatchMarkersToggle(isOn: $markersShown)
+                Button {
+                    withAnimation(.snappy) { confirmingDelete.toggle() }
+                } label: {
+                    Image(systemName: "trash").font(.system(size: 20)).frame(width: 44, height: 44)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
+                .accessibilityLabel("Delete all swatches")
+                .disabled(session.swatches.isEmpty)
+                Button(action: onDone) { Text("Done").frame(width: Self.doneWidth - 36) }
+                    .buttonStyle(.accent)
+            }
+            .padding(.leading, 17)
+            .padding(.trailing, Self.trailingSpacing)
+        }
+        .frame(maxWidth: .infinity)  // the whole width of the screen
+        .frame(height: Self.barHeight)
+        .themedBar()
+        .overlay(alignment: .bottomLeading) { toolPopup }
+        .overlay(alignment: .bottomTrailing) { deletePopup }
+        .onChange(of: session.swatches.isEmpty) { _, empty in if empty { confirmingDelete = false } }
+    }
+
+    // MARK: tools
+
+    private func toolTile(_ symbol: String, _ label: String, tool: Tool, on: Bool) -> some View {
+        Button { toggle(tool) } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 22))
+                .foregroundStyle(.white)
+                .frame(width: Self.tile, height: Self.tile)
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                    .fill(on ? Theme.lavender : Color.clear))
+        }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// On, with its options showing; or off. Simplify and Highlight take turns.
+    private func toggle(_ tool: Tool) {
+        let nowOn: Bool
+        switch tool {
+        case .pick:
+            picking.toggle()
+            nowOn = picking
+        case .simplify:
+            view = view == .simplify ? .normal : .simplify
+            nowOn = view == .simplify
+        case .highlight:
+            view = view == .highlight ? .normal : .highlight
+            nowOn = view == .highlight
+        }
+        withAnimation(.snappy) {
+            if nowOn {
+                popup = tool
+            } else if popup == tool {
+                popup = nil
+            }
+            if popup == .simplify && view != .simplify || popup == .highlight && view != .highlight { popup = nil }
+        }
+    }
+
+    @ViewBuilder
+    private var toolPopup: some View {
+        if let popup {
+            let index: CGFloat = switch popup { case .pick: 0; case .simplify: 1; case .highlight: 2 }
+            let center = Self.inset + Self.tile / 2 + index * (Self.tile + Self.tileSpacing)
+            Callout(arrowInset: Self.arrowInset) {
+                switch popup {
+                case .pick: pickOptions
+                case .simplify: simplifyOptions
+                case .highlight: highlightOptions
+                }
+            }
+            .fixedSize()  // its own size, not the bar's
+            .offset(x: center - Self.arrowInset, y: -(Self.barHeight + 4))  // just above the bar
+            .transition(.opacity)
+        }
+    }
+
+    private var pickOptions: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("Add a Swatch", systemImage: "eyedropper").font(.title3)
+            Picker("Sample size", selection: $sample) {
+                ForEach(SampleSize.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 200)
+        }
+    }
+
+    private var simplifyOptions: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Simplify", systemImage: "circle.lefthalf.filled").font(.title3.weight(.semibold))
+            HStack(alignment: .top, spacing: 36) {
+                sliderColumn("Steps") {
+                    VerticalSlider(value: Binding(get: { Double(simplify.count) }, set: { simplify.count = Int($0) }),
+                                   range: 1...24, label: "\(simplify.count)")
+                }
+                sliderColumn("Smoothing") {
+                    VerticalSlider(value: Binding(get: { Double(simplify.smoothing) }, set: { simplify.smoothing = Int($0) }),
+                                   range: 0...6)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            Picker("Show", selection: $simplify.mode) {
+                Text("Colors").tag(ColorStudy.SimplifyMode.colors)
+                Text("Values").tag(ColorStudy.SimplifyMode.values)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
+        }
+    }
+
+    private var highlightOptions: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Highlight", systemImage: "pencil.line").font(.title3.weight(.semibold))
+            if session.swatches.isEmpty {
+                Text("Add a swatch first.").font(.callout).foregroundStyle(.secondary)
+            }
+            // Range: how far from a swatch's color still counts as its color.
+            sliderColumn("Range") {
+                VerticalSlider(value: $highlight.tolerance, range: 2...40, label: "\(Int(highlight.tolerance.rounded()))")
+            }
+            .frame(maxWidth: .infinity)
+            Picker("Show", selection: $highlight.selectedOnly) {
+                Text("All").tag(false)
+                Text("Selected").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 220)
+        }
+    }
+
+    private func sliderColumn<Slider: View>(_ title: String, @ViewBuilder slider: () -> Slider) -> some View {
+        VStack(spacing: 10) {
+            Text(title).foregroundStyle(.secondary)
+            slider()
+        }
+    }
+
+    // MARK: delete all
+
+    @ViewBuilder
+    private var deletePopup: some View {
+        if confirmingDelete {
+            let arrowInset: CGFloat = 54
+            // The trash's middle, in from the bar's trailing edge.
+            let trash = Self.trailingSpacing + Self.doneWidth + Self.trailingSpacing + 22
+            Callout(arrowInset: arrowInset, trailing: true) {
+                HStack(spacing: 14) {
+                    Button("Cancel") { withAnimation(.snappy) { confirmingDelete = false } }
+                        .foregroundStyle(.secondary)
+                    Button("Delete All Swatches") {
+                        session.swatches.removeAll()  // one undo step
+                        selectedID = nil
+                        confirmingDelete = false
+                    }
+                    .buttonStyle(.accent)
+                }
             }
             .fixedSize()
-            Button {
-                session.swatches.removeAll()  // one undo step
-                selectedID = nil
-            } label: {
-                Image(systemName: "trash").font(.system(size: 18))
-            }
-            .accessibilityLabel("Clear all swatches")
-            .disabled(session.swatches.isEmpty)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            .offset(x: -(trash - arrowInset), y: -(Self.barHeight + 4))
+            .transition(.opacity)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+    }
+
+    // MARK: chips
+
+    @ViewBuilder
+    private var chips: some View {
+        if session.swatches.isEmpty {
+            Text(picking ? "Touch the canvas to add a swatch from the selected layer."
+                         : "Tap the eyedropper, then touch the canvas to add a swatch.")
+                .font(.callout).foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(Array(session.swatches.enumerated()), id: \.element.id) { index, swatch in
+                        chip(swatch, number: index + 1)
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+            }
+            .frame(maxWidth: .infinity)  // the chips take the room the bar has
+        }
     }
 
     private func chip(_ swatch: Swatch, number: Int) -> some View {
         let selected = swatch.id == selectedID
+        // In Highlight, each chip's edge is its highlight color.
+        let edge = view == .highlight ? ColorStudy.highlightColor(number - 1) : Color.white.opacity(0.4)
         return Button {
             selectedID = selected ? nil : swatch.id
         } label: {
             Text("\(number)")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(swatch.labelColor)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(RoundedRectangle(cornerRadius: 8).fill(swatch.color))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Color.blue : Color.white.opacity(0.4),
-                                                                  lineWidth: selected ? 3 : 1))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.accent : edge,
+                                                                  lineWidth: selected || view == .highlight ? 3 : 1))
         }
         .contextMenu {
             Button("Delete swatch \(number)", systemImage: "trash", role: .destructive) {

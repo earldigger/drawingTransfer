@@ -2,10 +2,11 @@ import SwiftUI
 
 /// What the Transform handles do (TransformMode in canvastransfer/geometry.py).
 enum TransformMode: String, CaseIterable, Identifiable {
+    // In the bar's order.
     case proportional = "Proportional"  // corners and edges scale evenly
+    case distort = "Distort"  // every corner moves on its own: perspective
     case free = "Free"  // corners scale width and height apart; edges stretch one way
     case skew = "Skew"  // edges slide along themselves; corners as Free
-    case distort = "Distort"  // every corner moves on its own: perspective
 
     var id: String { rawValue }
 }
@@ -237,13 +238,13 @@ struct TransformHandles: View {
                 p.addLines(quad)
                 p.closeSubpath()
             }
-            .stroke(Color.blue, lineWidth: 2)
+            .stroke(Theme.accent, lineWidth: 2)
             .allowsHitTesting(false)
             ForEach(0..<4, id: \.self) { i in
                 let horizontal = abs(quad[(i + 1) % 4].x - quad[i].x) >= abs(quad[(i + 1) % 4].y - quad[i].y)
                 Capsule()
                     .fill(Color.white)
-                    .overlay(Capsule().stroke(Color.blue, lineWidth: 2))
+                    .overlay(Capsule().stroke(Theme.accent, lineWidth: 2))
                     .frame(width: horizontal ? 26 : 8, height: horizontal ? 8 : 26)
                     .contentShape(Rectangle().inset(by: -18))
                     .position(mids[i])
@@ -252,7 +253,7 @@ struct TransformHandles: View {
             ForEach(0..<4, id: \.self) { i in
                 Rectangle()
                     .fill(Color.white)
-                    .overlay(Rectangle().stroke(Color.blue, lineWidth: 2.5))
+                    .overlay(Rectangle().stroke(Theme.accent, lineWidth: 2.5))
                     .frame(width: 18, height: 18)
                     .rotationEffect(mode == .distort ? .degrees(45) : .zero)  // a diamond: corners move on their own
                     .contentShape(Rectangle().inset(by: -14))  // 46 pt to touch
@@ -292,21 +293,30 @@ struct TransformBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            Label("Transform", systemImage: "arrow.up.and.down.and.arrow.left.and.right").font(.subheadline.weight(.semibold))
+        HStack(spacing: BarSpacing.group) {
+            BarTitle("Transform", symbol: "arrow.up.and.down.and.arrow.left.and.right")
             Picker("Mode", selection: $mode) {
                 ForEach(TransformMode.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .frame(width: 380)
-            Button("Flip H", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
-            Button("Flip V", systemImage: "arrow.up.and.down") { layer.flipVertical() }
-            Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
-            Button("Cancel", action: onCancel)
-            Button("Done", action: onDone).buttonStyle(.borderedProminent)
+            HStack(spacing: BarSpacing.icon) {
+                Button { layer.flipHorizontal() } label: {
+                    Image(systemName: "arrow.left.and.right").font(.system(size: 20)).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Flip horizontal")
+                Button { layer.flipVertical() } label: {
+                    Image(systemName: "arrow.up.and.down").font(.system(size: 20)).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Flip vertical")
+            }
+            HStack(spacing: BarSpacing.group) {
+                Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
+                Button("Cancel", action: onCancel)
+            }
+            Spacer(minLength: 0)
+            DoneButton(action: onDone)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(white: 0.13).opacity(0.95)))
+        .bottomBar()
     }
 }

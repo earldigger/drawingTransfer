@@ -16,7 +16,7 @@ struct ColorPanel: View {
     }
 
     @AppStorage("colorPanelTab") private var tab = Tab.mixes
-    private static let fill = Color(white: 0.13).opacity(0.97)
+    private static let fill = Theme.bar
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -32,10 +32,8 @@ struct ColorPanel: View {
                     .foregroundStyle(.secondary)
                     .accessibilityLabel("Close")
             }
-            Picker("Tab", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
+            UnderlineTabs(tabs: Tab.allCases, selection: $tab) { $0.rawValue }
+                .padding(.top, 4)
             ScrollView {
                 switch tab {
                 case .details: SwatchDetails(swatch: swatch)
@@ -45,8 +43,8 @@ struct ColorPanel: View {
         }
         .padding(14)
         .frame(width: 350)
-        .frame(maxHeight: 600)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Self.fill))
+        .frame(maxHeight: .infinity, alignment: .top)  // as tall as the space above the bottom bar
+        .background(RoundedRectangle(cornerRadius: Theme.barRadius, style: .continuous).fill(Self.fill))
         .overlay(alignment: .topTrailing) {
             if let pointerY {
                 GeometryReader { g in
@@ -206,15 +204,8 @@ struct MixesView: View {
                 if working && result == nil {
                     ProgressView().frame(maxWidth: .infinity)
                 } else if let result {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Mixes").font(.subheadline.weight(.semibold))
-                        if result.pairs.isEmpty {
-                            Text("Nothing to mix from.").font(.caption).foregroundStyle(.secondary)
-                        }
-                        ForEach(result.pairs) { recipe in
-                            RecipeRow(swatch: swatch, recipe: recipe, lightener: lightener)
-                        }
-                    }
+                    section("Two paints", Array(result.pairs.prefix(3)))
+                    section("Three paints", Array(result.triples.prefix(3)))
                 }
             }
         }
@@ -233,14 +224,25 @@ struct MixesView: View {
                 Button("Water (paper white)") { lightenWith = "water" }
                 Button("Nothing") { lightenWith = "none" }
             }
-            HStack {
-                Text("Favorites only")
-                Spacer()
-                Toggle("Favorites only", isOn: $favoritesOnly).labelsHidden()  // for "All … paints"
-            }
+            Toggle("Favorites only", isOn: $favoritesOnly)  // for "All … paints"
+                .padding(.trailing, 8)  // the switch's edge clear of the scroll view's
             .disabled(!(source?.key.hasPrefix("medium:") ?? false))
         }
         .font(.callout)
+    }
+
+    /// The best three mixes of one kind; "+ white" when there's a lightener.
+    private func section(_ title: String, _ recipes: [Mixing.Recipe]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title + (lightener == nil ? "" : " + \(lightener?.id == Mixing.water.id ? "water" : "white")"))
+                .font(.subheadline.weight(.semibold))
+            if recipes.isEmpty {
+                Text("Nothing to mix from.").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(recipes) { recipe in
+                RecipeRow(swatch: swatch, recipe: recipe, lightener: lightener)
+            }
+        }
     }
 
     /// A label, and under it a one-line menu as wide as the panel.
@@ -285,6 +287,13 @@ struct RecipeRow: View {
     let lightener: Paint?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            MixBar(recipe: recipe)
+            row
+        }
+    }
+
+    private var row: some View {
         HStack(alignment: .top, spacing: 10) {
             HStack(spacing: 0) {
                 Rectangle().fill(swatch.color)
@@ -308,6 +317,30 @@ struct RecipeRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// A thin bar over a mix: each paint's color, as long as its share of the
+/// mix (50 % white is half the bar), in the order the paints are listed.
+private struct MixBar: View {
+    let recipe: Mixing.Recipe
+
+    var body: some View {
+        GeometryReader { g in
+            HStack(spacing: 0) {
+                ForEach(recipe.parts.indices, id: \.self) { i in
+                    let part = recipe.parts[i]
+                    let c = recipe.colors[part.paint.id] ?? (128, 128, 128)
+                    Rectangle()
+                        .fill(Color(red: Double(c.0) / 255, green: Double(c.1) / 255, blue: Double(c.2) / 255))
+                        .frame(width: g.size.width * part.share)
+                }
+            }
+        }
+        .frame(height: 8)
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+        .accessibilityHidden(true)
     }
 }
 

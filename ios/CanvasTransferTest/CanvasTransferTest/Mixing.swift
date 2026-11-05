@@ -117,7 +117,8 @@ enum Mixing {
     static let top = 5
     private static let coarseSteps = 10
     private static let refinePairs = 20
-    private static let refineSpan = 0.1
+    private static let tripleCandidates = 8  // paints combined three at a time: 56 threes
+    private static let refineTriples = 10
 
     struct Recipe: Identifiable {
         let id = UUID()
@@ -126,11 +127,13 @@ enum Mixing {
         var deltaE: Double
         var offScreen: [Paint]  // colors clipped to the screen before mixing
         var standIns: [(paint: Paint, from: Paint)]  // paints mixed with another paint's color
+        var colors: [String: (Int, Int, Int)] = [:]  // each paint's screen color, by id, for the mix bar
     }
 
     struct Result {
         var singles: [Recipe]
-        var pairs: [Recipe]
+        var pairs: [Recipe]  // two paints + the lightener
+        var triples: [Recipe]  // three paints + the lightener
     }
 
     static func closeness(_ deltaE: Double) -> String {
@@ -180,14 +183,20 @@ enum Mixing {
     }
 
     private static func recipe(_ list: [Entry], _ indices: [Int], _ shares: [Double], _ rgb: (Double, Double, Double),
-                               _ deltaE: Double) -> Recipe {
+                               _ deltaE: Double, lightener: Int? = nil) -> Recipe {
         let used = zip(indices, shares).filter { $0.1 >= 0.005 }
         let real = realShares(strengths: used.map { list[$0.0].paint.strength }, effective: used.map(\.1))
         let entries = used.map { list[$0.0] }
-        return Recipe(parts: zip(entries, real).map { ($0.paint, $1) },
-                      rgb: (Int((rgb.0 * 255).rounded()), Int((rgb.1 * 255).rounded()), Int((rgb.2 * 255).rounded())),
-                      deltaE: deltaE, offScreen: entries.filter(\.offScreen).map(\.paint),
-                      standIns: entries.compactMap { e in e.standIn.map { (e.paint, $0) } })
+        var r = Recipe(parts: zip(entries, real).map { ($0.paint, $1) },
+                       rgb: (Int((rgb.0 * 255).rounded()), Int((rgb.1 * 255).rounded()), Int((rgb.2 * 255).rounded())),
+                       deltaE: deltaE, offScreen: entries.filter(\.offScreen).map(\.paint),
+                       standIns: entries.compactMap { e in e.standIn.map { (e.paint, $0) } })
+        r.colors = Dictionary(entries.map { ($0.paint.id, $0.rgb) }, uniquingKeysWith: { a, _ in a })
+        // Main color first, the lightener last.
+        let lightenerID = lightener.map { list[$0].paint.id }
+        r.parts = r.parts.filter { $0.paint.id != lightenerID }.sorted { $0.share > $1.share }
+            + r.parts.filter { $0.paint.id == lightenerID }
+        return r
     }
 
     /// The best one-paint and two-paint recipes for `target` from `paints`,
@@ -196,7 +205,7 @@ enum Mixing {
         let colors = paints.filter { $0.id != lightener?.id && !(lightener != nil && $0.isWhite) }
         var list = entries(colors, library: library)
         let n = list.count
-        guard n > 0, Mixbox.isAvailable else { return Result(singles: [], pairs: []) }
+        guard n > 0, Mixbox.isAvailable else { return Result(singles: [], pairs: [], triples: []) }
         if let lightener, let white = entries([lightener], library: library).first { list.append(white) }
         let hasWhite = list.count > n
         let zw: Mixbox.Latent = hasWhite ? list[n].latent : (0, 0, 0, 0, 0, 0, 0)
@@ -217,7 +226,7 @@ enum Mixing {
         }
         let singles = (0..<n).sorted { alone[$0] < alone[$1] }.prefix(top).map { i -> Recipe in
             let b = bestSingle[i]
-            return hasWhite ? recipe(list, [i, n], [b.share, 1 - b.share], b.rgb, b.de) : recipe(list, [i], [1], b.rgb, b.de)
+            return hasWhite ? recipe(list, [i, n], [b.share, 1 - b.share], b.rgb, b.de, lightener: n) : recipe(list, [i], [1], b.rgb, b.de)
         }
 
         // Two paints (+ white): a coarse grid over every pair, then 1 % steps around the best.
@@ -253,15 +262,71 @@ enum Mixing {
                 }
                 var indices = [c.i, c.j], shares = [best.a, best.b]
                 if hasWhite { indices.append(n); shares.append(max(0, 1 - best.a - best.b)) }
-                var r = recipe(list, indices, shares, best.rgb, best.de)
-                // Main color first, the lightener last.
-                let lightenerID = hasWhite ? list[n].paint.id : nil
-                r.parts = r.parts.filter { $0.paint.id != lightenerID }.sorted { $0.share > $1.share }
-                    + r.parts.filter { $0.paint.id == lightenerID }
+                let r = recipe(list, indices, shares, best.rgb, best.de, lightener: hasWhite ? n : nil)
                 refined.append((max(best.de, 1), min(alone[c.i], alone[c.j]), r))
             }
             pairs = refined.sorted { ($0.key, $0.tie) < ($1.key, $1.tie) }.prefix(top).map(\.recipe)
         }
-        return Result(singles: Array(singles), pairs: pairs)
+
+        // Three paints (+ white). Every three of all your paints is too many to
+        // try, so only the paints the searches above found most useful are
+        // combined: those in the best pairs, then the best on their own, up to
+        // `tripleCandidates`. A 10 % grid, then 1 % steps around the best few.
+        var triples: [Recipe] = []
+        if n >= 3 {
+            var picks: [Int] = []
+            for r in pairs {
+                for part in r.parts {
+                    if let i = list.prefix(n).firstIndex(where: { $0.paint.id == part.paint.id }), !picks.contains(i) { picks.append(i) }
+                }
+            }
+            for i in (0..<n).sorted(by: { alone[$0] < alone[$1] }) where !picks.contains(i) { picks.append(i) }
+            picks = Array(picks.prefix(tripleCandidates))
+            var grid: [(Double, Double, Double)] = []
+            for a in 1..<coarseSteps {
+                for b in 1..<coarseSteps {
+                    for c in 1..<coarseSteps where hasWhite ? a + b + c <= coarseSteps : a + b + c == coarseSteps {
+                        grid.append((Double(a) / 10, Double(b) / 10, Double(c) / 10))
+                    }
+                }
+            }
+            var coarse: [(i: Int, j: Int, k: Int, de: Double, a: Double, b: Double, c: Double)] = []
+            for x in 0..<picks.count {
+                for y in (x + 1)..<picks.count {
+                    for z in (y + 1)..<picks.count {
+                        let (i, j, k) = (picks[x], picks[y], picks[z])
+                        var best = (de: Double.infinity, a: 0.0, b: 0.0, c: 0.0)
+                        for (a, b, c) in grid {
+                            let mix = Mixbox.sum([(list[i].latent, a), (list[j].latent, b), (list[k].latent, c), (zw, max(1 - a - b - c, 0))])
+                            let (de, _) = score(mix, goal)
+                            if de < best.de { best = (de, a, b, c) }
+                        }
+                        coarse.append((i, j, k, best.de, best.a, best.b, best.c))
+                    }
+                }
+            }
+            var refined: [(key: Double, tie: Double, recipe: Recipe)] = []
+            for t in coarse.sorted(by: { $0.de < $1.de }).prefix(refineTriples) {
+                var best = (de: Double.infinity, a: 0.0, b: 0.0, c: 0.0, rgb: (0.0, 0.0, 0.0))
+                for da in -5...5 {
+                    for db in -5...5 {
+                        for dc in -5...5 {
+                            let a = t.a + Double(da) / 100, b = t.b + Double(db) / 100, c = t.c + Double(dc) / 100
+                            guard a >= 0.01, b >= 0.01, c >= 0.01,
+                                  hasWhite ? a + b + c <= 1 + 1e-9 : abs(a + b + c - 1) < 1e-9 else { continue }
+                            let mix = Mixbox.sum([(list[t.i].latent, a), (list[t.j].latent, b), (list[t.k].latent, c), (zw, max(1 - a - b - c, 0))])
+                            let (de, rgb) = score(mix, goal)
+                            if de < best.de { best = (de, a, b, c, rgb) }
+                        }
+                    }
+                }
+                var indices = [t.i, t.j, t.k], shares = [best.a, best.b, best.c]
+                if hasWhite { indices.append(n); shares.append(max(0, 1 - best.a - best.b - best.c)) }
+                let r = recipe(list, indices, shares, best.rgb, best.de, lightener: hasWhite ? n : nil)
+                refined.append((max(best.de, 1), min(alone[t.i], alone[t.j], alone[t.k]), r))
+            }
+            triples = refined.sorted { ($0.key, $0.tie) < ($1.key, $1.tie) }.prefix(top).map(\.recipe)
+        }
+        return Result(singles: Array(singles), pairs: pairs, triples: triples)
     }
 }

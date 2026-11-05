@@ -155,18 +155,19 @@ struct CameraScreen: View {
             VStack {
                 HStack {
                     Button("Cancel", action: onCancel)
-                        .buttonStyle(.borderedProminent).tint(Color(white: 0.15))
+                        .buttonStyle(.borderedProminent).tint(Theme.surface)
                     Spacer()
                     if found {
                         Text("Rectangle found · hold steady")
                             .padding(.horizontal, 14).padding(.vertical, 6)
-                            .background(Capsule().fill(Color.blue)).foregroundStyle(.white)
+                            .background(Capsule().fill(Theme.accent)).foregroundStyle(Theme.onAccent)
                     }
                     Spacer()
                     Toggle("Find rectangle", systemImage: "viewfinder", isOn: $findRectangle)
                         .toggleStyle(.button)
                         .buttonStyle(.borderedProminent)
-                        .tint(findRectangle ? .blue : Color(white: 0.15))
+                        .tint(findRectangle ? Theme.accent : Theme.surface)
+                        .foregroundStyle(findRectangle ? Theme.onAccent : Color.white)
                 }
                 Spacer()
             }

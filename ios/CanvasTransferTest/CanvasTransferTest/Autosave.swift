@@ -32,6 +32,7 @@ struct SessionSnapshot: Codable, Equatable {
     var selectedID: UUID?
     var grid: GridSettings?  // optional, so sessions saved before the grid still open
     var swatches: [Swatch]?  // optional, so sessions saved before Color still open
+    var background: CanvasBackground?  // optional; nil = white, as before
 }
 
 extension TransferSession {
@@ -45,7 +46,8 @@ extension TransferSession {
             },
             selectedID: selectedID,
             grid: grid,
-            swatches: swatches)
+            swatches: swatches,
+            background: background)
     }
 
     /// Makes the session match `snapshot`. Layers that are already here are
@@ -55,6 +57,7 @@ extension TransferSession {
         canvasSize = snapshot.canvasSize
         if let saved = snapshot.grid { grid = saved }
         swatches = snapshot.swatches ?? []
+        background = snapshot.background ?? .white
         let existing = Dictionary(uniqueKeysWithValues: layers.map { ($0.id, $0) })
         layers = snapshot.layers.compactMap { state in
             let imageID = state.imageID ?? state.id
@@ -93,29 +96,32 @@ extension TransferSession {
     }
 }
 
-/// The current session, kept on the iPad in Application Support/Session:
-/// session.json; each layer's image as a PNG named by its image id; each
-/// original photo as a JPEG named by its source id. Neither ever changes
-/// under its name (Edit corners makes a new image id), so each file is
-/// written once.
+/// A project's session, kept in its folder: session.json; each layer's image
+/// as a PNG named by its image id; each original photo as a JPEG named by its
+/// source id. Neither ever changes under its name (Edit corners makes a new
+/// image id), so each file is written once.
 enum SessionStore {
-    static let folder = URL.applicationSupportDirectory.appending(path: "Session", directoryHint: .isDirectory)
-    private static var file: URL { folder.appending(path: "session.json") }
-    private static func imageURL(_ id: UUID) -> URL { folder.appending(path: "\(id.uuidString).png") }
-    private static func sourceURL(_ id: UUID) -> URL { folder.appending(path: "\(id.uuidString)-source.jpg") }
+    /// Where the one session lived before projects; moved into the first project.
+    static let legacyFolder = URL.applicationSupportDirectory.appending(path: "Session", directoryHint: .isDirectory)
+    private static func file(_ folder: URL) -> URL { folder.appending(path: "session.json") }
+    private static func imageURL(_ id: UUID, _ folder: URL) -> URL { folder.appending(path: "\(id.uuidString).png") }
+    private static func sourceURL(_ id: UUID, _ folder: URL) -> URL { folder.appending(path: "\(id.uuidString)-source.jpg") }
     private static let queue = DispatchQueue(label: "autosave")  // one save at a time, in order
 
-    /// The saved session, or a new one. A layer whose image is missing is skipped.
-    static func load() -> TransferSession {
+    /// Runs after every save already asked for has finished (to copy a project safely).
+    static func afterSaves(_ work: @escaping () -> Void) { queue.async(execute: work) }
+
+    /// The saved session in `folder`, or a new one. A layer whose image is missing is skipped.
+    static func load(from folder: URL) -> TransferSession {
         let session = TransferSession()
-        guard let data = try? Data(contentsOf: file) else { return session }
+        guard let data = try? Data(contentsOf: file(folder)) else { return session }
         do {
             let saved = try JSONDecoder().decode(SessionSnapshot.self, from: data)
             session.apply(saved, images: { id in
-                let image = UIImage(contentsOfFile: imageURL(id).path)
+                let image = UIImage(contentsOfFile: imageURL(id, folder).path)
                 if image == nil { saveLog.error("No image \(id), skipped its layer") }
                 return image
-            }, sources: { UIImage(contentsOfFile: sourceURL($0).path) })
+            }, sources: { UIImage(contentsOfFile: sourceURL($0, folder).path) })
             saveLog.notice("Opened the saved session: \(session.layers.count) layers")
         } catch {
             saveLog.error("Couldn't read session.json, starting empty: \(error)")
@@ -125,24 +131,24 @@ enum SessionStore {
 
     /// Writes new images and photos, then session.json, and removes files no
     /// layer uses any more. Runs off the main thread; a PNG can take a moment.
-    static func save(_ snapshot: SessionSnapshot, images: [UUID: UIImage], sources: [UUID: UIImage]) {
+    static func save(_ snapshot: SessionSnapshot, images: [UUID: UIImage], sources: [UUID: UIImage], to folder: URL) {
         queue.async {
             do {
                 let files = FileManager.default
                 try files.createDirectory(at: folder, withIntermediateDirectories: true)
-                for (id, image) in images where !files.fileExists(atPath: imageURL(id).path) {
+                for (id, image) in images where !files.fileExists(atPath: imageURL(id, folder).path) {
                     guard let png = image.pngData() else { continue }
-                    try png.write(to: imageURL(id), options: .atomic)
+                    try png.write(to: imageURL(id, folder), options: .atomic)
                 }
-                for (id, photo) in sources where !files.fileExists(atPath: sourceURL(id).path) {
+                for (id, photo) in sources where !files.fileExists(atPath: sourceURL(id, folder).path) {
                     guard let jpeg = photo.jpegData(compressionQuality: 0.95) else { continue }
-                    try jpeg.write(to: sourceURL(id), options: .atomic)
+                    try jpeg.write(to: sourceURL(id, folder), options: .atomic)
                 }
                 // Files first: session.json never names one that isn't there yet.
-                try JSONEncoder().encode(snapshot).write(to: file, options: .atomic)
+                try JSONEncoder().encode(snapshot).write(to: file(folder), options: .atomic)
                 let keep = Set(snapshot.layers.flatMap { state in
-                    [imageURL(state.imageID ?? state.id).lastPathComponent]
-                        + (state.sourceID.map { [sourceURL($0).lastPathComponent] } ?? [])
+                    [imageURL(state.imageID ?? state.id, folder).lastPathComponent]
+                        + (state.sourceID.map { [sourceURL($0, folder).lastPathComponent] } ?? [])
                 })
                 for name in try files.contentsOfDirectory(atPath: folder.path)
                 where (name.hasSuffix(".png") || name.hasSuffix("-source.jpg")) && !keep.contains(name) {
@@ -156,9 +162,12 @@ enum SessionStore {
 }
 
 /// Saves the session half a second after it stops changing (a gesture
-/// changes it every frame), and at once when the app leaves the screen.
+/// changes it every frame), at once when the app leaves the screen, and when
+/// the project is closed. `onSaved` follows every save (the Gallery's thumbnail and date).
 struct Autosave: ViewModifier {
     let session: TransferSession
+    let folder: URL
+    var onSaved: () -> Void
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var pending: Task<Void, Never>? = nil
@@ -176,6 +185,7 @@ struct Autosave: ViewModifier {
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { saveNow() }
             }
+            .onDisappear { saveNow() }  // back to the Gallery
     }
 
     private func saveNow() {
@@ -185,10 +195,14 @@ struct Autosave: ViewModifier {
         SessionStore.save(session.snapshot,
                           images: Dictionary(layers.map { ($0.imageID, $0.image) }, uniquingKeysWith: { a, _ in a }),
                           sources: Dictionary(layers.compactMap { l in l.sourceID.flatMap { id in l.source.map { (id, $0) } } },
-                                              uniquingKeysWith: { a, _ in a }))
+                                              uniquingKeysWith: { a, _ in a }),
+                          to: folder)
+        onSaved()
     }
 }
 
 extension View {
-    func autosaves(_ session: TransferSession) -> some View { modifier(Autosave(session: session)) }
+    func autosaves(_ session: TransferSession, to folder: URL, onSaved: @escaping () -> Void = {}) -> some View {
+        modifier(Autosave(session: session, folder: folder, onSaved: onSaved))
+    }
 }
