@@ -93,12 +93,12 @@ automatically.
   colors. Each paint's brand and notes are behind its
   paint icon, orange when there's a note (a stand-in's color, or off screen).
 - **Paint library** (top bar, after Redo): Paints and Palettes, full screen,
-  Cancel or Done. Paints: the table with ★ and Use, Add Paint…, Edit… (the
+  Cancel or Save. Paints: the table with ★ and Use, Add Paint…, Edit… (the
   prototype's Edit Paint: group, brand, name, series, pigments, opacity,
-  lightfastness, drying, strength, Lab color, stand-in), Delete, Revert to
+  lightfastness, drying, strength, Lab color or hex, stand-in), Delete, Revert to
   Site Data, Open Web Page, Import paints… (a newer paints.json from the
   prototype). Palettes: yours and the classic ones; New, Edit, Duplicate as
-  My Palette, Delete. Done keeps the library on the iPad, in the prototype's
+  My Palette, Delete. Save keeps the library on the iPad, in the prototype's
   format; the Mac's paints.json isn't changed.
 - **Share swatch sheet (PDF)** (top right): the canvas with its numbered
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
@@ -117,8 +117,9 @@ automatically.
   marks A and B.
 - **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
   opacity. Long-press a layer to move it up or down, to the front or back,
-  duplicate, hide or delete it. The Look bar's **⋯** has Fit, Flip
-  horizontal / vertical, and **Edit corners…**, which reopens Adjust corners
+  duplicate, hide or delete it. The layer bar at the bottom has the layer's
+  name, opacity, blend, Adjust, Flip horizontal / vertical, and **⋯** with Fit
+  and **Edit corners…**, which reopens Adjust corners
   on the original photo (kept since this build) and keeps the placement.
 - **Grid** (top bar): on / off, rows and columns (1–10), Square cells,
   color and opacity.

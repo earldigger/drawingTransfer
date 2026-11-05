@@ -38,7 +38,7 @@ struct PaintLibraryView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onClose) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("Save") {
                         do {
                             try library.replace(paints: paints, palettes: palettes)
                             onClose()
@@ -280,6 +280,7 @@ private struct PaintEditor: View {
     @State private var paint: Paint
     @State private var pigments: String
     @State private var labText: String
+    @State private var hexText: String
 
     init(draft: PaintDraft, paints: [Paint], onSave: @escaping (Paint) -> Void, onCancel: @escaping () -> Void) {
         self.draft = draft
@@ -288,7 +289,26 @@ private struct PaintEditor: View {
         self.onCancel = onCancel
         _paint = State(initialValue: draft.paint)
         _pigments = State(initialValue: draft.paint.pigments.joined(separator: ", "))
-        _labText = State(initialValue: draft.paint.lab.map { $0.map { String(format: "%.2f", $0) }.joined(separator: "  ") } ?? "")
+        _labText = State(initialValue: draft.paint.lab.map(Self.labString) ?? "")
+        _hexText = State(initialValue: draft.paint.lab.map(Self.hex) ?? "")
+    }
+
+    private static func labString(_ lab: [Double]) -> String {
+        lab.map { String(format: "%.2f", $0) }.joined(separator: "  ")
+    }
+
+    /// The screen color of a Lab, as #RRGGBB.
+    private static func hex(_ lab: [Double]) -> String {
+        let c = PaintColor.srgb(lab).rgb
+        return String(format: "#%02X%02X%02X", c.0, c.1, c.2)
+    }
+
+    /// The Lab of a typed hex color (with or without #), or nil until it's six hex digits.
+    private static func lab(fromHex text: String) -> [Double]? {
+        let digits = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "#", with: "")
+        guard digits.count == 6, let v = Int(digits, radix: 16) else { return nil }
+        let lab = PaintColor.lab(((v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF))
+        return [lab.0, lab.1, lab.2].map { ($0 * 100).rounded() / 100 }
     }
 
     /// Three numbers, or nothing (then a stand-in's color is borrowed); nil if it doesn't read.
@@ -342,6 +362,22 @@ private struct PaintEditor: View {
                         PaintChip(lab: (parsedLab ?? nil) ?? color(of: paint, among: paints), size: 36)
                     }
                     .labeled("Color")
+                    // Hex and Lab follow each other: type either one.
+                    TextField("#RRGGBB", text: $hexText)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .monospacedDigit()
+                        .labeled("Hex")
+                        .onChange(of: hexText) { _, text in
+                            if let lab = Self.lab(fromHex: text), Self.hex(lab) != ((parsedLab ?? nil).map(Self.hex) ?? "") {
+                                labText = Self.labString(lab)
+                            }
+                        }
+                        .onChange(of: labText) { _, _ in
+                            if let lab = parsedLab ?? nil, Self.lab(fromHex: hexText).map(Self.hex) != Self.hex(lab) {
+                                hexText = Self.hex(lab)
+                            }
+                        }
                     if let lab = parsedLab ?? nil {
                         let screen = PaintColor.srgb(lab)
                         Text(String(format: "L* %.2f   a* %.2f   b* %.2f   screen #%02X%02X%02X", lab[0], lab[1], lab[2],
@@ -361,7 +397,7 @@ private struct PaintEditor: View {
                     }
                     .disabled((parsedLab ?? nil) != nil)  // only used without color data
                 } footer: {
-                    Text("On a paint's artistpigments.org page, open *All color measurement details* and copy the CIELAB D50 values. Leave Color empty to borrow a similar paint's color (stand-in).")
+                    Text("On a paint's artistpigments.org page, open *All color measurement details* and copy the CIELAB D50 values; they're more exact than a hex color, which is only a screen color. Or type a hex color (e.g. from a photo of your masstone) and the Lab follows. Leave Color empty to borrow a similar paint's color (stand-in).")
                 }
             }
             .navigationTitle(draft.isNew ? "Add Paint" : "Edit Paint")

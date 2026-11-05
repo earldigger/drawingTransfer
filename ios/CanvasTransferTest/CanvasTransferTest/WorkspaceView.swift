@@ -745,51 +745,63 @@ struct LookBar: View {
     @State private var adjusting = false
 
     var body: some View {
-        HStack(spacing: 14) {
-            Text(layer.name).font(.subheadline.weight(.semibold)).lineLimit(1).frame(maxWidth: 110, alignment: .leading)
-            Text("Opacity")
-            Slider(value: $layer.opacity, in: 0...1) { editing in
-                if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+        HStack(spacing: BarSpacing.group) {
+            HStack(spacing: 12) {
+                Image(systemName: "square.2.layers.3d").font(.system(size: 20))
+                Text(layer.name).font(.headline).lineLimit(1)
             }
-            .frame(width: 200)
-            Text("\(Int((layer.opacity * 100).rounded()))%")
-                .monospacedDigit()
-                .lineLimit(1)
-                .fixedSize()  // "100%" stays on one line
-                .frame(minWidth: 48, alignment: .trailing)
+            .frame(maxWidth: 180, alignment: .leading)
+            HStack(spacing: BarSpacing.icon) {
+                Text("Opacity")
+                Slider(value: $layer.opacity, in: 0...1) { editing in
+                    if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+                }
+                .frame(width: 200)
+                Text("\(Int((layer.opacity * 100).rounded()))%")
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .fixedSize()  // "100%" stays on one line
+                    .frame(minWidth: 48, alignment: .trailing)
+            }
             Picker("Blend", selection: $layer.blend) {
                 ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }
             }
             .pickerStyle(.segmented)
             .frame(width: 250)
-            Button {
-                adjusting = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 20))
-                    .overlay(alignment: .topTrailing) {
-                        if !layer.adjustments.isIdentity {  // this layer has adjustments
-                            Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: 5, y: -3)
+            HStack(spacing: BarSpacing.icon) {
+                Button {
+                    adjusting = true
+                } label: {
+                    icon("slider.horizontal.3")
+                        .overlay(alignment: .topTrailing) {
+                            if !layer.adjustments.isIdentity {  // this layer has adjustments
+                                Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: -6, y: 8)
+                            }
                         }
-                    }
+                }
+                .accessibilityLabel("Adjust")
+                .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
+                Button { layer.flipHorizontal() } label: { icon("arrow.left.and.right") }
+                    .accessibilityLabel("Flip horizontal")
+                Button { layer.flipVertical() } label: { icon("arrow.up.and.down") }
+                    .accessibilityLabel("Flip vertical")
+                Menu {
+                    Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
+                    Divider()
+                    Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
+                        .disabled(layer.source == nil)  // added before photos were kept
+                } label: {
+                    icon("ellipsis.circle")
+                }
+                .accessibilityLabel("More")
             }
-            .accessibilityLabel("Adjust")
-            .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
-            Menu {
-                Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
-                Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
-                Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipVertical() }
-                Divider()
-                Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
-                    .disabled(layer.source == nil)  // added before photos were kept
-            } label: {
-                Image(systemName: "ellipsis.circle").font(.system(size: 20))
-            }
-            .accessibilityLabel("More")
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .frame(height: 56)
-        .themedBar()
+        .bottomBar()
+    }
+
+    private func icon(_ symbol: String) -> some View {
+        Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
     }
 }
 
