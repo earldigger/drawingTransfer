@@ -15,40 +15,170 @@ struct ProjectInfo: Codable, Identifiable, Equatable {
     var canvasSize: CGSize  // inches
 }
 
-/// The paintings on this iPad, each a folder in Application Support/Projects
-/// named <id>.ctproj (the iPad's own layout, not the prototype's .ctproj):
-/// project.json, thumbnail.jpg, and the session's files.
+/// The paintings, each a folder named <id>.ctproj (the iPad's own layout,
+/// not the prototype's .ctproj): project.json, thumbnail.jpg, and the
+/// session's files. They're kept on this iPad (Application Support/Projects)
+/// or in a folder you choose in Files, such as one in iCloud Drive, which
+/// iCloud then syncs; that needs no iCloud entitlement, so it works with a
+/// free developer account.
 @Observable
 final class ProjectStore {
     static let shared = ProjectStore()
 
     private(set) var projects: [ProjectInfo] = []  // most recently changed first
     private(set) var thumbnails: [UUID: UIImage] = [:]
+    private(set) var root: URL = ProjectStore.localRoot
+    private(set) var folderName: String? = nil  // the chosen folder; nil = on this iPad
+    private(set) var storageProblem: String? = nil
+    private(set) var downloading = 0  // project files iCloud is still bringing down
 
-    static let root = URL.applicationSupportDirectory.appending(path: "Projects", directoryHint: .isDirectory)
+    static let localRoot = URL.applicationSupportDirectory.appending(path: "Projects", directoryHint: .isDirectory)
+    private static let bookmarkKey = "projectsFolderBookmark"
 
-    func folder(_ id: UUID) -> URL { Self.root.appending(path: "\(id.uuidString).ctproj", directoryHint: .isDirectory) }
+    func folder(_ id: UUID) -> URL { root.appending(path: "\(id.uuidString).ctproj", directoryHint: .isDirectory) }
     private func infoURL(_ id: UUID) -> URL { folder(id).appending(path: "project.json") }
     private func thumbnailURL(_ id: UUID) -> URL { folder(id).appending(path: "thumbnail.jpg") }
 
     private init() {
-        try? FileManager.default.createDirectory(at: Self.root, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: Self.localRoot, withIntermediateDirectories: true)
+        openChosenFolder()
         moveOldSession()
         reload()
     }
 
     func info(_ id: UUID) -> ProjectInfo? { projects.first { $0.id == id } }
 
+    /// Reads the projects again, e.g. after iCloud brought changes from elsewhere.
+    func refresh() { reload() }
+
     private func reload() {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: Self.root.path)) ?? []
+        let files = FileManager.default
+        let names = (try? files.contentsOfDirectory(atPath: root.path)) ?? []
+        var waiting = 0
         projects = names.filter { $0.hasSuffix(".ctproj") }.compactMap { name in
-            let url = Self.root.appending(path: name).appending(path: "project.json")
+            let folder = root.appending(path: name, directoryHint: .isDirectory)
+            let url = folder.appending(path: "project.json")
+            if !files.fileExists(atPath: url.path) {  // in iCloud, not on this iPad yet
+                if Self.startDownload(url) { waiting += 1 }
+                return nil
+            }
             return (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(ProjectInfo.self, from: $0) }
         }
         .sorted { $0.modified > $1.modified }
-        for p in projects where thumbnails[p.id] == nil {
-            thumbnails[p.id] = UIImage(contentsOfFile: thumbnailURL(p.id).path)
+        for p in projects {
+            let url = thumbnailURL(p.id)
+            if !files.fileExists(atPath: url.path) {
+                Self.startDownload(url)
+            } else if thumbnails[p.id] == nil {
+                thumbnails[p.id] = UIImage(contentsOfFile: url.path)
+            }
         }
+        downloading = waiting
+        if waiting > 0 {  // look again once iCloud has had a moment
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.reload() }
+        }
+    }
+
+    // MARK: where the projects are kept
+
+    /// Opens the folder chosen before, if it can still be reached; otherwise the iPad's.
+    private func openChosenFolder() {
+        guard let bookmark = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &stale),
+              url.startAccessingSecurityScopedResource()  // kept for as long as the app runs
+        else {
+            storageProblem = "Couldn't reach your projects folder, so projects on this iPad are shown. Choose the folder again."
+            projectLog.error("Couldn't open the chosen projects folder")
+            return
+        }
+        if stale, let fresh = try? url.bookmarkData() {
+            UserDefaults.standard.set(fresh, forKey: Self.bookmarkKey)
+        }
+        root = url
+        folderName = url.lastPathComponent
+    }
+
+    /// Keeps projects in `url` (a folder picked in Files) from now on. With
+    /// `moving`, the projects on this iPad are moved into it, after any saves.
+    func useFolder(_ url: URL, moving: Bool) throws {
+        guard url.startAccessingSecurityScopedResource() else { throw CocoaError(.fileReadNoPermission) }
+        let bookmark = try url.bookmarkData()
+        UserDefaults.standard.set(bookmark, forKey: Self.bookmarkKey)
+        let local = Self.localRoot
+        root = url
+        folderName = url.lastPathComponent
+        storageProblem = nil
+        thumbnails = [:]
+        if moving {
+            SessionStore.afterSaves { [weak self] in
+                Self.move(from: local, to: url)
+                DispatchQueue.main.async { self?.reload() }
+            }
+        }
+        reload()
+    }
+
+    /// Back to keeping projects on this iPad. The folder's projects stay where they are.
+    func useThisIPad() {
+        UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
+        root = Self.localRoot
+        folderName = nil
+        storageProblem = nil
+        thumbnails = [:]
+        reload()
+    }
+
+    /// How many projects are on this iPad, for "Move them?"
+    var localProjectCount: Int {
+        ((try? FileManager.default.contentsOfDirectory(atPath: Self.localRoot.path)) ?? [])
+            .filter { $0.hasSuffix(".ctproj") }.count
+    }
+
+    /// Each project folder from `from` into `to`, removed from `from` once copied.
+    /// One already in `to` (the same id) is left alone, and so is the iPad's copy.
+    private static func move(from: URL, to: URL) {
+        let files = FileManager.default
+        for name in ((try? files.contentsOfDirectory(atPath: from.path)) ?? []) where name.hasSuffix(".ctproj") {
+            let source = from.appending(path: name), target = to.appending(path: name)
+            guard !files.fileExists(atPath: target.path) else { continue }
+            do {
+                try files.copyItem(at: source, to: target)
+                try files.removeItem(at: source)
+            } catch {
+                projectLog.error("Couldn't move \(name): \(error)")
+            }
+        }
+    }
+
+    /// Asks iCloud for a file that's only in the cloud so far. False if it isn't an iCloud file.
+    @discardableResult
+    private static func startDownload(_ url: URL) -> Bool {
+        (try? FileManager.default.startDownloadingUbiquitousItem(at: url)) != nil
+    }
+
+    /// Waits until every file of a project is on this iPad (iCloud may have
+    /// only placeholders, named ".<name>.icloud"), for up to `timeout` seconds.
+    /// True when they're all here.
+    func download(_ id: UUID, timeout: TimeInterval = 60) async -> Bool {
+        let folder = folder(id), files = FileManager.default
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let names = (try? files.contentsOfDirectory(atPath: folder.path)) ?? []
+            // Not here yet: a placeholder, or a file iCloud lists but hasn't downloaded.
+            let missing = names.compactMap { name -> URL? in
+                if name.hasPrefix(".") && name.hasSuffix(".icloud") {
+                    return folder.appending(path: String(name.dropFirst().dropLast(".icloud".count)))
+                }
+                let url = folder.appending(path: name)
+                let status = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]).ubiquitousItemDownloadingStatus
+                return status == nil || status == .current ? nil : url
+            }
+            if missing.isEmpty && files.fileExists(atPath: folder.appending(path: "session.json").path) { return true }
+            missing.forEach { Self.startDownload($0) }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+        return false
     }
 
     private func write(_ info: ProjectInfo) {
@@ -237,6 +367,9 @@ struct GalleryView: View {
     @State private var renamingSize: CanvasSizeChoice? = nil
     @State private var newName = ""
     @State private var deleting: ProjectInfo? = nil
+    @State private var choosingFolder = false
+    @State private var pickedFolder: URL? = nil  // asking whether to move the iPad's projects into it
+    @State private var folderError: String? = nil
 
     private let columns = [GridItem(.adaptive(minimum: 200, maximum: 240), spacing: 24)]
 
@@ -287,16 +420,79 @@ struct GalleryView: View {
                             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
                             titleVisibility: .visible) {
             Button("Delete", role: .destructive) { if let d = deleting { store.delete(d.id) } }
-        } message: { Text("Its layers and swatches are deleted from this iPad.") }
+        } message: {
+            Text(store.folderName == nil ? "Its layers and swatches are deleted from this iPad."
+                                         : "Its layers and swatches are deleted from \(store.folderName ?? "the folder"), everywhere it syncs.")
+        }
+        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
+            guard case .success(let url) = result else { return }
+            if store.folderName == nil && store.localProjectCount > 0 {
+                pickedFolder = url  // ask first
+            } else {
+                use(url, moving: false)
+            }
+        }
+        .confirmationDialog("Move your \(store.localProjectCount) projects to \(pickedFolder?.lastPathComponent ?? "the folder")?",
+                            isPresented: Binding(get: { pickedFolder != nil }, set: { if !$0 { pickedFolder = nil } }),
+                            titleVisibility: .visible) {
+            Button("Move them") { if let url = pickedFolder { use(url, moving: true) } }
+            Button("Leave them on this iPad") { if let url = pickedFolder { use(url, moving: false) } }
+        } message: {
+            Text("Projects in an iCloud Drive folder sync through iCloud and show in Finder on your Mac.")
+        }
+        .alert("Couldn't use that folder", isPresented: Binding(get: { folderError != nil }, set: { if !$0 { folderError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(folderError ?? "") }
+        .onAppear { store.refresh() }
+    }
+
+    private func use(_ url: URL, moving: Bool) {
+        do {
+            try store.useFolder(url, moving: moving)
+        } catch {
+            folderError = error.localizedDescription
+        }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Gallery").font(.largeTitle.weight(.bold))
-            Text(store.projects.isEmpty ? "Let's start a painting" : "Pick up a painting, or start a new one")
-                .font(.callout).foregroundStyle(.secondary)
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Gallery").font(.largeTitle.weight(.bold))
+                Text(store.projects.isEmpty ? "Let's start a painting" : "Pick up a painting, or start a new one")
+                    .font(.callout).foregroundStyle(.secondary)
+                if let problem = store.storageProblem {
+                    Label(problem, systemImage: "exclamationmark.triangle").font(.callout).foregroundStyle(.orange)
+                }
+            }
+            Spacer()
+            storageMenu
         }
         .padding(.top, 8)
+    }
+
+    /// Where projects are kept: on this iPad, or a folder you chose (iCloud Drive syncs it).
+    private var storageMenu: some View {
+        Menu {
+            Section(store.folderName.map { "Projects are in “\($0)”" } ?? "Projects are on this iPad") {
+                Button("Choose a folder…", systemImage: "folder") { choosingFolder = true }
+                if store.folderName != nil {
+                    Button("Keep projects on this iPad", systemImage: "ipad") { store.useThisIPad() }
+                }
+                Button("Refresh", systemImage: "arrow.clockwise") { store.refresh() }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                if store.downloading > 0 { ProgressView().controlSize(.small) }
+                Image(systemName: store.folderName == nil ? "ipad" : "folder")
+                Text(store.folderName ?? "On this iPad").lineLimit(1)
+                Image(systemName: "chevron.down").font(.caption.weight(.semibold))
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(Capsule().fill(Theme.surface))
+        }
+        .tint(.white)
+        .accessibilityLabel("Where projects are kept")
     }
 
     // MARK: sizes
@@ -660,6 +856,8 @@ struct RootView: View {
     @State private var open: OpenProject? = nil
     @AppStorage("lastProject") private var lastProject = ""
     @Environment(\.scenePhase) private var scenePhase
+    @State private var opening: UUID? = nil  // waiting for iCloud to bring its files down
+    @State private var openFailed: String? = nil
 
     struct OpenProject {
         let id: UUID
@@ -680,6 +878,18 @@ struct RootView: View {
                     .id(open.id)
             } else {
                 GalleryView(store: store) { openProject($0) }
+                    .overlay {
+                        if let opening, store.folderName != nil {  // on the iPad it opens at once
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                Text("Downloading \(store.info(opening)?.name ?? "the project") from iCloud…")
+                            }
+                            .padding(28)
+                            .themedBar()
+                            .themed()
+                        }
+                    }
+                    .disabled(opening != nil)
             }
         }
         .onAppear {
@@ -688,13 +898,29 @@ struct RootView: View {
         .onChange(of: scenePhase) { _, phase in
             // The Gallery's picture stays current even if the app is closed from here.
             if phase == .background, let open { store.saveThumbnail(open.id, session: open.session) }
+            if phase == .active, open == nil { store.refresh() }  // changes made elsewhere
         }
+        .alert("Couldn't open the project", isPresented: Binding(get: { openFailed != nil }, set: { if !$0 { openFailed = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: { Text(openFailed ?? "") }
     }
 
+    /// Opens a project once all its files are here; in an iCloud folder that
+    /// may mean waiting for them to download.
     private func openProject(_ id: UUID) {
-        let session = SessionStore.load(from: store.folder(id))
-        open = OpenProject(id: id, session: session, history: History(session))
-        lastProject = id.uuidString
+        guard opening == nil else { return }
+        opening = id
+        Task { @MainActor in
+            let ready = await store.download(id)
+            opening = nil
+            guard ready else {
+                openFailed = "Its files didn't arrive from iCloud. Check the connection and try again."
+                return
+            }
+            let session = SessionStore.load(from: store.folder(id))
+            open = OpenProject(id: id, session: session, history: History(session))
+            lastProject = id.uuidString
+        }
     }
 
     private func close() {

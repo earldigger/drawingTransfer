@@ -47,6 +47,13 @@ automatically.
   under the layers everywhere) and Save this size. Below, your paintings, the
   most recent first; long-press one to rename, duplicate or delete it. The
   **house** at the top left goes back; each project keeps its own layers, swatches and grid.
+- **Where projects are kept** (the menu at the Gallery's top right): on this
+  iPad, or **Choose a folder…** in Files, e.g. iCloud Drive > Canvas Transfer.
+  iCloud syncs that folder (no iCloud entitlement needed, so it works with a
+  free developer account) and it shows in Finder on the Mac. Choosing it can
+  move the iPad's projects into it; a project still in the cloud downloads
+  when you open it. **Keep projects on this iPad** switches back (the
+  folder's projects stay in the folder).
 - **Top bar**: the house; in the middle the tools (Camera, Photos,
   Transform, Crop, Grid, Compare, the color tool); on the right undo and
   redo, Paint library, Share and Full screen. Each tool with a bar at the
