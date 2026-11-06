@@ -47,6 +47,12 @@ automatically.
   under the layers everywhere) and Save this size. Below, your paintings, the
   most recent first; long-press one to rename, duplicate or delete it. The
   **house** at the top left goes back; each project keeps its own layers, swatches and grid.
+- **iPhone** (the same app, upright only): the Gallery in one column, New
+  project in a sheet; in a project the tools are in a row at the bottom with
+  **Layers** (a sheet), and each bar stacks into rows. Camera puts the shutter
+  at the bottom; Adjust corners has its panel under the photo. Not on the
+  phone yet: Swatches / Simplify / Highlight, the swatch panel, the Paint
+  library and the swatch sheet PDF.
 - **Where projects are kept** (the menu at the Gallery's top right): on this
   iPad, or **Choose a folder…** in Files, e.g. iCloud Drive > Canvas Transfer.
   iCloud syncs that folder (no iCloud entitlement needed, so it works with a

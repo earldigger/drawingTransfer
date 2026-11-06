@@ -178,38 +178,68 @@ struct CompareBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: BarSpacing.group) {
-            BarTitle("Compare", symbol: "rectangle.split.2x1")
-            Picker("Mode", selection: $state.mode) {
-                ForEach(CompareMode.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 300)
-            HStack(spacing: BarSpacing.icon) {
-                layerPicker("A", $state.a)
-                if state.mode.needsB {
-                    layerPicker("B", $state.b)
-                    Button { (state.a, state.b) = (state.b, state.a) } label: {
-                        Image(systemName: "arrow.left.arrow.right").font(.system(size: 20)).frame(width: 44, height: 44)
+        Group {
+            if Theme.isPhone {  // rows: title and Done, mode, A / B / swap, then speed when blinking
+                VStack(spacing: 8) {
+                    HStack {
+                        BarTitle("Compare", symbol: "rectangle.split.2x1")
+                        Spacer(minLength: 8)
+                        DoneButton(action: onDone)
                     }
-                    .accessibilityLabel("Swap")
+                    modes
+                    HStack {
+                        roles
+                        Spacer(minLength: 0)
+                    }
+                    if state.mode.blinks { speed }
+                }
+            } else {
+                HStack(spacing: BarSpacing.group) {
+                    BarTitle("Compare", symbol: "rectangle.split.2x1")
+                    modes.frame(width: 300)
+                    roles
+                    if state.mode.blinks { speed }
+                    Spacer(minLength: 0)
+                    DoneButton(action: onDone)
                 }
             }
-            if state.mode.blinks {
-                HStack(spacing: BarSpacing.icon) {
-                    Text(String(format: "%.1f s", state.interval)).monospacedDigit().frame(width: 44)
-                    Slider(value: $state.interval, in: CompareState.intervalRange).frame(width: 120)
-                    Button { state.paused.toggle() } label: {
-                        Image(systemName: state.paused ? "play.fill" : "pause.fill").font(.system(size: 20))
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel(state.paused ? "Play" : "Pause")
-                }
-            }
-            Spacer(minLength: 0)
-            DoneButton(action: onDone)
         }
         .bottomBar()
+    }
+
+    private var modes: some View {
+        Picker("Mode", selection: $state.mode) {
+            ForEach(CompareMode.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    /// A and B, and Swap.
+    private var roles: some View {
+        HStack(spacing: BarSpacing.icon) {
+            layerPicker("A", $state.a)
+            if state.mode.needsB {
+                layerPicker("B", $state.b)
+                Button { (state.a, state.b) = (state.b, state.a) } label: {
+                    Image(systemName: "arrow.left.arrow.right").font(.system(size: 20)).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Swap")
+            }
+        }
+    }
+
+    /// The blink's speed, and pause.
+    private var speed: some View {
+        HStack(spacing: BarSpacing.icon) {
+            Text(String(format: "%.1f s", state.interval)).monospacedDigit().frame(width: 44)
+            Slider(value: $state.interval, in: CompareState.intervalRange)
+                .frame(width: Theme.isPhone ? nil : 120)  // on the phone, the row's width
+            Button { state.paused.toggle() } label: {
+                Image(systemName: state.paused ? "play.fill" : "pause.fill").font(.system(size: 20))
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel(state.paused ? "Play" : "Pause")
+        }
     }
 
     /// Layers by position, 1 at the bottom, as numbered in the layer bar while comparing.

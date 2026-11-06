@@ -18,6 +18,11 @@ enum Theme {
     static let cardRadius: CGFloat = 22
     static let barRadius: CGFloat = 20
     static let controlRadius: CGFloat = 12
+
+    /// Running on an iPhone (upright only): bars stack into rows, and a few
+    /// iPad tools (the color tools, the Paint library) aren't offered yet.
+    static let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+    static let device = isPhone ? "iPhone" : "iPad"  // "on this iPhone"
 }
 
 extension View {
@@ -34,12 +39,21 @@ extension View {
         background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Theme.bar))
     }
 
-    /// A tool's bar at the bottom: the whole width, 64 pt tall, navy.
+    /// A tool's bar at the bottom: the whole width, navy; 64 pt tall, or on
+    /// the phone as tall as its rows.
+    @ViewBuilder
     func bottomBar() -> some View {
-        padding(.horizontal, 20)
-            .frame(maxWidth: .infinity)
-            .frame(height: 64)
-            .themedBar()
+        if Theme.isPhone {
+            padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .themedBar()
+        } else {
+            padding(.horizontal, 20)
+                .frame(maxWidth: .infinity)
+                .frame(height: 64)
+                .themedBar()
+        }
     }
 
     /// A text field in a raised navy box.

@@ -41,7 +41,9 @@ struct CornersScreen: View {
     private var wholePhoto: Corners { Corners.inset(image.size, by: 0) }
 
     var body: some View {
-        HStack(spacing: 0) {
+        // The photo with the panel beside it (iPad) or below it (phone).
+        let layout = Theme.isPhone ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+        layout {
             GeometryReader { geo in
                 let rect = fitRect(image.size, in: geo.size, margin: 28)
                 let scale = rect.width / max(image.size.width, 1)
@@ -90,7 +92,7 @@ struct CornersScreen: View {
             }
             .background(Theme.background)
 
-            sidePanel
+            if Theme.isPhone { bottomPanel } else { sidePanel }
         }
         .background(Theme.background.ignoresSafeArea())
     }
@@ -148,6 +150,38 @@ struct CornersScreen: View {
         .padding(20)
         .frame(width: 300)
         .background(Theme.surface)
+        .themed()
+    }
+
+    /// The phone's panel, under the photo: the same choices, shorter.
+    private var bottomPanel: some View {
+        VStack(spacing: 14) {
+            HStack {
+                if let onRetake { Button("Retake", action: onRetake) }
+                Spacer()
+                Text("Adjust corners").font(.headline)
+                Spacer()
+                Button("Cancel", action: onCancel).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 20) {
+                Button("Reset", systemImage: "arrow.counterclockwise") { corners = wholePhoto }
+                Button("Detected", systemImage: "viewfinder") { corners = detected ?? notFound }
+                    .disabled(detected == nil)
+                Spacer(minLength: 0)
+                Toggle("Find", isOn: $findRectangle)
+                    .fixedSize()
+                    .onChange(of: findRectangle) { _, on in corners = on ? detected ?? notFound : wholePhoto }
+            }
+            .font(.callout)
+            Button {
+                onAdd(corners)
+            } label: {
+                Text(addTitle).frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.accent)
+        }
+        .padding(16)
+        .background(Theme.surface.ignoresSafeArea(edges: .bottom))
         .themed()
     }
 }

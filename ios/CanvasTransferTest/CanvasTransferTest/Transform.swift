@@ -293,30 +293,63 @@ struct TransformBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: BarSpacing.group) {
-            BarTitle("Transform", symbol: "arrow.up.and.down.and.arrow.left.and.right")
-            Picker("Mode", selection: $mode) {
-                ForEach(TransformMode.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 380)
-            HStack(spacing: BarSpacing.icon) {
-                Button { layer.flipHorizontal() } label: {
-                    Image(systemName: "arrow.left.and.right").font(.system(size: 20)).frame(width: 44, height: 44)
+        Group {
+            if Theme.isPhone {  // three rows: title and Done, mode, flips / Fit / Cancel
+                VStack(spacing: 8) {
+                    HStack {
+                        title
+                        Spacer(minLength: 8)
+                        DoneButton(action: onDone)
+                    }
+                    modes
+                    HStack {
+                        flips
+                        Spacer(minLength: 8)
+                        actions
+                    }
                 }
-                .accessibilityLabel("Flip horizontal")
-                Button { layer.flipVertical() } label: {
-                    Image(systemName: "arrow.up.and.down").font(.system(size: 20)).frame(width: 44, height: 44)
+            } else {
+                HStack(spacing: BarSpacing.group) {
+                    title
+                    modes.frame(width: 380)
+                    flips
+                    actions
+                    Spacer(minLength: 0)
+                    DoneButton(action: onDone)
                 }
-                .accessibilityLabel("Flip vertical")
             }
-            HStack(spacing: BarSpacing.group) {
-                Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
-                Button("Cancel", action: onCancel)
-            }
-            Spacer(minLength: 0)
-            DoneButton(action: onDone)
         }
         .bottomBar()
+    }
+
+    private var title: some View {
+        BarTitle("Transform", symbol: "arrow.up.and.down.and.arrow.left.and.right")
+    }
+
+    private var modes: some View {
+        Picker("Mode", selection: $mode) {
+            ForEach(TransformMode.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var flips: some View {
+        HStack(spacing: BarSpacing.icon) {
+            Button { layer.flipHorizontal() } label: {
+                Image(systemName: "arrow.left.and.right").font(.system(size: 20)).frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Flip horizontal")
+            Button { layer.flipVertical() } label: {
+                Image(systemName: "arrow.up.and.down").font(.system(size: 20)).frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Flip vertical")
+        }
+    }
+
+    private var actions: some View {
+        HStack(spacing: BarSpacing.group) {
+            Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
+            Button("Cancel", action: onCancel)
+        }
     }
 }

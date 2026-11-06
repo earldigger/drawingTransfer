@@ -162,20 +162,40 @@ struct CropBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: BarSpacing.group) {
-            BarTitle("Crop", symbol: "crop")
-            Picker("Shape", selection: $shape) {
-                ForEach(CropShape.allCases) { Text($0.rawValue).tag($0) }
+        Group {
+            if Theme.isPhone {  // two rows: title and Done, shape / Reset / Cancel
+                VStack(spacing: 8) {
+                    HStack {
+                        BarTitle("Crop", symbol: "crop")
+                        Spacer(minLength: 8)
+                        DoneButton(action: onDone)
+                    }
+                    HStack(spacing: 20) {
+                        shapes
+                        Button("Reset") { layer.crop = reshaped(Crop.full) }
+                        Button("Cancel", action: onCancel)
+                    }
+                }
+            } else {
+                HStack(spacing: BarSpacing.group) {
+                    BarTitle("Crop", symbol: "crop")
+                    shapes.frame(width: 200)
+                    Button("Reset") { layer.crop = reshaped(Crop.full) }
+                    Button("Cancel", action: onCancel)
+                    Spacer(minLength: 0)
+                    DoneButton(action: onDone)
+                }
             }
-            .pickerStyle(.segmented)
-            .frame(width: 200)
-            Button("Reset") { layer.crop = reshaped(Crop.full) }
-            Button("Cancel", action: onCancel)
-            Spacer(minLength: 0)
-            DoneButton(action: onDone)
         }
         .bottomBar()
         .onChange(of: shape) { layer.crop = reshaped(layer.crop) }
+    }
+
+    private var shapes: some View {
+        Picker("Shape", selection: $shape) {
+            ForEach(CropShape.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
     }
 
     private func reshaped(_ crop: CGRect) -> CGRect {

@@ -79,6 +79,8 @@ libdbus-1-3 are needed). Keep them passing.
 
 ## iPad app — done
 
+- **iPhone** (Nov 2026): the same app (iPad + iPhone, portrait only on the phone), switched by `Theme.isPhone`: tools in a bottom row, Layers in a sheet, bars stacked into rows. First scope only; the color tools and Paint library aren't on the phone yet.
+
 - **Flatten** (`Flatten.swift`): visible layers as shown into an ordinary "Flattened n", sources hidden. Update was removed (Nov 2026).
 - **One workspace** (Nov 2026): no Color tab; Swatches, Simplify and Highlight are in the tool strip, one tool at a time.
 - **Paint library** (Nov 2026, `PaintLibraryView.swift`): Paints and Palettes editors like the prototype's.

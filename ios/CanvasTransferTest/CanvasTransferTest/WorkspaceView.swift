@@ -51,11 +51,16 @@ struct WorkspaceView: View {
     @State private var studyWorking = false
     @State private var colorPanelOpen = true  // Details | Paints & mixes for the selected swatch
     @State private var paintLibraryOpen = false
+    @State private var layersSheet = false  // the phone's layer list
     @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
     var body: some View {
         GeometryReader { geo in
-            let margins = fullScreen ? EdgeInsets() : EdgeInsets(top: 68, leading: 24, bottom: 84, trailing: 96)
+            // Room for the bars, so the canvas sits clear of them (decision F). On the
+            // phone: the top bar, and below, the stacked bar and the tool row.
+            let margins = fullScreen ? EdgeInsets()
+                : Theme.isPhone ? EdgeInsets(top: 60, leading: 8, bottom: 236, trailing: 8)
+                : EdgeInsets(top: 68, leading: 24, bottom: 84, trailing: 96)
             let area = CGSize(width: geo.size.width - margins.leading - margins.trailing,
                               height: geo.size.height - margins.top - margins.bottom)
             let fitted = fitRect(session.canvasSize, in: area, margin: fullScreen ? 0 : 12)
@@ -114,6 +119,20 @@ struct WorkspaceView: View {
         }
         .fullScreenCover(isPresented: $paintLibraryOpen) {
             PaintLibraryView { paintLibraryOpen = false }
+        }
+        .sheet(isPresented: $layersSheet) {
+            // The phone's layers: the iPad's layer bar, expanded, in a sheet.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Layers").font(.title3.weight(.semibold))
+                    layerBar.frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .padding(20)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationBackground(Theme.surface)
+            .themed()
+            .onAppear { layerBarExpanded = true }
         }
         .photosPicker(isPresented: $showPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -387,7 +406,7 @@ struct WorkspaceView: View {
             topBar
             HStack(alignment: .top, spacing: 0) {
                 Spacer()
-                if colorBarShown, colorPanelOpen,
+                if colorBarShown, colorPanelOpen, !Theme.isPhone,
                    let index = session.swatches.firstIndex(where: { $0.id == selectedSwatchID }) {
                     let swatch = session.swatches[index]
                     ColorPanel(swatch: swatch, number: index + 1, pointerY: layerRowCenter(swatch.layerID)) {
@@ -395,7 +414,7 @@ struct WorkspaceView: View {
                     }
                     .padding(.vertical, 16)  // from under the top bar to just above the bottom bar
                 }
-                layerBar.padding(12)
+                if !Theme.isPhone { layerBar.padding(12) }  // on the phone, Layers opens a sheet
             }
             .frame(maxHeight: .infinity, alignment: .top)  // the swatch panel can run down to the bottom bar
             if colorToolOn, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
@@ -426,8 +445,14 @@ struct WorkspaceView: View {
                     LookBar(layer: layer, canvasAspect: session.canvasAspect, onEditCorners: { editCorners(layer) })
                 }
             }
-            .padding(.horizontal, 12)  // full-width bars keep a margin
-            .padding(.bottom, 12)
+            .padding(.horizontal, Theme.isPhone ? 8 : 12)  // full-width bars keep a margin
+            .padding(.bottom, Theme.isPhone ? 6 : 12)
+            if Theme.isPhone {
+                tools
+                    .padding(.bottom, 2)
+                    .frame(maxWidth: .infinity)
+                    .background(Theme.background.ignoresSafeArea(edges: .bottom))
+            }
         }
     }
 
@@ -460,7 +485,7 @@ struct WorkspaceView: View {
     /// library, share and full screen on the right.
     private var topBar: some View {
         ZStack {
-            tools
+            if !Theme.isPhone { tools }  // on the phone they're in a row at the bottom
             HStack(spacing: 0) {
                 Button {
                     endTools()
@@ -482,15 +507,19 @@ struct WorkspaceView: View {
                     .disabled(!canRedo)
                     .padding(.trailing, 32)
                 HStack(spacing: 16) {
-                    Button { paintLibraryOpen = true } label: { topIcon("books.vertical") }
-                        .accessibilityLabel("Paint library")
+                    if !Theme.isPhone {  // not on the phone yet
+                        Button { paintLibraryOpen = true } label: { topIcon("books.vertical") }
+                            .accessibilityLabel("Paint library")
+                    }
                     Menu {
                         Button("Share image", systemImage: "photo") { share(withGrid: false) }
                         if session.grid.isOn {
                             Button("Share image with grid", systemImage: "square.grid.3x3") { share(withGrid: true) }
                         }
-                        Button("Share swatch sheet (PDF)", systemImage: "doc.richtext") { shareSwatchSheet() }
-                            .disabled(session.swatches.isEmpty)
+                        if !Theme.isPhone {
+                            Button("Share swatch sheet (PDF)", systemImage: "doc.richtext") { shareSwatchSheet() }
+                                .disabled(session.swatches.isEmpty)
+                        }
                     } label: {
                         topIcon("square.and.arrow.up")
                     }
@@ -516,10 +545,11 @@ struct WorkspaceView: View {
         Image(systemName: symbol).font(.system(size: 20)).frame(width: 44, height: 44)
     }
 
-    /// The tools, in the middle of the top bar. Each one that has a bar at
-    /// the bottom turns the others off; tapping it again turns it off.
+    /// The tools, in the middle of the top bar (on the phone, in a row at the
+    /// bottom, with Layers). Each one that has a bar at the bottom turns the
+    /// others off; tapping it again turns it off.
     private var tools: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: Theme.isPhone ? 8 : 16) {
             toolButton("camera", "Camera") { capture = Capture(picked: nil) }
             toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
             toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn) {
@@ -548,12 +578,16 @@ struct WorkspaceView: View {
                 }
             }
             .disabled(session.layers.isEmpty)
-            toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
-                let on = colorBarShown
-                endTools()
-                colorBarShown = !on
+            if Theme.isPhone {
+                toolButton("square.2.layers.3d", "Layers", on: layersSheet) { layersSheet = true }
+            } else {
+                toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
+                    let on = colorBarShown
+                    endTools()
+                    colorBarShown = !on
+                }
+                .disabled(session.layers.isEmpty)
             }
-            .disabled(session.layers.isEmpty)
         }
     }
 
@@ -575,14 +609,16 @@ struct WorkspaceView: View {
     /// duplicating, hiding and deleting.
     private var layerBar: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            Button {
-                withAnimation(.snappy) { layerBarExpanded.toggle() }
-            } label: {
-                Image(systemName: layerBarExpanded ? "chevron.right" : "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 48, height: 28)
+            if !Theme.isPhone {  // the phone's sheet is always expanded
+                Button {
+                    withAnimation(.snappy) { layerBarExpanded.toggle() }
+                } label: {
+                    Image(systemName: layerBarExpanded ? "chevron.right" : "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 48, height: 28)
+                }
+                .accessibilityLabel(layerBarExpanded ? "Collapse layers" : "Expand layers")
             }
-            .accessibilityLabel(layerBarExpanded ? "Collapse layers" : "Expand layers")
             ForEach(session.layers.reversed()) { layer in  // top layer first
                 layerRow(layer)
             }
@@ -745,59 +781,87 @@ struct LookBar: View {
     @State private var adjusting = false
 
     var body: some View {
-        HStack(spacing: BarSpacing.group) {
-            HStack(spacing: 12) {
-                Image(systemName: "square.2.layers.3d").font(.system(size: 20))
-                Text(layer.name).font(.headline).lineLimit(1)
-            }
-            .frame(maxWidth: 180, alignment: .leading)
-            HStack(spacing: BarSpacing.icon) {
-                Text("Opacity")
-                Slider(value: $layer.opacity, in: 0...1) { editing in
-                    if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+        Group {
+            if Theme.isPhone {  // three rows: name and buttons, opacity, blend
+                VStack(spacing: 10) {
+                    HStack(spacing: 0) {
+                        title
+                        Spacer(minLength: 8)
+                        buttons
+                    }
+                    opacity
+                    blend
                 }
-                .frame(width: 200)
-                Text("\(Int((layer.opacity * 100).rounded()))%")
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .fixedSize()  // "100%" stays on one line
-                    .frame(minWidth: 48, alignment: .trailing)
-            }
-            Picker("Blend", selection: $layer.blend) {
-                ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 250)
-            HStack(spacing: BarSpacing.icon) {
-                Button {
-                    adjusting = true
-                } label: {
-                    icon("slider.horizontal.3")
-                        .overlay(alignment: .topTrailing) {
-                            if !layer.adjustments.isIdentity {  // this layer has adjustments
-                                Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: -6, y: 8)
-                            }
-                        }
+            } else {
+                HStack(spacing: BarSpacing.group) {
+                    title.frame(maxWidth: 180, alignment: .leading)
+                    opacity
+                    blend.frame(width: 250)
+                    buttons
+                    Spacer(minLength: 0)
                 }
-                .accessibilityLabel("Adjust")
-                .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
-                Button { layer.flipHorizontal() } label: { icon("arrow.left.and.right") }
-                    .accessibilityLabel("Flip horizontal")
-                Button { layer.flipVertical() } label: { icon("arrow.up.and.down") }
-                    .accessibilityLabel("Flip vertical")
-                Menu {
-                    Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
-                    Divider()
-                    Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
-                        .disabled(layer.source == nil)  // added before photos were kept
-                } label: {
-                    icon("ellipsis.circle")
-                }
-                .accessibilityLabel("More")
             }
-            Spacer(minLength: 0)
         }
         .bottomBar()
+    }
+
+    private var title: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "square.2.layers.3d").font(.system(size: 20))
+            Text(layer.name).font(.headline).lineLimit(1)
+        }
+    }
+
+    private var opacity: some View {
+        HStack(spacing: BarSpacing.icon) {
+            Text("Opacity")
+            Slider(value: $layer.opacity, in: 0...1) { editing in
+                if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
+            }
+            .frame(width: Theme.isPhone ? nil : 200)  // on the phone, the row's width
+            Text("\(Int((layer.opacity * 100).rounded()))%")
+                .monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()  // "100%" stays on one line
+                .frame(minWidth: 48, alignment: .trailing)
+        }
+    }
+
+    private var blend: some View {
+        Picker("Blend", selection: $layer.blend) {
+            ForEach(Blend.allCases) { Text($0.rawValue).tag($0) }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    private var buttons: some View {
+        HStack(spacing: Theme.isPhone ? 4 : BarSpacing.icon) {
+            Button {
+                adjusting = true
+            } label: {
+                icon("slider.horizontal.3")
+                    .overlay(alignment: .topTrailing) {
+                        if !layer.adjustments.isIdentity {  // this layer has adjustments
+                            Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: -6, y: 8)
+                        }
+                    }
+            }
+            .accessibilityLabel("Adjust")
+            .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
+            Button { layer.flipHorizontal() } label: { icon("arrow.left.and.right") }
+                .accessibilityLabel("Flip horizontal")
+            Button { layer.flipVertical() } label: { icon("arrow.up.and.down") }
+                .accessibilityLabel("Flip vertical")
+            Menu {
+                Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
+                Divider()
+                Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
+                    .disabled(layer.source == nil)  // added before photos were kept
+            } label: {
+                icon("ellipsis.circle")
+            }
+            .accessibilityLabel("More")
+        }
     }
 
     private func icon(_ symbol: String) -> some View {
@@ -847,46 +911,81 @@ struct GridBar: View {
     var onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: BarSpacing.group) {
-            HStack(spacing: 24) {
-                BarTitle("Grid", symbol: "square.grid.3x3")
-                Toggle("Grid", isOn: $session.grid.isOn)
-                    .labelsHidden()
-                    .fixedSize()
-            }
-            count("Rows", $session.grid.rows)
-            count("Columns", $session.grid.columns)
-            Button {
-                session.grid.squareCells(canvasAspect: session.canvasAspect)
-            } label: {
-                Image(systemName: "square.grid.3x3.square").font(.system(size: 24)).frame(width: 44, height: 44)
-            }
-            .accessibilityLabel("Square cells")
-            HStack(spacing: 3) {
-                ForEach(GridColor.allCases) { color in
-                    Button {
-                        session.grid.color = color
-                    } label: {
-                        Circle()
-                            .fill(color.color)
-                            .frame(width: 26, height: 26)
-                            .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
-                            .padding(3)
-                            .overlay(Circle().stroke(Theme.accent, lineWidth: session.grid.color == color ? 3 : 0))
-                            .frame(width: 44, height: 44)
+        Group {
+            if Theme.isPhone {  // three rows: title and Done, counts, colors and opacity
+                VStack(spacing: 8) {
+                    HStack {
+                        title
+                        Spacer(minLength: 8)
+                        DoneButton(action: onDone)
                     }
-                    .accessibilityLabel(color.rawValue.capitalized)
-                    .accessibilityAddTraits(session.grid.color == color ? .isSelected : [])
+                    HStack(spacing: 20) {
+                        count("Rows", $session.grid.rows)
+                        count("Columns", $session.grid.columns)
+                        Spacer(minLength: 0)
+                        squareCells
+                    }
+                    HStack(spacing: 12) {
+                        colors
+                        Slider(value: $session.grid.opacity, in: 0.1...1)
+                            .accessibilityLabel("Opacity")
+                    }
+                }
+            } else {
+                HStack(spacing: BarSpacing.group) {
+                    title
+                    count("Rows", $session.grid.rows)
+                    count("Columns", $session.grid.columns)
+                    squareCells
+                    colors
+                    HStack(spacing: 16) {
+                        Text("Opacity")
+                        Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
+                    }
+                    Spacer(minLength: 0)
+                    DoneButton(action: onDone)
                 }
             }
-            HStack(spacing: 16) {
-                Text("Opacity")
-                Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
-            }
-            Spacer(minLength: 0)
-            DoneButton(action: onDone)
         }
         .bottomBar()
+    }
+
+    private var title: some View {
+        HStack(spacing: 24) {
+            BarTitle("Grid", symbol: "square.grid.3x3")
+            Toggle("Grid", isOn: $session.grid.isOn)
+                .labelsHidden()
+                .fixedSize()
+        }
+    }
+
+    private var squareCells: some View {
+        Button {
+            session.grid.squareCells(canvasAspect: session.canvasAspect)
+        } label: {
+            Image(systemName: "square.grid.3x3.square").font(.system(size: 24)).frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("Square cells")
+    }
+
+    private var colors: some View {
+        HStack(spacing: 3) {
+            ForEach(GridColor.allCases) { color in
+                Button {
+                    session.grid.color = color
+                } label: {
+                    Circle()
+                        .fill(color.color)
+                        .frame(width: 26, height: 26)
+                        .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
+                        .padding(3)
+                        .overlay(Circle().stroke(Theme.accent, lineWidth: session.grid.color == color ? 3 : 0))
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel(color.rawValue.capitalized)
+                .accessibilityAddTraits(session.grid.color == color ? .isSelected : [])
+            }
+        }
     }
 
     /// "Rows  4 ⌄": a menu of 1 to 10.

@@ -139,7 +139,7 @@ struct CameraPreview: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: CameraController, context: Context) {}
 }
 
-/// Capture: full screen, shutter on the right.
+/// Capture: full screen, shutter on the right (on the phone, at the bottom).
 struct CameraScreen: View {
     var onPhoto: (UIImage) -> Void
     var onCancel: () -> Void
@@ -152,46 +152,78 @@ struct CameraScreen: View {
     var body: some View {
         ZStack {
             CameraPreview(controller: controller).ignoresSafeArea()
-            VStack {
-                HStack {
-                    Button("Cancel", action: onCancel)
-                        .buttonStyle(.borderedProminent).tint(Theme.surface)
+            if Theme.isPhone {
+                VStack(spacing: 12) {
+                    HStack {
+                        cancel
+                        Spacer()
+                        findToggle
+                    }
+                    .padding(.horizontal)
+                    if found { foundLabel }
                     Spacer()
-                    if found {
-                        Text("Rectangle found · hold steady")
-                            .padding(.horizontal, 14).padding(.vertical, 6)
-                            .background(Capsule().fill(Theme.accent)).foregroundStyle(Theme.onAccent)
+                    ZStack {
+                        Color.black.opacity(0.55).ignoresSafeArea()
+                        shutter
+                    }
+                    .frame(height: 120)
+                }
+            } else {
+                VStack {
+                    HStack {
+                        cancel
+                        Spacer()
+                        if found { foundLabel }
+                        Spacer()
+                        findToggle
                     }
                     Spacer()
-                    Toggle("Find rectangle", systemImage: "viewfinder", isOn: $findRectangle)
-                        .toggleStyle(.button)
-                        .buttonStyle(.borderedProminent)
-                        .tint(findRectangle ? Theme.accent : Theme.surface)
-                        .foregroundStyle(findRectangle ? Theme.onAccent : Color.white)
                 }
-                Spacer()
-            }
-            .padding()
-            .padding(.trailing, 110)
+                .padding()
+                .padding(.trailing, 110)
 
-            HStack {
-                Spacer()
-                ZStack {
-                    Color.black.opacity(0.55).ignoresSafeArea()
-                    Button {
-                        guard !capturing else { return }
-                        capturing = true
-                        controller.capture { image in onPhoto(image) }
-                    } label: {
-                        Circle().fill(Color.white).frame(width: 64, height: 64)
-                            .padding(6)
-                            .overlay(Circle().stroke(Color.white, lineWidth: 4))
+                HStack {
+                    Spacer()
+                    ZStack {
+                        Color.black.opacity(0.55).ignoresSafeArea()
+                        shutter
                     }
-                    .accessibilityLabel("Take photo")
+                    .frame(width: 110)
                 }
-                .frame(width: 110)
             }
         }
         .onAppear { controller.onRectangleFound = { found = $0 } }
+    }
+
+    private var cancel: some View {
+        Button("Cancel", action: onCancel)
+            .buttonStyle(.borderedProminent).tint(Theme.surface)
+    }
+
+    private var foundLabel: some View {
+        Text("Rectangle found · hold steady")
+            .padding(.horizontal, 14).padding(.vertical, 6)
+            .background(Capsule().fill(Theme.accent)).foregroundStyle(Theme.onAccent)
+    }
+
+    private var findToggle: some View {
+        Toggle("Find rectangle", systemImage: "viewfinder", isOn: $findRectangle)
+            .toggleStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .tint(findRectangle ? Theme.accent : Theme.surface)
+            .foregroundStyle(findRectangle ? Theme.onAccent : Color.white)
+    }
+
+    private var shutter: some View {
+        Button {
+            guard !capturing else { return }
+            capturing = true
+            controller.capture { image in onPhoto(image) }
+        } label: {
+            Circle().fill(Color.white).frame(width: 64, height: 64)
+                .padding(6)
+                .overlay(Circle().stroke(Color.white, lineWidth: 4))
+        }
+        .accessibilityLabel("Take photo")
     }
 }

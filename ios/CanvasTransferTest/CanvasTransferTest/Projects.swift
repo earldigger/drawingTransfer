@@ -88,7 +88,7 @@ final class ProjectStore {
         guard let url = try? URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &stale),
               url.startAccessingSecurityScopedResource()  // kept for as long as the app runs
         else {
-            storageProblem = "Couldn't reach your projects folder, so projects on this iPad are shown. Choose the folder again."
+            storageProblem = "Couldn't reach your projects folder, so projects on this \(Theme.device) are shown. Choose the folder again."
             projectLog.error("Couldn't open the chosen projects folder")
             return
         }
@@ -371,7 +371,8 @@ struct GalleryView: View {
     @State private var pickedFolder: URL? = nil  // asking whether to move the iPad's projects into it
     @State private var folderError: String? = nil
 
-    private let columns = [GridItem(.adaptive(minimum: 200, maximum: 240), spacing: 24)]
+    private let columns = Theme.isPhone ? [GridItem(.adaptive(minimum: 150), spacing: 14)]  // two across
+                                        : [GridItem(.adaptive(minimum: 200, maximum: 240), spacing: 24)]
 
     /// The sizes of your recent paintings, each once, newest first.
     private var recent: [CanvasSizeChoice] {
@@ -393,10 +394,10 @@ struct GalleryView: View {
                     sizesSection
                     projectsSection
                 }
-                .padding(.horizontal, 40)
-                .padding(.vertical, 32)
+                .padding(.horizontal, Theme.isPhone ? 16 : 40)
+                .padding(.vertical, Theme.isPhone ? 16 : 32)
             }
-            if let current = draft {
+            if let current = draft, !Theme.isPhone {  // on the phone it's a sheet
                 NewProjectPanel(draft: Binding(get: { draft ?? current }, set: { draft = $0 }),
                                 onCreate: create, onClose: { withAnimation { draft = nil } })
                     .frame(width: 380)
@@ -406,6 +407,14 @@ struct GalleryView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .themed()
+        .sheet(isPresented: Binding(get: { Theme.isPhone && draft != nil }, set: { if !$0 { draft = nil } })) {
+            if let current = draft {
+                NewProjectPanel(draft: Binding(get: { draft ?? current }, set: { draft = $0 }),
+                                onCreate: create, onClose: { draft = nil })
+                    .themed()
+                    .presentationBackground(Theme.surface)
+            }
+        }
         .alert("Rename", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}
@@ -421,7 +430,7 @@ struct GalleryView: View {
                             titleVisibility: .visible) {
             Button("Delete", role: .destructive) { if let d = deleting { store.delete(d.id) } }
         } message: {
-            Text(store.folderName == nil ? "Its layers and swatches are deleted from this iPad."
+            Text(store.folderName == nil ? "Its layers and swatches are deleted from this \(Theme.device)."
                                          : "Its layers and swatches are deleted from \(store.folderName ?? "the folder"), everywhere it syncs.")
         }
         .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { result in
@@ -436,7 +445,7 @@ struct GalleryView: View {
                             isPresented: Binding(get: { pickedFolder != nil }, set: { if !$0 { pickedFolder = nil } }),
                             titleVisibility: .visible) {
             Button("Move them") { if let url = pickedFolder { use(url, moving: true) } }
-            Button("Leave them on this iPad") { if let url = pickedFolder { use(url, moving: false) } }
+            Button("Leave them on this \(Theme.device)") { if let url = pickedFolder { use(url, moving: false) } }
         } message: {
             Text("Projects in an iCloud Drive folder sync through iCloud and show in Finder on your Mac.")
         }
@@ -473,18 +482,20 @@ struct GalleryView: View {
     /// Where projects are kept: on this iPad, or a folder you chose (iCloud Drive syncs it).
     private var storageMenu: some View {
         Menu {
-            Section(store.folderName.map { "Projects are in “\($0)”" } ?? "Projects are on this iPad") {
+            Section(store.folderName.map { "Projects are in “\($0)”" } ?? "Projects are on this \(Theme.device)") {
                 Button("Choose a folder…", systemImage: "folder") { choosingFolder = true }
                 if store.folderName != nil {
-                    Button("Keep projects on this iPad", systemImage: "ipad") { store.useThisIPad() }
+                    Button("Keep projects on this \(Theme.device)", systemImage: Theme.isPhone ? "iphone" : "ipad") {
+                        store.useThisIPad()
+                    }
                 }
                 Button("Refresh", systemImage: "arrow.clockwise") { store.refresh() }
             }
         } label: {
             HStack(spacing: 8) {
                 if store.downloading > 0 { ProgressView().controlSize(.small) }
-                Image(systemName: store.folderName == nil ? "ipad" : "folder")
-                Text(store.folderName ?? "On this iPad").lineLimit(1)
+                Image(systemName: store.folderName == nil ? (Theme.isPhone ? "iphone" : "ipad") : "folder")
+                Text(store.folderName ?? "On this \(Theme.device)").lineLimit(1)
                 Image(systemName: "chevron.down").font(.caption.weight(.semibold))
             }
             .padding(.horizontal, 14)
@@ -654,7 +665,7 @@ struct GalleryView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 180)
+                .frame(height: Theme.isPhone ? 140 : 180)
                 .padding(.bottom, 10)
                 Text(project.name).font(.headline).lineLimit(1)
                 Text("\(SizeUnit.inches.text(project.canvasSize)) · "
