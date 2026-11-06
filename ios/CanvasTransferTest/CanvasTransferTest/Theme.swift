@@ -8,6 +8,7 @@ enum Theme {
     static let background = Color(red: 0.075, green: 0.094, blue: 0.20)  // deep navy
     static let surface = Color(red: 0.118, green: 0.145, blue: 0.29)  // cards and bars
     static let raised = Color(red: 0.165, green: 0.196, blue: 0.37)  // controls and icon tiles on a card
+    static let popup = Color(red: 0.27, green: 0.31, blue: 0.54)  // pop-ups over the bars: lighter, to stand out
     static let accent = Color(red: 0.55, green: 0.81, blue: 0.93)  // sky blue
     static let onAccent = Color(red: 0.06, green: 0.08, blue: 0.18)  // text and icons on the accent
     static let lavender = Color(red: 0.73, green: 0.62, blue: 0.96)  // a color tool that's on
@@ -104,8 +105,10 @@ struct DoneButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) { Text("Done").frame(width: 42) }
-            .buttonStyle(.accent)
+        Button(action: action) {
+            Text("Done").lineLimit(1).fixedSize().frame(minWidth: 42)  // never wraps, whatever the text size
+        }
+        .buttonStyle(.accent)
     }
 }
 
@@ -135,15 +138,16 @@ extension ButtonStyle where Self == AccentButtonStyle {
 struct Callout<Content: View>: View {
     var arrowInset: CGFloat? = nil
     var trailing = false
+    var fill = Theme.surface
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: arrowInset == nil ? .center : trailing ? .trailing : .leading, spacing: 0) {
             content
                 .padding(18)
-                .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Theme.surface))
+                .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(fill))
             DownArrow()
-                .fill(Theme.surface)
+                .fill(fill)
                 .frame(width: 22, height: 11)
                 .padding(trailing ? .trailing : .leading, (arrowInset ?? 11) - 11)
         }

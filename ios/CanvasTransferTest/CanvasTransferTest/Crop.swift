@@ -163,18 +163,16 @@ struct CropBar: View {
 
     var body: some View {
         Group {
-            if Theme.isPhone {  // two rows: title and Done, shape / Reset / Cancel
+            if Theme.isPhone {  // two rows: icon, Reset, Cancel and Done; then the shape
                 VStack(spacing: 8) {
-                    HStack {
-                        BarTitle("Crop", symbol: "crop")
-                        Spacer(minLength: 8)
-                        DoneButton(action: onDone)
-                    }
                     HStack(spacing: 20) {
-                        shapes
+                        Image(systemName: "crop").font(.system(size: 20)).accessibilityLabel("Crop")
+                        Spacer(minLength: 0)
                         Button("Reset") { layer.crop = reshaped(Crop.full) }
                         Button("Cancel", action: onCancel)
+                        DoneButton(action: onDone)
                     }
+                    shapes
                 }
             } else {
                 HStack(spacing: BarSpacing.group) {

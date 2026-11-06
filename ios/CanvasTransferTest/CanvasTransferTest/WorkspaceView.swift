@@ -646,7 +646,7 @@ struct WorkspaceView: View {
     /// The pop-up above a combined button: icons with their names. Choosing
     /// one closes it.
     private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)]) -> some View {
-        Callout {
+        Callout(fill: Theme.popup) {
             HStack(spacing: 18) {
                 ForEach(choices, id: \.title) { choice in
                     Button {

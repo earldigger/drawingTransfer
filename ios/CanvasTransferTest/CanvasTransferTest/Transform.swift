@@ -294,19 +294,17 @@ struct TransformBar: View {
 
     var body: some View {
         Group {
-            if Theme.isPhone {  // three rows: title and Done, mode, flips / Fit / Cancel
+            if Theme.isPhone {  // two rows: icon, ⋯, Cancel and Done; then the mode
                 VStack(spacing: 8) {
-                    HStack {
-                        title
-                        Spacer(minLength: 8)
+                    HStack(spacing: 20) {
+                        Image(systemName: "arrow.up.and.down.and.arrow.left.and.right").font(.system(size: 20))
+                            .accessibilityLabel("Transform")
+                        Spacer(minLength: 0)
+                        more
+                        Button("Cancel", action: onCancel)
                         DoneButton(action: onDone)
                     }
                     modes
-                    HStack {
-                        flips
-                        Spacer(minLength: 8)
-                        actions
-                    }
                 }
             } else {
                 HStack(spacing: BarSpacing.group) {
@@ -344,6 +342,20 @@ struct TransformBar: View {
             }
             .accessibilityLabel("Flip vertical")
         }
+    }
+
+    /// The phone's ⋯: Flip horizontal, Flip vertical and Fit.
+    private var more: some View {
+        Menu {
+            Button("Flip horizontal", systemImage: "arrow.left.and.right") { layer.flipHorizontal() }
+            Button("Flip vertical", systemImage: "arrow.up.and.down") { layer.flipVertical() }
+            Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") {
+                layer.fit(canvasAspect: canvasSize.width / canvasSize.height)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle").font(.system(size: 22)).frame(width: 44, height: 44)
+        }
+        .accessibilityLabel("More")
     }
 
     private var actions: some View {

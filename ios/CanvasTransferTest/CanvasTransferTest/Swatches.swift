@@ -259,8 +259,7 @@ struct ColorBar: View {
                 }
                 .accessibilityLabel("Delete all swatches")
                 .disabled(session.swatches.isEmpty)
-                Button(action: onDone) { Text("Done").frame(width: Self.doneWidth - 36) }
-                    .buttonStyle(.accent)
+                DoneButton(action: onDone)
             }
             .padding(.leading, 17)
             .padding(.trailing, Self.trailingSpacing)
