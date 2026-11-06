@@ -81,6 +81,225 @@ enum Look {
 
 /// The Adjust popover: invert, levels, hue / saturation / lightness,
 /// colorize, reset. Live on the canvas; each slider drag is one undo step.
+/// The phone's Adjust: a strip that comes up out of the top of the layer
+/// bar. A row of adjustments, each an icon with its name, scrolls sideways;
+/// the chosen one shows its value, and the thin slider along the top sets it.
+/// Invert and Colorize are switches: tapping them turns them on or off.
+struct AdjustStrip: View {
+    @Bindable var layer: Layer
+    @Environment(History.self) private var history
+    @State private var selected = Item.black
+
+    enum Item: String, CaseIterable, Identifiable {
+        case invert, black, mid, white, hue, saturation, lightness, colorize
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .invert: "invert"
+            case .black: "black"
+            case .mid: "mid"
+            case .white: "white"
+            case .hue: "hue"
+            case .saturation: "saturation"
+            case .lightness: "lightness"
+            case .colorize: "colorize"
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .invert: "circle.righthalf.filled"
+            case .black: "circle.fill"
+            case .mid: "circle.bottomhalf.filled"
+            case .white: "circle"
+            case .hue: "paintpalette"
+            case .saturation: "drop.halffull"
+            case .lightness: "sun.max"
+            case .colorize: "paintbrush"
+            }
+        }
+
+        var isSwitch: Bool { self == .invert || self == .colorize }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let value = value(selected) {
+                ThinSlider(value: value, range: range(selected)) { editing in
+                    if editing { history.hold("look") } else { history.release("look") }  // one drag, one step
+                }
+                .accessibilityLabel(selected.title)
+                .accessibilityValue(text(selected) ?? "")
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Item.allCases) { tile($0) }
+                    Button { layer.adjustments = Adjustments() } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "arrow.counterclockwise").font(.system(size: 20)).frame(width: 44, height: 44)
+                            Text("reset").font(.caption2.weight(.semibold))
+                        }
+                        .frame(minWidth: 52)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(layer.adjustments.isIdentity)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+        }
+        .background(UnevenRoundedRectangle(topLeadingRadius: 18, topTrailingRadius: 18, style: .continuous).fill(Theme.popup))
+        .onChange(of: layer.adjustments.black) { keepLevelsInOrder(movedBlack: true) }
+        .onChange(of: layer.adjustments.white) { keepLevelsInOrder(movedBlack: false) }
+    }
+
+    /// An adjustment: its icon (filled sky blue with the value when chosen,
+    /// or when a switch is on) and its name.
+    private func tile(_ item: Item) -> some View {
+        let on = item.isSwitch ? isOn(item) : item == selected
+        return Button {
+            if item == .invert { layer.adjustments.invert.toggle() }
+            else if item == .colorize { layer.adjustments.colorize.toggle() }
+            else { selected = item }
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                        .fill(on ? Theme.accent : Color.white.opacity(0.08))
+                    if item == selected, let text = text(item) {
+                        Text(text).font(.caption.weight(.bold)).monospacedDigit()
+                            .minimumScaleFactor(0.6).lineLimit(1).padding(.horizontal, 3)
+                            .foregroundStyle(Theme.onAccent)
+                    } else {
+                        Image(systemName: item.symbol).font(.system(size: 20))
+                            .foregroundStyle(on ? Theme.onAccent : Color.white)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .overlay(alignment: .topTrailing) {  // changed from the start
+                    if changed(item) && !on { Circle().fill(Theme.accent).frame(width: 7, height: 7).offset(x: 2, y: -2) }
+                }
+                Text(item.title).font(.caption2.weight(.semibold)).lineLimit(1)
+            }
+            .frame(minWidth: 52)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    private func isOn(_ item: Item) -> Bool {
+        item == .invert ? layer.adjustments.invert : item == .colorize ? layer.adjustments.colorize : false
+    }
+
+    private func changed(_ item: Item) -> Bool {
+        let a = layer.adjustments, none = Adjustments()
+        switch item {
+        case .invert: return a.invert
+        case .black: return a.black != none.black
+        case .mid: return a.gamma != none.gamma
+        case .white: return a.white != none.white
+        case .hue: return a.colorize ? a.colorizeHue != none.colorizeHue : a.hue != none.hue
+        case .saturation: return a.colorize ? a.colorizeSaturation != none.colorizeSaturation : a.saturation != none.saturation
+        case .lightness: return a.lightness != none.lightness
+        case .colorize: return a.colorize
+        }
+    }
+
+    /// What the slider sets. With Colorize on, Hue and Saturation set the tint.
+    private func value(_ item: Item) -> Binding<Double>? {
+        let colorize = layer.adjustments.colorize
+        switch item {
+        case .black: return $layer.adjustments.black
+        case .mid: return $layer.adjustments.gamma
+        case .white: return $layer.adjustments.white
+        case .hue: return colorize ? $layer.adjustments.colorizeHue : $layer.adjustments.hue
+        case .saturation: return colorize ? $layer.adjustments.colorizeSaturation : $layer.adjustments.saturation
+        case .lightness: return $layer.adjustments.lightness
+        case .invert, .colorize: return nil
+        }
+    }
+
+    private func range(_ item: Item) -> ClosedRange<Double> {
+        let colorize = layer.adjustments.colorize
+        switch item {
+        case .black: return 0...254
+        case .mid: return 0.2...5
+        case .white: return 1...255
+        case .hue: return colorize ? 0...360 : -180...180
+        case .saturation: return colorize ? 0...100 : -100...100
+        case .lightness: return -100...100
+        case .invert, .colorize: return 0...1
+        }
+    }
+
+    private func text(_ item: Item) -> String? {
+        guard let v = value(item)?.wrappedValue else { return nil }
+        let colorize = layer.adjustments.colorize
+        switch item {
+        case .mid: return String(format: "%.2f", v)
+        case .hue: return String(format: colorize ? "%.0f°" : "%+.0f°", v)
+        case .saturation where !colorize, .lightness: return String(format: "%+.0f", v)
+        default: return String(format: "%.0f", v)
+        }
+    }
+
+    /// The black point stays below the white point.
+    private func keepLevelsInOrder(movedBlack: Bool) {
+        let a = layer.adjustments
+        guard a.black >= a.white else { return }
+        if movedBlack { layer.adjustments.black = a.white - 1 } else { layer.adjustments.white = a.black + 1 }
+    }
+}
+
+/// A thin bar slider without a knob: drag along it (or tap) to set the value.
+struct ThinSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var onEditing: (Bool) -> Void = { _ in }
+
+    @State private var dragging = false
+
+    var body: some View {
+        GeometryReader { g in
+            let span = range.upperBound - range.lowerBound
+            let fraction = min(max((value - range.lowerBound) / span, 0), 1)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.22))
+                Capsule().fill(Theme.accent).frame(width: max(g.size.width * fraction, 10))
+            }
+            .frame(height: 12)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        if !dragging { dragging = true; onEditing(true) }
+                        let f = min(max(drag.location.x / max(g.size.width, 1), 0), 1)
+                        value = range.lowerBound + f * span
+                    }
+                    .onEnded { _ in
+                        dragging = false
+                        onEditing(false)
+                    }
+            )
+        }
+        .frame(height: 30)
+        .accessibilityElement()
+        .accessibilityAdjustableAction { direction in
+            let step = (range.upperBound - range.lowerBound) / 50
+            switch direction {
+            case .increment: value = min(value + step, range.upperBound)
+            case .decrement: value = max(value - step, range.lowerBound)
+            @unknown default: break
+            }
+        }
+    }
+}
+
 struct LookPanel: View {
     @Bindable var layer: Layer
     @Environment(History.self) private var history

@@ -682,9 +682,14 @@ struct WorkspaceView: View {
                     .frame(width: 48, height: 28)
             }
             .accessibilityLabel(layerBarExpanded ? "Collapse layers" : "Expand layers")
-            ForEach(session.layers.reversed()) { layer in  // top layer first
-                layerRow(layer)
+            // Top layer first. More than 8 scroll, behind a fixed Flatten.
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .trailing, spacing: 6) {
+                    ForEach(session.layers.reversed()) { layer in layerRow(layer) }
+                }
             }
+            .frame(height: CGFloat(min(session.layers.count, 8)) * 54 - (session.layers.isEmpty ? 0 : 6))
+            .scrollDisabled(session.layers.count <= 8)
             if session.layers.isEmpty {
                 Text("No layers").font(.caption).foregroundStyle(.secondary).frame(width: 60)
             } else {
@@ -844,8 +849,13 @@ struct LookBar: View {
     @State private var adjusting = false
 
     var body: some View {
-        Group {
-            if Theme.isPhone {  // three rows: name and buttons, opacity, blend
+        if Theme.isPhone {  // three rows: name and buttons, opacity, blend; Adjust's strip above
+            VStack(spacing: 0) {
+                if adjusting {
+                    AdjustStrip(layer: layer)
+                        .padding(.horizontal, 10)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 VStack(spacing: 10) {
                     HStack(spacing: 0) {
                         title
@@ -855,17 +865,17 @@ struct LookBar: View {
                     opacity
                     blend
                 }
-            } else {
-                HStack(spacing: BarSpacing.group) {
-                    title.frame(maxWidth: 180, alignment: .leading)
-                    opacity
-                    blend.frame(width: 250)
-                    buttons
-                    Spacer(minLength: 0)
-                }
+                .bottomBar()
+            }        } else {
+            HStack(spacing: BarSpacing.group) {
+                title.frame(maxWidth: 180, alignment: .leading)
+                opacity
+                blend.frame(width: 250)
+                buttons
+                Spacer(minLength: 0)
             }
+            .bottomBar()
         }
-        .bottomBar()
     }
 
     private var title: some View {
@@ -900,9 +910,11 @@ struct LookBar: View {
     private var buttons: some View {
         HStack(spacing: Theme.isPhone ? 4 : BarSpacing.icon) {
             Button {
-                adjusting = true
+                if Theme.isPhone { withAnimation(.snappy) { adjusting.toggle() } } else { adjusting = true }
             } label: {
                 icon("slider.horizontal.3")
+                    .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                        .fill(Theme.isPhone && adjusting ? Theme.popup : Color.clear))  // joined to its strip
                     .overlay(alignment: .topTrailing) {
                         if !layer.adjustments.isIdentity {  // this layer has adjustments
                             Circle().fill(Theme.accent).frame(width: 8, height: 8).offset(x: -6, y: 8)
@@ -910,7 +922,10 @@ struct LookBar: View {
                     }
             }
             .accessibilityLabel("Adjust")
-            .popover(isPresented: $adjusting) { LookPanel(layer: layer) }
+            // The iPad's Adjust is a pop-up panel; the phone's is the strip above the bar.
+            .popover(isPresented: Binding(get: { adjusting && !Theme.isPhone }, set: { adjusting = $0 })) {
+                LookPanel(layer: layer)
+            }
             Button { layer.flipHorizontal() } label: { icon("arrow.left.and.right") }
                 .accessibilityLabel("Flip horizontal")
             Button { layer.flipVertical() } label: { icon("arrow.up.and.down") }

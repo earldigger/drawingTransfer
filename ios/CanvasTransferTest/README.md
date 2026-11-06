@@ -52,7 +52,10 @@ automatically.
   pop-up with Camera and Photos), Transform / Crop (a pop-up; the button
   shows the one that's on), Grid, Compare and **Layers** (the layer
   panel at the side, thumbnails with ‹ to expand, and the layer bar at the
-  bottom, on and off together), and each bar stacks into rows. Camera puts the shutter
+  bottom, on and off together), and each bar stacks into rows. On the phone, Adjust opens a strip above the layer bar: invert,
+  black, mid, white, hue, saturation, lightness, colorize and reset, with a
+  thin slider along its top for the chosen one. The layer panel scrolls past
+  8 layers, Flatten staying put. Camera puts the shutter
   at the bottom; Adjust corners has its panel under the photo. Not on the
   phone yet: Swatches / Simplify / Highlight, the swatch panel, the Paint
   library and the swatch sheet PDF.
