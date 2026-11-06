@@ -130,21 +130,22 @@ extension ButtonStyle where Self == AccentButtonStyle {
 
 /// A pop-up above a bar: a navy rounded box with a small arrow pointing
 /// down at the button it belongs to. `arrowInset` is from the box's leading
-/// edge (or trailing, if `trailing`) to the middle of the arrow.
+/// edge (or trailing, if `trailing`) to the middle of the arrow; nil puts the
+/// arrow in the middle.
 struct Callout<Content: View>: View {
-    var arrowInset: CGFloat
+    var arrowInset: CGFloat? = nil
     var trailing = false
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: trailing ? .trailing : .leading, spacing: 0) {
+        VStack(alignment: arrowInset == nil ? .center : trailing ? .trailing : .leading, spacing: 0) {
             content
                 .padding(18)
                 .background(RoundedRectangle(cornerRadius: 26, style: .continuous).fill(Theme.surface))
             DownArrow()
                 .fill(Theme.surface)
                 .frame(width: 22, height: 11)
-                .padding(trailing ? .trailing : .leading, arrowInset - 11)
+                .padding(trailing ? .trailing : .leading, (arrowInset ?? 11) - 11)
         }
         .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
     }

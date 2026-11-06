@@ -52,6 +52,7 @@ struct WorkspaceView: View {
     @State private var colorPanelOpen = true  // Details | Paints & mixes for the selected swatch
     @State private var paintLibraryOpen = false
     @State private var layersSheet = false  // the phone's layer list
+    @State private var toolPopup: ToolPopup? = nil  // the phone's + or Transform / Crop choices
     @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
     var body: some View {
@@ -202,6 +203,7 @@ struct WorkspaceView: View {
         transformOn = false
         gridBarShown = false
         compare = nil
+        toolPopup = nil
         colorBarShown = false
         swatchesOn = false
         colorView = .normal
@@ -549,21 +551,18 @@ struct WorkspaceView: View {
     /// bottom, with Layers). Each one that has a bar at the bottom turns the
     /// others off; tapping it again turns it off.
     private var tools: some View {
-        HStack(spacing: Theme.isPhone ? 8 : 16) {
-            toolButton("camera", "Camera") { capture = Capture(picked: nil) }
-            toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
-            toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn) {
-                let on = transformOn
-                endTools()
-                transformOn = !on
+        HStack(spacing: Theme.isPhone ? 20 : 16) {
+            if Theme.isPhone {  // two buttons, each opening a pop-up with two choices
+                addButton
+                shapeButton
+            } else {
+                toolButton("camera", "Camera") { capture = Capture(picked: nil) }
+                toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
+                toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn, action: toggleTransform)
+                    .disabled(session.selected == nil)
+                toolButton("crop", "Crop", on: cropping != nil, action: toggleCrop)
+                    .disabled(session.selected == nil)
             }
-            .disabled(session.selected == nil)
-            toolButton("crop", "Crop", on: cropping != nil) {
-                let on = cropping != nil
-                endTools()
-                if !on, let layer = session.selected { startCrop(layer) }
-            }
-            .disabled(session.selected == nil)
             toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
                 let on = gridBarShown
                 endTools()
@@ -579,7 +578,10 @@ struct WorkspaceView: View {
             }
             .disabled(session.layers.isEmpty)
             if Theme.isPhone {
-                toolButton("square.2.layers.3d", "Layers", on: layersSheet) { layersSheet = true }
+                toolButton("square.2.layers.3d", "Layers", on: layersSheet) {
+                    toolPopup = nil
+                    layersSheet = true
+                }
             } else {
                 toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
                     let on = colorBarShown
@@ -589,6 +591,81 @@ struct WorkspaceView: View {
                 .disabled(session.layers.isEmpty)
             }
         }
+    }
+
+    private func toggleTransform() {
+        let on = transformOn
+        endTools()
+        transformOn = !on
+    }
+
+    private func toggleCrop() {
+        let on = cropping != nil
+        endTools()
+        if !on, let layer = session.selected { startCrop(layer) }
+    }
+
+    // MARK: the phone's combined buttons
+
+    /// Which of the phone's combined buttons has its pop-up open.
+    enum ToolPopup { case add, shape }
+
+    /// + : Camera or Photos.
+    private var addButton: some View {
+        toolButton("plus", "Add an image", on: toolPopup == .add) {
+            withAnimation(.snappy) { toolPopup = toolPopup == .add ? nil : .add }
+        }
+        .overlay(alignment: .bottom) {
+            if toolPopup == .add {
+                popupChoices([
+                    ("camera", "Camera", false, true, { capture = Capture(picked: nil) }),
+                    ("photo.on.rectangle", "Photos", false, true, { showPhotos = true }),
+                ])
+            }
+        }
+    }
+
+    /// Transform or Crop. Shows the one that's on; choosing it again turns it off.
+    private var shapeButton: some View {
+        let transformSymbol = "arrow.up.and.down.and.arrow.left.and.right"
+        return toolButton(cropping != nil ? "crop" : transformSymbol, "Transform or crop",
+                          on: transformOn || cropping != nil || toolPopup == .shape) {
+            withAnimation(.snappy) { toolPopup = toolPopup == .shape ? nil : .shape }
+        }
+        .disabled(session.selected == nil)
+        .overlay(alignment: .bottom) {
+            if toolPopup == .shape {
+                popupChoices([
+                    (transformSymbol, "Transform", transformOn, session.selected != nil, toggleTransform),
+                    ("crop", "Crop", cropping != nil, session.selected != nil, toggleCrop),
+                ])
+            }
+        }
+    }
+
+    /// The pop-up above a combined button: icons with their names. Choosing
+    /// one closes it.
+    private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)]) -> some View {
+        Callout {
+            HStack(spacing: 18) {
+                ForEach(choices, id: \.title) { choice in
+                    Button {
+                        toolPopup = nil
+                        choice.action()
+                    } label: {
+                        VStack(spacing: 4) {
+                            toolIcon(choice.symbol, on: choice.on)
+                            Text(choice.title).font(.caption)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!choice.enabled)
+                }
+            }
+        }
+        .fixedSize()  // its own size, not the button's
+        .offset(y: -(44 + 6))  // just above the button
+        .transition(.opacity)
     }
 
     private func toolButton(_ symbol: String, _ label: String, on: Bool = false, action: @escaping () -> Void) -> some View {
