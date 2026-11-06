@@ -50,7 +50,9 @@ automatically.
 - **iPhone** (the same app, upright only): the Gallery in one column, New
   project in a sheet; in a project the tools are in a row at the bottom: **+** (a
   pop-up with Camera and Photos), Transform / Crop (a pop-up; the button
-  shows the one that's on), Grid, Compare and **Layers** (a sheet), and each bar stacks into rows. Camera puts the shutter
+  shows the one that's on), Grid, Compare and **Layers** (the layer
+  panel at the side, thumbnails with ‹ to expand, and the layer bar at the
+  bottom, on and off together), and each bar stacks into rows. Camera puts the shutter
   at the bottom; Adjust corners has its panel under the photo. Not on the
   phone yet: Swatches / Simplify / Highlight, the swatch panel, the Paint
   library and the swatch sheet PDF.

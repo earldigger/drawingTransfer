@@ -51,7 +51,7 @@ struct WorkspaceView: View {
     @State private var studyWorking = false
     @State private var colorPanelOpen = true  // Details | Paints & mixes for the selected swatch
     @State private var paintLibraryOpen = false
-    @State private var layersSheet = false  // the phone's layer list
+    @State private var layersShown = false  // the phone's Layers: the layer panel at the side and the layer bar at the bottom
     @State private var toolPopup: ToolPopup? = nil  // the phone's + or Transform / Crop choices
     @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
@@ -120,20 +120,6 @@ struct WorkspaceView: View {
         }
         .fullScreenCover(isPresented: $paintLibraryOpen) {
             PaintLibraryView { paintLibraryOpen = false }
-        }
-        .sheet(isPresented: $layersSheet) {
-            // The phone's layers: the iPad's layer bar, expanded, in a sheet.
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Layers").font(.title3.weight(.semibold))
-                    layerBar.frame(maxWidth: .infinity, alignment: .trailing)
-                }
-                .padding(20)
-            }
-            .presentationDetents([.medium, .large])
-            .presentationBackground(Theme.surface)
-            .themed()
-            .onAppear { layerBarExpanded = true }
         }
         .photosPicker(isPresented: $showPhotos, selection: $photoItem, matching: .images)
         .onChange(of: photoItem) { _, item in
@@ -204,6 +190,7 @@ struct WorkspaceView: View {
         gridBarShown = false
         compare = nil
         toolPopup = nil
+        layersShown = false
         colorBarShown = false
         swatchesOn = false
         colorView = .normal
@@ -416,7 +403,7 @@ struct WorkspaceView: View {
                     }
                     .padding(.vertical, 16)  // from under the top bar to just above the bottom bar
                 }
-                if !Theme.isPhone { layerBar.padding(12) }  // on the phone, Layers opens a sheet
+                if !Theme.isPhone || layersShown { layerBar.padding(Theme.isPhone ? 8 : 12) }  // the phone's only with Layers
             }
             .frame(maxHeight: .infinity, alignment: .top)  // the swatch panel can run down to the bottom bar
             if colorToolOn, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
@@ -443,7 +430,7 @@ struct WorkspaceView: View {
                     ColorBar(session: session, selectedID: $selectedSwatchID, picking: $swatchesOn, view: $colorView,
                              sample: $sampleSize, simplify: $simplifySettings, highlight: $highlightSettings,
                              markersShown: $studyMarkersShown, working: studyWorking) { endTools() }
-                } else if let layer = session.selected {
+                } else if let layer = session.selected, !Theme.isPhone || layersShown {  // the phone's only with Layers
                     LookBar(layer: layer, canvasAspect: session.canvasAspect, onEditCorners: { editCorners(layer) })
                 }
             }
@@ -578,9 +565,10 @@ struct WorkspaceView: View {
             }
             .disabled(session.layers.isEmpty)
             if Theme.isPhone {
-                toolButton("square.2.layers.3d", "Layers", on: layersSheet) {
-                    toolPopup = nil
-                    layersSheet = true
+                toolButton("square.2.layers.3d", "Layers", on: layersShown) {
+                    let on = layersShown
+                    endTools()
+                    withAnimation(.snappy) { layersShown = !on }
                 }
             } else {
                 toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
@@ -686,16 +674,14 @@ struct WorkspaceView: View {
     /// duplicating, hiding and deleting.
     private var layerBar: some View {
         VStack(alignment: .trailing, spacing: 6) {
-            if !Theme.isPhone {  // the phone's sheet is always expanded
-                Button {
-                    withAnimation(.snappy) { layerBarExpanded.toggle() }
-                } label: {
-                    Image(systemName: layerBarExpanded ? "chevron.right" : "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 48, height: 28)
-                }
-                .accessibilityLabel(layerBarExpanded ? "Collapse layers" : "Expand layers")
+            Button {
+                withAnimation(.snappy) { layerBarExpanded.toggle() }
+            } label: {
+                Image(systemName: layerBarExpanded ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 48, height: 28)
             }
+            .accessibilityLabel(layerBarExpanded ? "Collapse layers" : "Expand layers")
             ForEach(session.layers.reversed()) { layer in  // top layer first
                 layerRow(layer)
             }

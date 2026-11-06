@@ -81,7 +81,7 @@ enum BarSpacing {
     static let icon: CGFloat = 16
 }
 
-/// A bottom bar's title: its tool's icon and name.
+/// A bottom bar's title: its tool's icon and name (on the phone, the icon only).
 struct BarTitle: View {
     let title: String
     let symbol: String
@@ -94,9 +94,11 @@ struct BarTitle: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).font(.system(size: 20))
-            Text(title).font(.headline)
+            if !Theme.isPhone { Text(title).font(.headline) }
         }
         .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
     }
 }
 
