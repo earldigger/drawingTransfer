@@ -79,6 +79,8 @@ libdbus-1-3 are needed). Keep them passing.
 
 ## iPad app — done
 
+- **Pencil** (Nov 2026, `Pencil.swift`): PencilKit strokes on a sheet over the canvas, drawn into a "Drawing n" image layer when the Pencil is put away (no new file format). iPad only for now.
+
 - **iPhone** (Nov 2026): the same app (iPad + iPhone, portrait only on the phone), switched by `Theme.isPhone`: tools in a bottom row (+ and Transform / Crop are pop-ups), Layers toggles the side layer panel and the layer bar together, bars stacked into rows. First scope only; the color tools and Paint library aren't on the phone yet.
 
 - **Flatten** (`Flatten.swift`): visible layers as shown into an ordinary "Flattened n", sources hidden. Update was removed (Nov 2026).

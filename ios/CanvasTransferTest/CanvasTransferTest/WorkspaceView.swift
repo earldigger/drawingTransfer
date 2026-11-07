@@ -1,3 +1,4 @@
+import PencilKit
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -53,6 +54,12 @@ struct WorkspaceView: View {
     @State private var paintLibraryOpen = false
     @State private var layersShown = false  // the phone's Layers: the layer panel at the side and the layer bar at the bottom
     @State private var toolPopup: ToolPopup? = nil  // the phone's + or Transform / Crop choices
+    @State private var pencilOn = false  // the Pencil: strokes go on a sheet, then into a drawing layer
+    @State private var pencil = PencilController()
+    @AppStorage("pencilSize") private var pencilSize = 4.0  // points
+    @AppStorage("pencilOpacity") private var pencilOpacity = 1.0
+    @AppStorage("pencilColor") private var pencilColor = "#202020"
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
     var body: some View {
@@ -173,6 +180,9 @@ struct WorkspaceView: View {
             study = result.map { StudyResult(layerID: layer.id, view: view, image: $0.0, simplified: $0.1,
                                              pixels: PixelBuffer($0.0)) }
         }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active && pencilOn { commitPencil() }  // strokes are saved with the session
+        }
         .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
         .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
     }
@@ -191,10 +201,25 @@ struct WorkspaceView: View {
         compare = nil
         toolPopup = nil
         layersShown = false
+        if pencilOn { commitPencil() }
+        pencilOn = false
         colorBarShown = false
         swatchesOn = false
         colorView = .normal
         probe = nil
+    }
+
+    // MARK: pencil
+
+    /// The strokes drawn so far into the drawing layer (see `Pencil.commit`).
+    private func commitPencil() {
+        guard let drawing = pencil.take() else { return }
+        Pencil.commit(drawing, sheet: pencil.canvasSize, to: session)
+    }
+
+    /// The Pencil's ink: its size, color and opacity.
+    private var pencilTool: PKInkingTool {
+        PKInkingTool(.pencil, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity), width: pencilSize)
     }
 
     // MARK: crop
@@ -238,9 +263,17 @@ struct WorkspaceView: View {
         transformOn = false
     }
 
-    /// Off while cropping, which has its own Cancel.
-    private var canUndo: Bool { cropping == nil && history.canUndo }
-    private var canRedo: Bool { cropping == nil && history.canRedo }
+    /// Off while cropping, which has its own Cancel. While drawing, strokes are undone first.
+    private var canUndo: Bool { cropping == nil && (history.canUndo || (pencilOn && pencil.canUndo)) }
+    private var canRedo: Bool { cropping == nil && (history.canRedo || (pencilOn && pencil.canRedo)) }
+
+    private func undo() {
+        if pencilOn && pencil.canUndo { pencil.undo() } else { history.undo() }
+    }
+
+    private func redo() {
+        if pencilOn && pencil.canRedo { pencil.redo() } else { history.redo() }
+    }
 
     // MARK: canvas
 
@@ -266,6 +299,12 @@ struct WorkspaceView: View {
             }
         }
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
+        .overlay {
+            // The Pencil's sheet, after the shadow so strokes don't cast one.
+            if pencilOn {
+                PencilCanvas(controller: pencil, tool: pencilTool, colorHex: pencilColor, size: size)
+            }
+        }
     }
 
     // MARK: pick
@@ -371,8 +410,8 @@ struct WorkspaceView: View {
             },
             rotate: { r in transformTarget?.rotate(by: r, in: canvas) },
             doubleTap: { withAnimation { viewScale = 1; viewOffset = .zero } },
-            undo: { if canUndo { history.undo() } },
-            redo: { if canRedo { history.redo() } },
+            undo: { if canUndo { undo() } },
+            redo: { if canRedo { redo() } },
             began: { history.hold("gesture") },
             ended: {
                 history.release("gesture")
@@ -426,6 +465,9 @@ struct WorkspaceView: View {
                 } else if transformOn, let layer = session.selected {
                     TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
                                  onCancel: cancelTransform, onDone: { transformOn = false })
+                } else if pencilOn {
+                    PencilBar(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor,
+                              recents: pencil.recents) { endTools() }
                 } else if colorBarShown {
                     ColorBar(session: session, selectedID: $selectedSwatchID, picking: $swatchesOn, view: $colorView,
                              sample: $sampleSize, simplify: $simplifySettings, highlight: $highlightSettings,
@@ -485,12 +527,12 @@ struct WorkspaceView: View {
                 .foregroundStyle(.white)
                 .accessibilityLabel("Gallery")
                 Spacer()
-                Button { history.undo() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 28, height: 44) }
+                Button { undo() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 28, height: 44) }
                     .accessibilityLabel("Undo")
                     .keyboardShortcut("z", modifiers: .command)
                     .disabled(!canUndo)
                     .padding(.trailing, 16)
-                Button { history.redo() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 28, height: 44) }
+                Button { redo() } label: { Image(systemName: "arrow.uturn.forward").frame(width: 28, height: 44) }
                     .accessibilityLabel("Redo")
                     .keyboardShortcut("z", modifiers: [.command, .shift])
                     .disabled(!canRedo)
@@ -571,6 +613,11 @@ struct WorkspaceView: View {
                     withAnimation(.snappy) { layersShown = !on }
                 }
             } else {
+                toolButton("pencil", "Pencil", on: pencilOn) {
+                    let on = pencilOn
+                    endTools()
+                    pencilOn = !on
+                }
                 toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
                     let on = colorBarShown
                     endTools()
