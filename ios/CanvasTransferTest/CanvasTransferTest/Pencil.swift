@@ -134,6 +134,24 @@ enum Pencil {
         }
     }
 
+    /// A new, empty (transparent) drawing layer on top, filling the canvas at
+    /// Normal 100 %, selected; the Pencil draws into it. One undo step.
+    @MainActor
+    static func addBlankLayer(to session: TransferSession) {
+        let aspect = session.canvasAspect
+        let pixels = aspect >= 1 ? CGSize(width: longEdge, height: (longEdge / aspect).rounded())
+                                 : CGSize(width: (longEdge * aspect).rounded(), height: longEdge)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let image = UIGraphicsImageRenderer(size: pixels, format: format).image { _ in }  // nothing drawn: clear
+        let layer = Layer(name: "Drawing \(nextNumber(session))", image: image, canvasAspect: aspect)
+        layer.opacity = 1
+        layer.blend = .normal
+        layer.quad = Flatten.fullCanvas
+        session.add(layer)
+    }
+
     /// One more than the highest "Drawing n" there is.
     static func nextNumber(_ session: TransferSession) -> Int {
         let numbers = session.layers.compactMap { layer -> Int? in

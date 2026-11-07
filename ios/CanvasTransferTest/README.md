@@ -104,6 +104,8 @@ automatically.
   strokes one at a time. When you leave the Pencil the strokes go into the
   selected drawing layer, or a new "Drawing n" on top at Normal 100 %: an
   ordinary layer, saved like the others.
+- **New layer** (+, below Flatten in the layer bar): an empty, transparent
+  "Drawing n" on top, filling the canvas; the Pencil draws into it.
 - **Flatten** (bottom of the layer bar): the visible layers exactly as shown
   (opacity, blend, Look, crop, transform) become one new, ordinary layer,
   "Flattened 1", on top at Normal 100 %, filling the canvas; the layers in it

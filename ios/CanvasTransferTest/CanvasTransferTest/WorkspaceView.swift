@@ -744,6 +744,7 @@ struct WorkspaceView: View {
                 layerBarButton("Flatten", systemImage: "square.3.layers.3d.down.right") { flatten() }
                     .disabled(!session.layers.contains(where: \.isVisible))
             }
+            layerBarButton("New layer", systemImage: "plus") { addBlankLayer() }
         }
         .padding(6)
         .themedBar()
@@ -769,6 +770,13 @@ struct WorkspaceView: View {
         transformOn = false
         compare = nil
         session.flattenVisible()
+    }
+
+    /// A new transparent layer on top (see `Pencil.addBlankLayer`). Strokes
+    /// already drawn go into the layer they were meant for first.
+    private func addBlankLayer() {
+        if pencilOn { commitPencil() }
+        Pencil.addBlankLayer(to: session)
     }
 
     /// Where a layer's thumbnail is, down from the top of the layer bar, so
