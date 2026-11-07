@@ -56,7 +56,7 @@ struct WorkspaceView: View {
     @State private var toolPopup: ToolPopup? = nil  // the phone's + or Transform / Crop choices
     @State private var pencilOn = false  // the Pencil: strokes go on a sheet, then into a drawing layer
     @State private var pencil = PencilController()
-    @AppStorage("pencilSizePixels") private var pencilSize = 10.0  // in the drawing layer's pixels, 1...100
+    @AppStorage("pencilSizePixels") private var pencilSize = 10.0  // in the drawing layer's pixels (Pencil.sizes)
     @AppStorage("pencilOpacity") private var pencilOpacity = 1.0
     @AppStorage("pencilColor") private var pencilColor = "#202020"
     @Environment(\.scenePhase) private var scenePhase
@@ -215,18 +215,15 @@ struct WorkspaceView: View {
     /// The strokes drawn so far into the drawing layer (see `Pencil.commit`):
     /// the selected one, or `layerID`'s when the selection has just changed.
     private func commitPencil(into layerID: UUID? = nil) {
-        guard let drawing = pencil.take() else { return }
-        Pencil.commit(drawing, sheet: pencil.canvasSize, to: session, layerID: layerID ?? session.selectedID)
+        guard let strokes = pencil.take() else { return }
+        Pencil.commit(strokes.drawing, sheet: strokes.sheet, to: session, layerID: layerID ?? session.selectedID)
     }
 
     /// The Pencil's ink: its color and opacity, and its size in the drawing
-    /// layer's pixels turned into the sheet's points (within the ink's limits).
-    private var pencilTool: PKInkingTool {
-        let sheet = pencil.canvasSize
-        let pointsPerPixel = sheet.width > 0 ? max(sheet.width, sheet.height) / Pencil.longEdge : 0.45
-        let limits = PKInkingTool.InkType.pencil.validWidthRange
-        let width = min(max(pencilSize * pointsPerPixel, limits.lowerBound), limits.upperBound)
-        return PKInkingTool(.pencil, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity), width: width)
+    /// layer's pixels turned into the sheet's points.
+    private func pencilTool(display: CGSize) -> PKInkingTool {
+        Pencil.tool(pixels: pencilSize, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity),
+                    display: display, scale: Pencil.scale(pixels: pencilSize, display: display))
     }
 
     // MARK: crop
@@ -309,7 +306,9 @@ struct WorkspaceView: View {
         .overlay {
             // The Pencil's sheet, after the shadow so strokes don't cast one.
             if pencilOn {
-                PencilCanvas(controller: pencil, tool: pencilTool, colorHex: pencilColor, size: size)
+                let scale = Pencil.scale(pixels: pencilSize, display: size)
+                PencilCanvas(controller: pencil, tool: pencilTool(display: size), size: size, scale: scale)
+                    .onChange(of: scale) { commitPencil() }  // strokes on the old sheet go in first
             }
         }
     }
@@ -441,7 +440,7 @@ struct WorkspaceView: View {
             topBar
             HStack(alignment: .top, spacing: 0) {
                 if pencilOn {  // the Pencil's size, opacity and color, at the left
-                    PencilPanel(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor, recents: pencil.recents)
+                    PencilPanel(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor, pencil: pencil)
                         .padding(12)
                         .frame(maxHeight: .infinity)
                 }

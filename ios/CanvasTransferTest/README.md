@@ -100,8 +100,9 @@ automatically.
   at that layer.
 - **Pencil** (iPad top bar): draw with Apple Pencil or a finger (while it's
   on, pinch and pan don't move the canvas: zoom first). A panel at the left
-  has Size (1–100 px of the drawing layer), Opacity and Color (a pop-up with
-  the color picker and the 8 colors drawn with last). No Done: it draws until
+  has Size (1–300 px of the drawing layer; past the ink's widest, the sheet
+  is drawn smaller and magnified), Opacity and Color (one pop-up: a hue ring
+  and shade disc, and a History of the last 10 colors chosen, with Clear). No Done: it draws until
   turned off. Undo takes back strokes one at a time. The strokes go into the
   selected drawing layer (or a new "Drawing n" on top) when you choose
   another layer, add one, or put the Pencil away. Thumbnails have a

@@ -12,21 +12,25 @@ import UIKit
 @Observable
 final class PencilController: NSObject, PKCanvasViewDelegate {
     @ObservationIgnored weak var canvasView: PKCanvasView?
-    @ObservationIgnored var canvasSize: CGSize = .zero  // the sheet's size in points, for drawing it into the layer
-    @ObservationIgnored var colorHex = "#202020"  // the color being drawn with, for the recent colors
+    @ObservationIgnored var displaySize: CGSize = .zero  // the canvas on screen, in points
+    @ObservationIgnored var scale: CGFloat = 1  // the sheet is drawn this many times larger (see PencilSheet)
+    @ObservationIgnored private var strokeSheet: CGSize = .zero  // the sheet's size when these strokes began
 
     private(set) var hasStrokes = false
     private(set) var canUndo = false
     private(set) var canRedo = false
-    /// The last 8 colors drawn with, newest first, as #RRGGBB.
+    /// The last colors chosen, newest first, as #RRGGBB.
     private(set) var recents: [String] = UserDefaults.standard.stringArray(forKey: PencilController.recentsKey) ?? []
 
+    static let recentsCount = 10
     private static let recentsKey = "pencilRecentColors"
     @ObservationIgnored private var strokeCount = 0
 
     func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
         let count = canvasView.drawing.strokes.count
-        if count > strokeCount { remember(colorHex) }  // a new stroke, not an undo
+        if strokeCount == 0 && count > 0 {  // the first stroke: note the sheet it's measured in
+            strokeSheet = CGSize(width: displaySize.width / scale, height: displaySize.height / scale)
+        }
         strokeCount = count
         hasStrokes = count > 0
         canUndo = canvasView.undoManager?.canUndo ?? false
@@ -36,13 +40,20 @@ final class PencilController: NSObject, PKCanvasViewDelegate {
     func undo() { canvasView?.undoManager?.undo() }
     func redo() { canvasView?.undoManager?.redo() }
 
-    private func remember(_ hex: String) {
-        recents = Array(([hex] + recents.filter { $0 != hex }).prefix(8))
+    /// A color just chosen goes to the front of the history.
+    func remember(_ hex: String) {
+        recents = Array(([hex] + recents.filter { $0 != hex }).prefix(Self.recentsCount))
         UserDefaults.standard.set(recents, forKey: Self.recentsKey)
     }
 
-    /// The strokes so far, and a clear sheet (and no stroke undo) from here on.
-    func take() -> PKDrawing? {
+    func clearRecents() {
+        recents = []
+        UserDefaults.standard.removeObject(forKey: Self.recentsKey)
+    }
+
+    /// The strokes so far with the sheet size they were drawn on, and a clear
+    /// sheet (and no stroke undo) from here on.
+    func take() -> (drawing: PKDrawing, sheet: CGSize)? {
         guard let view = canvasView, !view.drawing.strokes.isEmpty else { return nil }
         let drawing = view.drawing
         view.drawing = PKDrawing()
@@ -51,21 +62,23 @@ final class PencilController: NSObject, PKCanvasViewDelegate {
         hasStrokes = false
         canUndo = false
         canRedo = false
-        return drawing
+        return (drawing, strokeSheet)
     }
 }
 
 /// The sheet the Pencil draws on, with Apple Pencil or a finger. While it's
 /// out, the canvas's own finger gestures (pinch, pan, two-finger undo) don't
-/// reach the canvas.
+/// reach the canvas. `scale` above 1 makes the sheet smaller and shows it
+/// that much larger, so a stroke can be wider than the ink allows.
 struct PencilCanvas: UIViewRepresentable {
     let controller: PencilController
     let tool: PKInkingTool
-    let colorHex: String
     let size: CGSize
+    let scale: CGFloat
 
-    func makeUIView(context: Context) -> PKCanvasView {
-        let view = PKCanvasView()
+    func makeUIView(context: Context) -> PencilSheet {
+        let sheet = PencilSheet()
+        let view = sheet.canvas
         view.backgroundColor = .clear
         view.isOpaque = false
         view.isScrollEnabled = false
@@ -73,18 +86,63 @@ struct PencilCanvas: UIViewRepresentable {
         view.drawingPolicy = .anyInput  // a finger draws too
         view.delegate = controller
         controller.canvasView = view
-        return view
+        return sheet
     }
 
-    func updateUIView(_ view: PKCanvasView, context: Context) {
-        view.tool = tool
-        controller.colorHex = colorHex
-        controller.canvasSize = size
+    func updateUIView(_ sheet: PencilSheet, context: Context) {
+        sheet.canvas.tool = tool
+        sheet.scale = scale
+        controller.displaySize = size
+        controller.scale = scale
+    }
+}
+
+/// Holds the PencilKit canvas, `scale` times smaller than itself and magnified to fit.
+final class PencilSheet: UIView {
+    let canvas = PKCanvasView()
+    var scale: CGFloat = 1 {
+        didSet { if scale != oldValue { setNeedsLayout() } }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        addSubview(canvas)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        canvas.transform = .identity
+        canvas.bounds = CGRect(x: 0, y: 0, width: bounds.width / scale, height: bounds.height / scale)
+        canvas.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        canvas.transform = CGAffineTransform(scaleX: scale, y: scale)
     }
 }
 
 enum Pencil {
     static let longEdge: CGFloat = 2048  // a drawing layer's pixels on its long side
+    static let sizes: ClosedRange<Double> = 1...300  // the Pencil's size, in a drawing layer's pixels
+    private static let ink = PKInkingTool.InkType.pencil
+
+    /// How much larger the sheet is shown so a `pixels`-wide stroke fits the
+    /// ink's widest, on a canvas `display` points in size on screen.
+    static func scale(pixels: Double, display: CGSize) -> CGFloat {
+        let points = pixels * pointsPerPixel(display)
+        return max(1, ceil(points / ink.validWidthRange.upperBound))
+    }
+
+    /// The ink: `pixels` wide in the drawing layer, drawn on the sheet at `scale`.
+    static func tool(pixels: Double, color: UIColor, display: CGSize, scale: CGFloat) -> PKInkingTool {
+        let width = pixels * pointsPerPixel(display) / scale
+        let limits = ink.validWidthRange
+        return PKInkingTool(ink, color: color, width: min(max(width, limits.lowerBound), limits.upperBound))
+    }
+
+    private static func pointsPerPixel(_ display: CGSize) -> CGFloat {
+        display.width > 0 ? max(display.width, display.height) / longEdge : 0.45
+    }
 
     /// A drawing layer: drawn with the Pencil and still filling the canvas as made.
     static func isDrawingLayer(_ layer: Layer) -> Bool {
@@ -173,13 +231,13 @@ extension Color {
 // MARK: - the bar
 
 /// The Pencil's panel at the left: size (in the drawing layer's pixels),
-/// opacity, and the color, whose pop-up has the color picker and the 8
-/// colors drawn with last. No Done: the Pencil draws until it's turned off.
+/// opacity, and the color, whose pop-up has a color wheel and the colors
+/// chosen last. No Done: the Pencil draws until it's turned off.
 struct PencilPanel: View {
     @Binding var size: Double
     @Binding var opacity: Double
     @Binding var colorHex: String
-    let recents: [String]
+    let pencil: PencilController
 
     @State private var choosingColor = false
 
@@ -187,7 +245,7 @@ struct PencilPanel: View {
         VStack(spacing: 14) {
             Image(systemName: "pencil").font(.system(size: 20)).accessibilityLabel("Pencil")
             column("Size") {
-                VerticalSlider(value: Binding(get: { size }, set: { size = $0.rounded() }), range: 1...100,
+                VerticalSlider(value: Binding(get: { size }, set: { size = $0.rounded() }), range: Pencil.sizes,
                                label: "\(Int(size.rounded()))", height: 170)
                     .accessibilityLabel("Size, pixels")
             }
@@ -219,32 +277,128 @@ struct PencilPanel: View {
         }
     }
 
-    /// The color picker, and the colors drawn with last.
+    /// One pop-up: the color wheel, and the history of colors chosen.
     private var colorPopup: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ColorPicker("Color", selection: Binding(get: { Color(hex: colorHex) }, set: { colorHex = $0.hex }),
-                        supportsOpacity: false)
-            Text("Recent").font(.caption).foregroundStyle(.secondary)
-            if recents.isEmpty {
-                Text("Colors you draw with show here.").font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            ColorWheel(hex: $colorHex) { pencil.remember($0) }
+            HStack {
+                Text("History").font(.headline).foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear") { pencil.clearRecents() }
+                    .buttonStyle(.bordered)
+                    .disabled(pencil.recents.isEmpty)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.fixed(36), spacing: 8), count: 4), alignment: .leading, spacing: 8) {
-                ForEach(recents, id: \.self) { hex in
-                    Button { colorHex = hex } label: {
-                        Circle()
-                            .fill(Color(hex: hex))
-                            .frame(width: 28, height: 28)
-                            .overlay(Circle().stroke(Color.white.opacity(0.5), lineWidth: 1))
-                            .padding(3)
-                            .overlay(Circle().stroke(Theme.accent, lineWidth: hex == colorHex ? 3 : 0))
+            HStack(spacing: 0) {
+                ForEach(0..<PencilController.recentsCount, id: \.self) { i in
+                    if i < pencil.recents.count {
+                        let hex = pencil.recents[i]
+                        Button { colorHex = hex } label: {
+                            Rectangle().fill(Color(hex: hex))
+                                .overlay(Rectangle().strokeBorder(Theme.accent, lineWidth: hex == colorHex ? 3 : 0))
+                        }
+                        .accessibilityLabel("Color \(hex)")
+                    } else {
+                        Rectangle().fill(Color.white.opacity(0.06))
                     }
-                    .accessibilityLabel("Color \(hex)")
                 }
             }
+            .frame(height: 36)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
-        .padding(18)
-        .frame(width: 220)
+        .padding(20)
+        .frame(width: 320)
         .themed()
+    }
+}
+
+/// A color wheel: hue round the ring, and in the disc saturation from left
+/// (gray) to right (full) and brightness from top (light) to bottom (black).
+/// `onPicked` follows each drag, with the color chosen.
+struct ColorWheel: View {
+    @Binding var hex: String
+    var onPicked: (String) -> Void
+
+    @State private var hue = 0.0
+    @State private var saturation = 0.0
+    @State private var brightness = 0.0
+    @State private var dragging: Part? = nil
+
+    private enum Part { case ring, disc }
+    private let size: CGFloat = 280
+    private let ringWidth: CGFloat = 36
+    private let gap: CGFloat = 12
+    private var discDiameter: CGFloat { size - 2 * (ringWidth + gap) }
+
+    var body: some View {
+        let c = size / 2
+        let ringRadius = c - ringWidth / 2
+        let hueAngle = hue * 2 * .pi  // counterclockwise from the right, as in the wheel
+        ZStack {
+            // The ring: red at the right, then yellow, green, cyan, blue, magenta going counterclockwise.
+            Circle()
+                .strokeBorder(AngularGradient(colors: stride(from: 1.0, through: 0, by: -1 / 12).map {
+                    Color(hue: $0, saturation: 1, brightness: 1)
+                }, center: .center), lineWidth: ringWidth)
+            ZStack {
+                LinearGradient(colors: [.white, Color(hue: hue, saturation: 1, brightness: 1)], startPoint: .leading, endPoint: .trailing)
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+            }
+            .frame(width: discDiameter, height: discDiameter)
+            .clipShape(Circle())
+            // Where the hue is on the ring, filled with it.
+            Circle()
+                .fill(Color(hue: hue, saturation: 1, brightness: 1))
+                .frame(width: ringWidth + 14, height: ringWidth + 14)
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                .shadow(radius: 3)
+                .position(x: c + ringRadius * cos(hueAngle), y: c - ringRadius * sin(hueAngle))
+            // Where the color is in the disc.
+            let left = c - discDiameter / 2, top = c - discDiameter / 2
+            Circle()
+                .stroke(Color.white, lineWidth: 2)
+                .frame(width: 24, height: 24)
+                .shadow(radius: 2)
+                .position(x: left + saturation * discDiameter, y: top + (1 - brightness) * discDiameter)
+        }
+        .frame(width: size, height: size)
+        .contentShape(Circle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { drag in
+                    let dx = drag.location.x - c, dy = drag.location.y - c
+                    if dragging == nil {
+                        let start = hypot(drag.startLocation.x - c, drag.startLocation.y - c)
+                        dragging = start > discDiameter / 2 + gap / 2 ? .ring : .disc
+                    }
+                    if dragging == .ring {
+                        let angle = atan2(-dy, dx)  // counterclockwise from the right
+                        hue = (angle < 0 ? angle + 2 * .pi : angle) / (2 * .pi)
+                    } else {
+                        // Kept inside the disc, then read as a square.
+                        let r = hypot(dx, dy), limit = discDiameter / 2
+                        let k = r > limit ? limit / r : 1
+                        saturation = min(max((dx * k + limit) / discDiameter, 0), 1)
+                        brightness = min(max(1 - (dy * k + limit) / discDiameter, 0), 1)
+                    }
+                    hex = Color(hue: hue, saturation: saturation, brightness: brightness).hex
+                }
+                .onEnded { _ in
+                    dragging = nil
+                    onPicked(hex)
+                }
+        )
+        .onAppear(perform: read)
+        .onChange(of: hex) { if dragging == nil { read() } }  // chosen from the history
+        .accessibilityLabel("Color wheel")
+    }
+
+    /// Hue, saturation and brightness from `hex`; the hue is kept for grays.
+    private func read() {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        UIColor(Color(hex: hex)).getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+        if s > 0.001 { hue = Double(h) }
+        saturation = Double(s)
+        brightness = Double(b)
     }
 }
 
