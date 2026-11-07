@@ -98,12 +98,14 @@ automatically.
   shows the swatch markers, the trash deletes all swatches (asks first), and
   Done. Choosing a swatch selects its layer and opens its panel, which points
   at that layer.
-- **Pencil** (iPad top bar): draw with Apple Pencil (with "Only Draw with
-  Apple Pencil" on, fingers still pan, zoom and undo). The bar has size,
-  opacity, a color picker and the 8 colors drawn with last. Undo takes back
-  strokes one at a time. When you leave the Pencil the strokes go into the
-  selected drawing layer, or a new "Drawing n" on top at Normal 100 %: an
-  ordinary layer, saved like the others.
+- **Pencil** (iPad top bar): draw with Apple Pencil or a finger (while it's
+  on, pinch and pan don't move the canvas: zoom first). A panel at the left
+  has Size (1–100 px of the drawing layer), Opacity and Color (a pop-up with
+  the color picker and the 8 colors drawn with last). No Done: it draws until
+  turned off. Undo takes back strokes one at a time. The strokes go into the
+  selected drawing layer (or a new "Drawing n" on top) when you choose
+  another layer, add one, or put the Pencil away. Thumbnails have a
+  checkerboard behind see-through parts.
 - **New layer** (+, below Flatten in the layer bar): an empty, transparent
   "Drawing n" on top, filling the canvas; the Pencil draws into it.
 - **Flatten** (bottom of the layer bar): the visible layers exactly as shown

@@ -56,7 +56,7 @@ struct WorkspaceView: View {
     @State private var toolPopup: ToolPopup? = nil  // the phone's + or Transform / Crop choices
     @State private var pencilOn = false  // the Pencil: strokes go on a sheet, then into a drawing layer
     @State private var pencil = PencilController()
-    @AppStorage("pencilSize") private var pencilSize = 4.0  // points
+    @AppStorage("pencilSizePixels") private var pencilSize = 10.0  // in the drawing layer's pixels, 1...100
     @AppStorage("pencilOpacity") private var pencilOpacity = 1.0
     @AppStorage("pencilColor") private var pencilColor = "#202020"
     @Environment(\.scenePhase) private var scenePhase
@@ -138,7 +138,8 @@ struct WorkspaceView: View {
                 photoItem = nil
             }
         }
-        .onChange(of: session.selectedID) { _, id in
+        .onChange(of: session.selectedID) { old, id in
+            if pencilOn { commitPencil(into: old) }  // strokes go into the layer they were drawn on
             if let cropping, cropping.id != id { finishCrop(keep: true) }  // another layer: keep this crop
             if transformOn { noteTransformStart() }
         }
@@ -211,15 +212,21 @@ struct WorkspaceView: View {
 
     // MARK: pencil
 
-    /// The strokes drawn so far into the drawing layer (see `Pencil.commit`).
-    private func commitPencil() {
+    /// The strokes drawn so far into the drawing layer (see `Pencil.commit`):
+    /// the selected one, or `layerID`'s when the selection has just changed.
+    private func commitPencil(into layerID: UUID? = nil) {
         guard let drawing = pencil.take() else { return }
-        Pencil.commit(drawing, sheet: pencil.canvasSize, to: session)
+        Pencil.commit(drawing, sheet: pencil.canvasSize, to: session, layerID: layerID ?? session.selectedID)
     }
 
-    /// The Pencil's ink: its size, color and opacity.
+    /// The Pencil's ink: its color and opacity, and its size in the drawing
+    /// layer's pixels turned into the sheet's points (within the ink's limits).
     private var pencilTool: PKInkingTool {
-        PKInkingTool(.pencil, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity), width: pencilSize)
+        let sheet = pencil.canvasSize
+        let pointsPerPixel = sheet.width > 0 ? max(sheet.width, sheet.height) / Pencil.longEdge : 0.45
+        let limits = PKInkingTool.InkType.pencil.validWidthRange
+        let width = min(max(pencilSize * pointsPerPixel, limits.lowerBound), limits.upperBound)
+        return PKInkingTool(.pencil, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity), width: width)
     }
 
     // MARK: crop
@@ -433,6 +440,11 @@ struct WorkspaceView: View {
         VStack(spacing: 0) {
             topBar
             HStack(alignment: .top, spacing: 0) {
+                if pencilOn {  // the Pencil's size, opacity and color, at the left
+                    PencilPanel(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor, recents: pencil.recents)
+                        .padding(12)
+                        .frame(maxHeight: .infinity)
+                }
                 Spacer()
                 if colorBarShown, colorPanelOpen, !Theme.isPhone,
                    let index = session.swatches.firstIndex(where: { $0.id == selectedSwatchID }) {
@@ -465,9 +477,6 @@ struct WorkspaceView: View {
                 } else if transformOn, let layer = session.selected {
                     TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
                                  onCancel: cancelTransform, onDone: { transformOn = false })
-                } else if pencilOn {
-                    PencilBar(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor,
-                              recents: pencil.recents) { endTools() }
                 } else if colorBarShown {
                     ColorBar(session: session, selectedID: $selectedSwatchID, picking: $swatchesOn, view: $colorView,
                              sample: $sampleSize, simplify: $simplifySettings, highlight: $highlightSettings,
@@ -822,6 +831,7 @@ struct WorkspaceView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: 48, height: 48)
+                    .background(Checkerboard())  // see-through parts (a new blank layer is all checkerboard)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .opacity(layer.isVisible ? 1 : 0.35)
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.accent, lineWidth: selected ? 3 : 0))
