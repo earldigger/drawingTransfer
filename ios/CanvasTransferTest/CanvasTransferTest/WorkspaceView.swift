@@ -438,6 +438,7 @@ struct WorkspaceView: View {
     private var chrome: some View {
         VStack(spacing: 0) {
             topBar
+                .zIndex(1)  // its pop-ups open over what's below
             HStack(alignment: .top, spacing: 0) {
                 if pencilOn {  // the Pencil's size, opacity and color, at the left
                     PencilPanel(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor, pencil: pencil)
@@ -589,17 +590,9 @@ struct WorkspaceView: View {
     /// others off; tapping it again turns it off.
     private var tools: some View {
         HStack(spacing: Theme.isPhone ? 20 : 16) {
-            if Theme.isPhone {  // two buttons, each opening a pop-up with two choices
-                addButton
-                shapeButton
-            } else {
-                toolButton("camera", "Camera") { capture = Capture(picked: nil) }
-                toolButton("photo.on.rectangle", "Photos") { showPhotos = true }
-                toolButton("arrow.up.and.down.and.arrow.left.and.right", "Transform", on: transformOn, action: toggleTransform)
-                    .disabled(session.selected == nil)
-                toolButton("crop", "Crop", on: cropping != nil, action: toggleCrop)
-                    .disabled(session.selected == nil)
-            }
+            // Two buttons, each opening a pop-up with two choices.
+            addButton
+            shapeButton
             toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
                 let on = gridBarShown
                 endTools()
@@ -648,9 +641,9 @@ struct WorkspaceView: View {
         if !on, let layer = session.selected { startCrop(layer) }
     }
 
-    // MARK: the phone's combined buttons
+    // MARK: the combined buttons
 
-    /// Which of the phone's combined buttons has its pop-up open.
+    /// Which of the combined buttons has its pop-up open.
     enum ToolPopup { case add, shape }
 
     /// + : Camera or Photos.
@@ -658,7 +651,7 @@ struct WorkspaceView: View {
         toolButton("plus", "Add an image", on: toolPopup == .add) {
             withAnimation(.snappy) { toolPopup = toolPopup == .add ? nil : .add }
         }
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: Theme.isPhone ? .bottom : .top) {
             if toolPopup == .add {
                 popupChoices([
                     ("camera", "Camera", false, true, { capture = Capture(picked: nil) }),
@@ -676,7 +669,7 @@ struct WorkspaceView: View {
             withAnimation(.snappy) { toolPopup = toolPopup == .shape ? nil : .shape }
         }
         .disabled(session.selected == nil)
-        .overlay(alignment: .bottom) {
+        .overlay(alignment: Theme.isPhone ? .bottom : .top) {
             if toolPopup == .shape {
                 popupChoices([
                     (transformSymbol, "Transform", transformOn, session.selected != nil, toggleTransform),
@@ -686,10 +679,11 @@ struct WorkspaceView: View {
         }
     }
 
-    /// The pop-up above a combined button: icons with their names. Choosing
-    /// one closes it.
+    /// The pop-up by a combined button: icons with their names. Above it on
+    /// the phone (the tools are at the bottom), below it on the iPad (at the
+    /// top). Choosing one closes it.
     private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)]) -> some View {
-        Callout(fill: Theme.popup) {
+        Callout(below: !Theme.isPhone, fill: Theme.popup) {
             HStack(spacing: 18) {
                 ForEach(choices, id: \.title) { choice in
                     Button {
@@ -707,7 +701,7 @@ struct WorkspaceView: View {
             }
         }
         .fixedSize()  // its own size, not the button's
-        .offset(y: -(44 + 6))  // just above the button
+        .offset(y: Theme.isPhone ? -(44 + 6) : 44 + 6)  // just above (phone) or below (iPad) the button
         .transition(.opacity)
     }
 

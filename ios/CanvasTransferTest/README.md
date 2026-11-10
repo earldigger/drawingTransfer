@@ -66,8 +66,9 @@ automatically.
   move the iPad's projects into it; a project still in the cloud downloads
   when you open it. **Keep projects on this iPad** switches back (the
   folder's projects stay in the folder).
-- **Top bar**: the house; in the middle the tools (Camera, Photos,
-  Transform, Crop, Grid, Compare, the color tool); on the right undo and
+- **Top bar**: the house; in the middle the tools (+ with Camera and
+  Photos, Transform / Crop, Grid, Compare, Pencil, the color tool; the
+  combined ones open a pop-up below); on the right undo and
   redo, Paint library, Share and Full screen. Each tool with a bar at the
   bottom turns the others off.
 
