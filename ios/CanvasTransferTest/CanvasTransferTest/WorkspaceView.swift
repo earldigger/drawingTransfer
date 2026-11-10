@@ -44,6 +44,9 @@ struct WorkspaceView: View {
     @State private var swatchesOn = false  // its Eyedropper: one finger picks
     @State private var sampleSize = SampleSize.small
     @State private var selectedSwatchID: UUID? = nil
+    @State private var quietSwatchSelection = false  // the next swatch chosen doesn't open its panel
+    @State private var renaming: Layer? = nil  // Rename… in a layer's menu
+    @State private var newLayerName = ""
     @State private var probe: (pick: PickProbe, screen: CGPoint)? = nil  // while a finger is picking
     @State private var colorView = ColorView.normal  // Color: Simplify or Highlight the selected layer
     @State private var simplifySettings = SimplifySettings()
@@ -104,6 +107,14 @@ struct WorkspaceView: View {
         .sheet(item: $shareFile) { file in
             ShareSheet(items: [file.url]) { shareFile = nil }
         }
+        .alert("Rename layer", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Name", text: $newLayerName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let name = newLayerName.trimmingCharacters(in: .whitespaces)
+                if let layer = renaming, !name.isEmpty { layer.name = name }  // one undo step
+            }
+        }
         .alert("Couldn't make the image", isPresented: $shareFailed) {
             Button("OK", role: .cancel) {}
         }
@@ -147,7 +158,7 @@ struct WorkspaceView: View {
         .onChange(of: selectedSwatchID) { _, id in
             // Choosing a swatch opens its panel again, on the layer it belongs to.
             guard let id, let swatch = session.swatches.first(where: { $0.id == id }) else { return }
-            colorPanelOpen = true
+            if quietSwatchSelection { quietSwatchSelection = false } else { colorPanelOpen = true }
             if session.layers.contains(where: { $0.id == swatch.layerID }) { session.selectedID = swatch.layerID }
         }
         .onChange(of: transformOn) { _, on in
@@ -297,8 +308,8 @@ struct WorkspaceView: View {
             }
         }
         .overlay {
-            // While the color tool is open, unless hidden to see the colors alone.
-            if colorBarShown && studyMarkersShown {
+            // While the color tool is open (on the phone, Highlight), unless hidden to see the colors alone.
+            if (colorBarShown || (Theme.isPhone && colorView == .highlight)) && studyMarkersShown {
                 SwatchMarkers(swatches: session.swatches, layers: session.layers, canvas: size,
                               selectedID: selectedSwatchID, scale: viewScale)
             }
@@ -338,7 +349,14 @@ struct WorkspaceView: View {
                 let swatch = Swatch(layerID: layer.id, u: found.u, v: found.v, red: rgb.0, green: rgb.1, blue: rgb.2,
                                     radius: sampleSize.rawValue)
                 session.swatches.append(swatch)  // one undo step
-                selectedSwatchID = nil  // its panel opens when you choose its chip, not now
+                if colorView == .highlight {
+                    // In Highlight, the new swatch is the one highlighted (its panel stays closed).
+                    quietSwatchSelection = true
+                    selectedSwatchID = swatch.id
+                    highlightSettings.selectedOnly = true
+                } else {
+                    selectedSwatchID = nil  // its panel opens when you choose its chip, not now
+                }
             }
         case false?:
             probe = nil  // a second finger: panning or zooming instead
@@ -478,6 +496,11 @@ struct WorkspaceView: View {
                 } else if transformOn, let layer = session.selected {
                     TransformBar(layer: layer, mode: $transformMode, canvasSize: session.canvasSize,
                                  onCancel: cancelTransform, onDone: { transformOn = false })
+                } else if Theme.isPhone && colorView == .simplify {
+                    PhoneSimplifyBar(settings: $simplifySettings, working: studyWorking) { endTools() }
+                } else if Theme.isPhone && colorView == .highlight {
+                    PhoneHighlightBar(session: session, selectedID: $selectedSwatchID, picking: $swatchesOn,
+                                      settings: $highlightSettings, working: studyWorking) { endTools() }
                 } else if colorBarShown {
                     ColorBar(session: session, selectedID: $selectedSwatchID, picking: $swatchesOn, view: $colorView,
                              sample: $sampleSize, simplify: $simplifySettings, highlight: $highlightSettings,
@@ -536,6 +559,7 @@ struct WorkspaceView: View {
                 }
                 .foregroundStyle(.white)
                 .accessibilityLabel("Gallery")
+                if Theme.isPhone { addButton.padding(.leading, 8) }  // + with Camera and Photos, beside home
                 Spacer()
                 Button { undo() } label: { Image(systemName: "arrow.uturn.backward").frame(width: 28, height: 44) }
                     .accessibilityLabel("Undo")
@@ -590,9 +614,10 @@ struct WorkspaceView: View {
     /// bottom, with Layers). Each one that has a bar at the bottom turns the
     /// others off; tapping it again turns it off.
     private var tools: some View {
-        HStack(spacing: Theme.isPhone ? 20 : 16) {
-            // Two buttons, each opening a pop-up with two choices.
-            addButton
+        HStack(spacing: Theme.isPhone ? 14 : 16) {
+            // + and Transform / Crop each open a pop-up with two choices. On
+            // the phone, + is in the top bar, beside home.
+            if !Theme.isPhone { addButton }
             shapeButton
             toolButton("square.grid.3x3", "Grid", on: gridBarShown) {
                 let on = gridBarShown
@@ -608,18 +633,19 @@ struct WorkspaceView: View {
                 }
             }
             .disabled(session.layers.isEmpty)
+            toolButton("pencil", "Pencil", on: pencilOn) {
+                let on = pencilOn
+                endTools()
+                pencilOn = !on
+            }
             if Theme.isPhone {
+                swatchesButton
                 toolButton("square.2.layers.3d", "Layers", on: layersShown) {
                     let on = layersShown
                     endTools()
                     withAnimation(.snappy) { layersShown = !on }
                 }
             } else {
-                toolButton("pencil", "Pencil", on: pencilOn) {
-                    let on = pencilOn
-                    endTools()
-                    pencilOn = !on
-                }
                 toolButton("eyedropper", "Swatches, Simplify and Highlight", on: colorBarShown) {
                     let on = colorBarShown
                     endTools()
@@ -645,21 +671,44 @@ struct WorkspaceView: View {
     // MARK: the combined buttons
 
     /// Which of the combined buttons has its pop-up open.
-    enum ToolPopup { case add, shape }
+    enum ToolPopup { case add, shape, color }
 
-    /// + : Camera or Photos.
+    /// + : Camera or Photos. Always in the top bar, so its pop-up opens below.
     private var addButton: some View {
         toolButton("plus", "Add an image", on: toolPopup == .add) {
             withAnimation(.snappy) { toolPopup = toolPopup == .add ? nil : .add }
         }
-        .overlay(alignment: Theme.isPhone ? .bottom : .top) {
+        .overlay(alignment: .top) {
             if toolPopup == .add {
                 popupChoices([
                     ("camera", "Camera", false, true, { capture = Capture(picked: nil) }),
                     ("photo.on.rectangle", "Photos", false, true, { showPhotos = true }),
+                ], below: true)
+            }
+        }
+    }
+
+    /// The phone's Swatches: Simplify or Highlight, each with its own bar.
+    /// Choosing the one that's on turns it off.
+    private var swatchesButton: some View {
+        toolButton("swatchpalette", "Simplify or Highlight", on: colorView != .normal || toolPopup == .color) {
+            withAnimation(.snappy) { toolPopup = toolPopup == .color ? nil : .color }
+        }
+        .disabled(session.layers.isEmpty)
+        .overlay(alignment: .bottom) {
+            if toolPopup == .color {
+                popupChoices([
+                    (SimplifySymbol.simplify, "Simplify", colorView == .simplify, session.selected != nil, { toggleView(.simplify) }),
+                    (SimplifySymbol.highlight, "Highlight", colorView == .highlight, session.selected != nil, { toggleView(.highlight) }),
                 ])
             }
         }
+    }
+
+    private func toggleView(_ view: ColorView) {
+        let on = colorView == view
+        endTools()
+        colorView = on ? .normal : view
     }
 
     /// Transform or Crop. Shows the one that's on; choosing it again turns it off.
@@ -680,11 +729,11 @@ struct WorkspaceView: View {
         }
     }
 
-    /// The pop-up by a combined button: icons with their names. Above it on
-    /// the phone (the tools are at the bottom), below it on the iPad (at the
-    /// top). Choosing one closes it.
-    private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)]) -> some View {
-        Callout(below: !Theme.isPhone, fill: Theme.popup) {
+    /// The pop-up by a combined button: icons with their names. Below a button
+    /// in the top bar, above one in the phone's bottom row. Choosing one closes it.
+    private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)],
+                              below: Bool = !Theme.isPhone) -> some View {
+        Callout(below: below, fill: Theme.popup) {
             HStack(spacing: 18) {
                 ForEach(choices, id: \.title) { choice in
                     Button {
@@ -702,7 +751,7 @@ struct WorkspaceView: View {
             }
         }
         .fixedSize()  // its own size, not the button's
-        .offset(y: Theme.isPhone ? -(44 + 6) : 44 + 6)  // just above (phone) or below (iPad) the button
+        .offset(y: below ? 44 + 6 : -(44 + 6))  // just below or above the button
         .transition(.opacity)
     }
 
@@ -809,7 +858,7 @@ struct WorkspaceView: View {
                     session.selectedID = layer.id
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(layer.name.hasPrefix("Flattened") ? layer.name : "Layer \(number)")  // "Flattened 1"
+                        Text(layer.name)  // its name (Rename… in its menu)
                             .font(.subheadline.weight(selected ? .semibold : .regular))
                             .lineLimit(1)
                         Text("\(layer.blend.rawValue) · \(Int((layer.opacity * 100).rounded()))%")
@@ -855,6 +904,10 @@ struct WorkspaceView: View {
             Divider()
             Button("Edit corners…", systemImage: "perspective") { editCorners(layer) }
                 .disabled(layer.source == nil)
+            Button("Rename…", systemImage: "pencil.and.list.clipboard") {
+                newLayerName = layer.name
+                renaming = layer
+            }
             Button("Duplicate", systemImage: "plus.square.on.square") { session.duplicate(layer) }
             Button(layer.isVisible ? "Hide" : "Show", systemImage: layer.isVisible ? "eye.slash" : "eye") {
                 layer.isVisible.toggle()

@@ -48,17 +48,18 @@ automatically.
   most recent first; long-press one to rename, duplicate or delete it. The
   **house** at the top left goes back; each project keeps its own layers, swatches and grid.
 - **iPhone** (the same app, upright only): the Gallery in one column, New
-  project in a sheet; in a project the tools are in a row at the bottom: **+** (a
-  pop-up with Camera and Photos), Transform / Crop (a pop-up; the button
-  shows the one that's on), Grid, Compare and **Layers** (the layer
+  project in a sheet; in a project **+** (Camera, Photos) is beside home and the tools
+  are in a row at the bottom: Transform / Crop (a pop-up; the button shows
+  the one that's on), Grid, Compare, Pencil, **Swatches** (Simplify or
+  Highlight, each with its own bar; Highlight has an eyedropper and plain
+  swatch chips, × to delete one, the trash for all) and **Layers** (the layer
   panel at the side, thumbnails with ‹ to expand, and the layer bar at the
   bottom, on and off together), and each bar stacks into rows. On the phone, Adjust opens a strip above the layer bar: invert,
   black, mid, white, hue, saturation, lightness, colorize and reset, with a
   thin slider along its top for the chosen one. The layer panel scrolls past
   8 layers, Flatten staying put. Camera puts the shutter
   at the bottom; Adjust corners has its panel under the photo. Not on the
-  phone yet: Swatches / Simplify / Highlight, the swatch panel, the Paint
-  library and the swatch sheet PDF.
+  phone yet: the swatch details panel, the Paint library and the swatch sheet PDF.
 - **Where projects are kept** (the menu at the Gallery's top right): on this
   iPad, or **Choose a folder…** in Files, e.g. iCloud Drive > Canvas Transfer.
   iCloud syncs that folder (no iCloud entitlement needed, so it works with a
@@ -150,7 +151,7 @@ automatically.
   marks A and B.
 - **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
   opacity. Tap a thumbnail to select it, double-tap to show or hide it. Long-press a layer to move it up or down, to the front or back,
-  duplicate, hide or delete it. The layer bar at the bottom has the layer's
+  rename, duplicate, hide or delete it. The layer bar at the bottom has the layer's
   name, opacity, blend, Adjust, Flip horizontal / vertical, and **⋯** with Fit
   and **Edit corners…**, which reopens Adjust corners
   on the original photo (kept since this build) and keeps the placement.

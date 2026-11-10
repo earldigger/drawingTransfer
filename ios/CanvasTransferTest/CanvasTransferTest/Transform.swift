@@ -341,13 +341,15 @@ struct TransformBar: View {
 
     var body: some View {
         Group {
-            if Theme.isPhone {  // two rows: icon, ⋯, Cancel and Done; then the mode
+            if Theme.isPhone {  // two rows: icon and ⋯, then Cancel and Done; then the mode
                 VStack(spacing: 8) {
                     HStack(spacing: 20) {
-                        Image(systemName: "arrow.up.and.down.and.arrow.left.and.right").font(.system(size: 20))
-                            .accessibilityLabel("Transform")
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.up.and.down.and.arrow.left.and.right").font(.system(size: 20))
+                                .accessibilityLabel("Transform")
+                            more
+                        }
                         Spacer(minLength: 0)
-                        more
                         Button("Cancel", action: onCancel)
                         DoneButton(action: onDone)
                     }

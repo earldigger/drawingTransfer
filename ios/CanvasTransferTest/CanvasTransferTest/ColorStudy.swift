@@ -260,6 +260,12 @@ enum ColorView: Equatable {
     case normal, simplify, highlight
 }
 
+/// The icons for Simplify and Highlight, the same everywhere.
+enum SimplifySymbol {
+    static let simplify = "circle.lefthalf.filled"
+    static let highlight = "scope"  // a target: finds where a swatch's color is
+}
+
 struct SimplifySettings: Equatable {
     var mode = ColorStudy.SimplifyMode.values
     var count = 5
@@ -269,6 +275,152 @@ struct SimplifySettings: Equatable {
 struct HighlightSettings: Equatable {
     var tolerance = 12.0  // DEFAULT_HIGHLIGHT_TOLERANCE; about 2.3 is a just-noticeable difference
     var selectedOnly = false
+}
+
+/// The phone's Simplify bar: Colors or Values, steps and smoothing. The
+/// image stays simplified until Done (or Highlight, or another tool).
+struct PhoneSimplifyBar: View {
+    @Binding var settings: SimplifySettings
+    let working: Bool
+    var onDone: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 14) {
+                Image(systemName: SimplifySymbol.simplify).font(.system(size: 20)).accessibilityLabel("Simplify")
+                Picker("Show", selection: $settings.mode) {
+                    Text("Colors").tag(ColorStudy.SimplifyMode.colors)
+                    Text("Values").tag(ColorStudy.SimplifyMode.values)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 180)
+                ProgressView().controlSize(.small).opacity(working ? 1 : 0)
+                Spacer(minLength: 0)
+                DoneButton(action: onDone)
+            }
+            row("Steps", "\(settings.count)") {
+                Slider(value: Binding(get: { Double(settings.count) }, set: { settings.count = Int($0.rounded()) }),
+                       in: 1...24, step: 1)
+            }
+            row("Smoothing", "\(settings.smoothing)") {
+                Slider(value: Binding(get: { Double(settings.smoothing) }, set: { settings.smoothing = Int($0.rounded()) }),
+                       in: 0...6, step: 1)
+            }
+        }
+        .bottomBar()
+    }
+
+    private func row<S: View>(_ title: String, _ value: String, @ViewBuilder slider: () -> S) -> some View {
+        HStack(spacing: 12) {
+            Text(title).frame(width: 86, alignment: .leading)
+            slider()
+            Text(value).monospacedDigit().frame(width: 28, alignment: .trailing)
+        }
+    }
+}
+
+/// The phone's Highlight bar: the eyedropper (a swatch added becomes the one
+/// highlighted), the swatches as plain chips (tap to choose, × to delete one,
+/// the trash for all), range, and All or Selected. No color details.
+struct PhoneHighlightBar: View {
+    @Bindable var session: TransferSession
+    @Binding var selectedID: UUID?
+    @Binding var picking: Bool
+    @Binding var settings: HighlightSettings
+    let working: Bool
+    var onDone: () -> Void
+
+    @State private var confirmingClear = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 14) {
+                Image(systemName: SimplifySymbol.highlight).font(.system(size: 20)).accessibilityLabel("Highlight")
+                Button { picking.toggle() } label: {
+                    Image(systemName: "eyedropper")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                            .fill(picking ? Theme.lavender : Color.clear))
+                }
+                .accessibilityLabel(picking ? "Stop adding swatches" : "Add a swatch")
+                if working { ProgressView().controlSize(.small) }
+                Spacer(minLength: 0)
+                Button { confirmingClear = true } label: {
+                    Image(systemName: "trash").font(.system(size: 18)).frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Delete all swatches")
+                .disabled(session.swatches.isEmpty)
+                DoneButton(action: onDone)
+            }
+            chips
+            HStack(spacing: 12) {
+                Text("Range")
+                Slider(value: $settings.tolerance, in: 2...40)
+                Picker("Show", selection: $settings.selectedOnly) {
+                    Text("All").tag(false)
+                    Text("Selected").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 140)
+            }
+        }
+        .bottomBar()
+        .confirmationDialog("Delete all swatches?", isPresented: $confirmingClear, titleVisibility: .visible) {
+            Button("Delete All Swatches", role: .destructive) {
+                session.swatches.removeAll()  // one undo step
+                selectedID = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var chips: some View {
+        if session.swatches.isEmpty {
+            Text(picking ? "Touch the canvas to add a swatch." : "Tap the eyedropper, then touch the canvas.")
+                .font(.callout).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(session.swatches.enumerated()), id: \.element.id) { i, swatch in
+                        chip(swatch, index: i)
+                    }
+                }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 3)  // room for the first chip's ring and the last ×
+                .padding(.trailing, 6)
+            }
+        }
+    }
+
+    /// A swatch: its color with its highlight color round it; × deletes it.
+    private func chip(_ swatch: Swatch, index: Int) -> some View {
+        let selected = swatch.id == selectedID
+        return Button { selectedID = swatch.id } label: {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(swatch.color)
+                .frame(width: 40, height: 40)
+                .overlay(RoundedRectangle(cornerRadius: 8)
+                    .stroke(selected ? Theme.accent : ColorStudy.highlightColor(index), lineWidth: 3))
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                session.swatches.removeAll { $0.id == swatch.id }  // one undo step
+                if selectedID == swatch.id { selectedID = nil }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, Color.black.opacity(0.7))
+            }
+            .offset(x: 7, y: -7)
+            .accessibilityLabel("Delete swatch \(index + 1)")
+        }
+        .accessibilityLabel("Swatch \(index + 1)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
 }
 
 /// Shows or hides the numbered swatch markers on the image, to see the

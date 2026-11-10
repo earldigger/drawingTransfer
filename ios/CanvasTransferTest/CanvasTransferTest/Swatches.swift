@@ -241,8 +241,8 @@ struct ColorBar: View {
         HStack(spacing: 0) {
             HStack(spacing: Self.tileSpacing) {
                 toolTile("eyedropper", "Eyedropper", tool: .pick, on: picking)
-                toolTile("circle.lefthalf.filled", "Simplify", tool: .simplify, on: view == .simplify)
-                toolTile("pencil.line", "Highlight", tool: .highlight, on: view == .highlight)
+                toolTile(SimplifySymbol.simplify, "Simplify", tool: .simplify, on: view == .simplify)
+                toolTile(SimplifySymbol.highlight, "Highlight", tool: .highlight, on: view == .highlight)
             }
             .padding(.leading, Self.inset)
             .padding(.trailing, 9)
@@ -347,7 +347,7 @@ struct ColorBar: View {
 
     private var simplifyOptions: some View {
         VStack(alignment: .leading, spacing: 16) {
-            popupHeader("Simplify", symbol: "circle.lefthalf.filled")
+            popupHeader("Simplify", symbol: SimplifySymbol.simplify)
             HStack(alignment: .top, spacing: 36) {
                 sliderColumn("Steps") {
                     VerticalSlider(value: Binding(get: { Double(simplify.count) }, set: { simplify.count = Int($0) }),
@@ -370,9 +370,19 @@ struct ColorBar: View {
 
     private var highlightOptions: some View {
         VStack(alignment: .leading, spacing: 16) {
-            popupHeader("Highlight", symbol: "pencil.line")
-            if session.swatches.isEmpty {
-                Text("Add a swatch first.").font(.callout).foregroundStyle(.secondary)
+            popupHeader("Highlight", symbol: SimplifySymbol.highlight)
+            // The eyedropper: a swatch added now becomes the one highlighted.
+            Button { picking.toggle() } label: {
+                Label(picking ? "Touch the canvas to add a swatch" : "Add a swatch",
+                      systemImage: "eyedropper")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
+                    .background(Capsule().fill(picking ? Theme.lavender : Color.white.opacity(0.1)))
+            }
+            .buttonStyle(.plain)
+            if session.swatches.isEmpty && !picking {
+                Text("No swatches yet.").font(.callout).foregroundStyle(.secondary)
             }
             // Range: how far from a swatch's color still counts as its color.
             sliderColumn("Range") {
@@ -388,18 +398,12 @@ struct ColorBar: View {
         }
     }
 
-    /// Simplify's or Highlight's title, with Off (ends the mode) and ⌄ (hides
-    /// the options; the mode stays on).
+    /// Simplify's or Highlight's title, with ⌄ to hide the options (the mode
+    /// stays on until the other one, or Done).
     private func popupHeader(_ title: String, symbol: String) -> some View {
         HStack(spacing: 14) {
             Label(title, systemImage: symbol).font(.title3.weight(.semibold))
             Spacer(minLength: 12)
-            Button("Off") {
-                withAnimation(.snappy) {
-                    view = .normal
-                    popup = nil
-                }
-            }
             Button {
                 withAnimation(.snappy) { popup = nil }
             } label: {
