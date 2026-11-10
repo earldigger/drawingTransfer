@@ -243,7 +243,7 @@ struct PencilPanel: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "pencil").font(.system(size: 20)).accessibilityLabel("Pencil")
+            Image(systemName: "pencil").font(.system(size: 20, weight: .bold)).accessibilityLabel("Pencil")
             column("Size") {
                 VerticalSlider(value: Binding(get: { size }, set: { size = $0.rounded() }), range: Pencil.sizes,
                                label: "\(Int(size.rounded()))", height: 170)

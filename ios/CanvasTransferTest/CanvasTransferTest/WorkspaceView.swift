@@ -712,7 +712,7 @@ struct WorkspaceView: View {
 
     private func toolIcon(_ symbol: String, on: Bool) -> some View {
         Image(systemName: symbol)
-            .font(.system(size: 22))
+            .font(.system(size: 22, weight: symbol == "pencil" ? .bold : .regular))  // the thin pencil was too faint
             .frame(width: 44, height: 44)
             .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
                 .fill(on ? Theme.accent : Color.clear))
@@ -818,25 +818,29 @@ struct WorkspaceView: View {
                     .frame(width: 96, alignment: .leading)
                 }
             }
-            Button {
-                session.selectedID = layer.id
-            } label: {
-                Image(uiImage: layer.shownImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 48, height: 48)
-                    .background(Checkerboard())  // see-through parts (a new blank layer is all checkerboard)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .opacity(layer.isVisible ? 1 : 0.35)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.accent, lineWidth: selected ? 3 : 0))
-                    .overlay(alignment: .bottomLeading) { compareBadge(layer) }
-                    .overlay(alignment: .leading) {
-                        if session.swatches.contains(where: { $0.layerID == layer.id }) {  // this layer has swatches
-                            SwatchBadge().offset(x: -8)  // half over the thumbnail's left edge
-                        }
+            // One tap selects the layer; two show or hide it.
+            Image(uiImage: layer.shownImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 48, height: 48)
+                .background(Checkerboard())  // see-through parts (a new blank layer is all checkerboard)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .opacity(layer.isVisible ? 1 : 0.35)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.accent, lineWidth: selected ? 3 : 0))
+                .overlay(alignment: .bottomLeading) { compareBadge(layer) }
+                .overlay(alignment: .leading) {
+                    if session.swatches.contains(where: { $0.layerID == layer.id }) {  // this layer has swatches
+                        SwatchBadge().offset(x: -8)  // half over the thumbnail's left edge
                     }
-            }
-            .accessibilityLabel("Layer \(number)")
+                }
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) { layer.isVisible.toggle() }
+                .onTapGesture { session.selectedID = layer.id }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Layer \(number)\(layer.isVisible ? "" : ", hidden")")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { session.selectedID = layer.id }
+                .accessibilityAction(named: layer.isVisible ? "Hide" : "Show") { layer.isVisible.toggle() }
         }
         .contentShape(Rectangle())
         .contextMenu {

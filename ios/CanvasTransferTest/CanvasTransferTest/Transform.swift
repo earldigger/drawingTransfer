@@ -240,6 +240,24 @@ struct TransformHandles: View {
             }
             .stroke(Theme.accent, lineWidth: 2)
             .allowsHitTesting(false)
+            if mode == .proportional {
+                // Rotate: a short line out from the top edge's middle, with a round handle at its end.
+                let base = mids[0], knob = rotateKnob(quad)
+                Path { p in
+                    p.move(to: base)
+                    p.addLine(to: knob)
+                }
+                .stroke(Theme.accent, lineWidth: 2)
+                .allowsHitTesting(false)
+                Circle()
+                    .fill(Color.white)
+                    .overlay(Circle().stroke(Theme.accent, lineWidth: 2.5))
+                    .frame(width: 20, height: 20)
+                    .contentShape(Circle().inset(by: -13))  // 46 pt to touch
+                    .position(knob)
+                    .gesture(rotateDrag)
+                    .accessibilityLabel("Rotate")
+            }
             ForEach(0..<4, id: \.self) { i in
                 let horizontal = abs(quad[(i + 1) % 4].x - quad[i].x) >= abs(quad[(i + 1) % 4].y - quad[i].y)
                 Capsule()
@@ -263,6 +281,34 @@ struct TransformHandles: View {
         }
         .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
         .coordinateSpace(.named("transform"))
+    }
+
+    /// Where the rotate handle is: 36 pt out from the top edge's middle, away from the center.
+    private func rotateKnob(_ quad: [CGPoint]) -> CGPoint {
+        let base = QuadGeometry.edgeMidpoints(quad)[0], center = QuadGeometry.centroid(quad)
+        let out = base - center, length = max(hypot(out.x, out.y), 0.001)
+        return base + out * (36 / length)
+    }
+
+    /// Turns the image about its center by the angle the finger has gone
+    /// round it since the drag began. One drag, one undo step.
+    private var rotateDrag: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .named("transform"))
+            .onChanged { value in
+                if start == nil {
+                    start = layer.quadPoints(in: canvas)
+                    onBegin()
+                }
+                guard let start else { return }
+                let center = QuadGeometry.centroid(start)
+                let from = atan2(value.startLocation.y - center.y, value.startLocation.x - center.x)
+                let to = atan2(value.location.y - center.y, value.location.x - center.x)
+                layer.setQuad(points: QuadGeometry.rotate(start, by: to - from, about: center), in: canvas)
+            }
+            .onEnded { _ in
+                start = nil
+                onEnd()
+            }
     }
 
     private func drag(_ handle: TransformHandle) -> some Gesture {

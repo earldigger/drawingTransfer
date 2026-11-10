@@ -136,7 +136,8 @@ automatically.
   swatches, and each swatch's numbers and best mixes, to print or keep at the easel.
 - A small purple circle on a layer thumbnail's left edge means it has swatches.
 - **Transform**: a bar with Proportional, Distort, Free and Skew for the
-  corner and edge handles, Flip H / V, Fit, Cancel and Done. Fingers move,
+  corner and edge handles (Proportional also has a rotate handle above the
+  top edge), Flip H / V, Fit, Cancel and Done. Fingers move,
   pinch and twist in every mode. Placement is four corners, as in the prototype.
 - **Undo / redo**: the top-bar buttons, a two-finger tap to undo, a
   three-finger tap to redo, or ⌘Z / ⇧⌘Z. A gesture, an opacity drag or a
@@ -148,7 +149,7 @@ automatically.
   crossfade), or Split with a draggable line; A and B, swap, speed, pause. The layer bar numbers the layers and
   marks A and B.
 - **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
-  opacity. Long-press a layer to move it up or down, to the front or back,
+  opacity. Tap a thumbnail to select it, double-tap to show or hide it. Long-press a layer to move it up or down, to the front or back,
   duplicate, hide or delete it. The layer bar at the bottom has the layer's
   name, opacity, blend, Adjust, Flip horizontal / vertical, and **⋯** with Fit
   and **Edit corners…**, which reopens Adjust corners
