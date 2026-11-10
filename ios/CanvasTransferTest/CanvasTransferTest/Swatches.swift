@@ -389,12 +389,7 @@ struct ColorBar: View {
                 VerticalSlider(value: $highlight.tolerance, range: 2...40, label: "\(Int(highlight.tolerance.rounded()))")
             }
             .frame(maxWidth: .infinity)
-            Picker("Show", selection: $highlight.selectedOnly) {
-                Text("All").tag(false)
-                Text("Selected").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 220)
+            Text("Highlights the chosen swatch.").font(.caption).foregroundStyle(.secondary)
         }
     }
 

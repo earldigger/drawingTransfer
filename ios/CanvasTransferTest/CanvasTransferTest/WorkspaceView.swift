@@ -197,6 +197,13 @@ struct WorkspaceView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active && pencilOn { commitPencil() }  // strokes are saved with the session
         }
+        .onChange(of: colorView) { _, view in
+            // Highlight shows one swatch: with none chosen yet, the newest (its panel stays closed).
+            if view == .highlight, selectedSwatchID == nil, let newest = session.swatches.last {
+                quietSwatchSelection = true
+                selectedSwatchID = newest.id
+            }
+        }
         .task(id: colorView) {
             // The phone shows "Colors are read from…" for 3 seconds as Highlight opens.
             guard Theme.isPhone, colorView == .highlight else { phoneReadNote = false; return }
@@ -366,7 +373,6 @@ struct WorkspaceView: View {
                     // In Highlight, the new swatch is the one highlighted (its panel stays closed).
                     quietSwatchSelection = true
                     selectedSwatchID = swatch.id
-                    highlightSettings.selectedOnly = true
                 } else {
                     selectedSwatchID = nil  // its panel opens when you choose its chip, not now
                 }
@@ -403,10 +409,10 @@ struct WorkspaceView: View {
         return study
     }
 
-    /// The swatches Highlight shows, each with its number's highlight color.
+    /// The swatch Highlight shows: the chosen one only, in its number's highlight color.
     private var highlightSwatches: [(rgb: (Int, Int, Int), index: Int)] {
         session.swatches.enumerated()
-            .filter { !highlightSettings.selectedOnly || $0.element.id == selectedSwatchID }
+            .filter { $0.element.id == selectedSwatchID }
             .map { (($0.element.red, $0.element.green, $0.element.blue), $0.offset) }
     }
 
@@ -750,7 +756,9 @@ struct WorkspaceView: View {
     /// left edge with the arrow at its middle. Choosing one closes it.
     private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)],
                               below: Bool = !Theme.isPhone, fromLeadingEdge: Bool = false) -> some View {
-        Callout(arrowInset: fromLeadingEdge ? 22 : nil, below: below, fill: Theme.popup) {
+        // From the leading edge: the box starts 18 pt left of the button, so the arrow
+        // (under the button's middle) meets a straight edge, clear of the rounded corner.
+        Callout(arrowInset: fromLeadingEdge ? 22 + 18 : nil, below: below, fill: Theme.popup) {
             HStack(spacing: 18) {
                 ForEach(choices, id: \.title) { choice in
                     Button {
@@ -768,7 +776,7 @@ struct WorkspaceView: View {
             }
         }
         .fixedSize()  // its own size, not the button's
-        .offset(y: below ? 44 + 6 : -(44 + 6))  // just below or above the button
+        .offset(x: fromLeadingEdge ? -18 : 0, y: below ? 44 + 6 : -(44 + 6))  // just below or above the button
         .transition(.opacity)
     }
 

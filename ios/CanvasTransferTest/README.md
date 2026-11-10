@@ -95,8 +95,8 @@ automatically.
   **Simplify**: upright Steps (1–24) and Smoothing sliders, Colors or Values
   (tap the tile again, or ⌄, to hide the options and stay simplified; Off ends it);
   the eyedropper then reads the flat color you see.
-  **Highlight**: each swatch's range in its own bright color over gray, with
-  an upright Range slider and All or Selected.
+  **Highlight**: the chosen swatch's range in its bright color over gray,
+  with an upright Range slider (choose a chip to highlight another).
   Then the chips (long-press to delete one); on the right, the pin hides or
   shows the swatch markers, the trash deletes all swatches (asks first), and
   Done. Choosing a swatch selects its layer and opens its panel, which points

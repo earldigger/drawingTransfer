@@ -274,7 +274,6 @@ struct SimplifySettings: Equatable {
 
 struct HighlightSettings: Equatable {
     var tolerance = 12.0  // DEFAULT_HIGHLIGHT_TOLERANCE; about 2.3 is a just-noticeable difference
-    var selectedOnly = false
 }
 
 /// The phone's Simplify bar: Colors or Values, steps and smoothing. The
@@ -312,7 +311,7 @@ struct PhoneSimplifyBar: View {
 
     private func row<S: View>(_ title: String, _ value: String, @ViewBuilder slider: () -> S) -> some View {
         HStack(spacing: 12) {
-            Text(title).frame(width: 86, alignment: .leading)
+            Text(title).font(.footnote).lineLimit(1).fixedSize().frame(width: 72, alignment: .leading)
             slider()
             Text(value).monospacedDigit().frame(width: 28, alignment: .trailing)
         }
@@ -320,8 +319,8 @@ struct PhoneSimplifyBar: View {
 }
 
 /// The phone's Highlight bar: the eyedropper (a swatch added becomes the one
-/// highlighted), the swatches as plain chips (tap to choose, × to delete one,
-/// the trash for all), range, and All or Selected. No color details.
+/// highlighted), the swatches as plain chips (tap one to highlight it, × to
+/// delete one, the trash for all), and the range. No color details.
 struct PhoneHighlightBar: View {
     @Bindable var session: TransferSession
     @Binding var selectedID: UUID?
@@ -347,33 +346,40 @@ struct PhoneHighlightBar: View {
                 .accessibilityLabel(picking ? "Stop adding swatches" : "Add a swatch")
                 if working { ProgressView().controlSize(.small) }
                 Spacer(minLength: 0)
-                Button { confirmingClear = true } label: {
+                Button { withAnimation(.snappy) { confirmingClear.toggle() } } label: {
                     Image(systemName: "trash").font(.system(size: 18)).frame(width: 44, height: 44)
                 }
                 .accessibilityLabel("Delete all swatches")
                 .disabled(session.swatches.isEmpty)
+                .overlay(alignment: .bottom) {  // asks first, in a pop-up pointing at the trash
+                    if confirmingClear {
+                        Callout(fill: Theme.popup) {
+                            HStack(spacing: 14) {
+                                Button("Cancel") { withAnimation(.snappy) { confirmingClear = false } }
+                                    .foregroundStyle(.secondary)
+                                Button("Delete all") {
+                                    session.swatches.removeAll()  // one undo step
+                                    selectedID = nil
+                                    confirmingClear = false
+                                }
+                                .buttonStyle(.accent)
+                            }
+                        }
+                        .fixedSize()
+                        .offset(y: -(44 + 6))
+                        .transition(.opacity)
+                    }
+                }
                 DoneButton(action: onDone)
             }
             chips
             HStack(spacing: 12) {
                 Text("Range")
                 Slider(value: $settings.tolerance, in: 2...40)
-                Picker("Show", selection: $settings.selectedOnly) {
-                    Text("All").tag(false)
-                    Text("Selected").tag(true)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 140)
             }
         }
         .bottomBar()
-        .confirmationDialog("Delete all swatches", isPresented: $confirmingClear, titleVisibility: .hidden) {
-            Button("Delete all", role: .destructive) {
-                session.swatches.removeAll()  // one undo step
-                selectedID = nil
-            }
-            Button("Cancel", role: .cancel) {}
-        }
+        .onChange(of: session.swatches.isEmpty) { _, empty in if empty { confirmingClear = false } }
     }
 
     @ViewBuilder
