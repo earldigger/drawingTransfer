@@ -263,7 +263,7 @@ enum ColorView: Equatable {
 /// The icons for Simplify and Highlight, the same everywhere.
 enum SimplifySymbol {
     static let simplify = "circle.lefthalf.filled"
-    static let highlight = "scope"  // a target: finds where a swatch's color is
+    static let highlight = "sun.horizon"  // a half circle with rays: lights up where a swatch's color is
 }
 
 struct SimplifySettings: Equatable {
@@ -367,11 +367,12 @@ struct PhoneHighlightBar: View {
             }
         }
         .bottomBar()
-        .confirmationDialog("Delete all swatches?", isPresented: $confirmingClear, titleVisibility: .visible) {
-            Button("Delete All Swatches", role: .destructive) {
+        .confirmationDialog("Delete all swatches", isPresented: $confirmingClear, titleVisibility: .hidden) {
+            Button("Delete all", role: .destructive) {
                 session.swatches.removeAll()  // one undo step
                 selectedID = nil
             }
+            Button("Cancel", role: .cancel) {}
         }
     }
 

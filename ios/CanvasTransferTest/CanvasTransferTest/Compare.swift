@@ -243,11 +243,11 @@ struct CompareBar: View {
         }
     }
 
-    /// Layers by position, 1 at the bottom, as numbered in the layer bar while comparing.
+    /// Layers by name, top layer first, as in the layer bar.
     private func layerPicker(_ title: String, _ selection: Binding<UUID?>) -> some View {
         Picker(title, selection: selection) {
-            ForEach(Array(layers.enumerated()).reversed(), id: \.element.id) { i, layer in
-                Text("\(title): Layer \(i + 1)").tag(Optional(layer.id))
+            ForEach(layers.reversed()) { layer in
+                Text("\(title): \(layer.name)").tag(Optional(layer.id))
             }
         }
         .pickerStyle(.menu)

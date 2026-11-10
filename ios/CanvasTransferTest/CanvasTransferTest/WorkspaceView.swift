@@ -45,6 +45,7 @@ struct WorkspaceView: View {
     @State private var sampleSize = SampleSize.small
     @State private var selectedSwatchID: UUID? = nil
     @State private var quietSwatchSelection = false  // the next swatch chosen doesn't open its panel
+    @State private var phoneReadNote = false  // the phone's "Colors are read from…", for a moment
     @State private var renaming: Layer? = nil  // Rename… in a layer's menu
     @State private var newLayerName = ""
     @State private var probe: (pick: PickProbe, screen: CGPoint)? = nil  // while a finger is picking
@@ -196,6 +197,14 @@ struct WorkspaceView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active && pencilOn { commitPencil() }  // strokes are saved with the session
         }
+        .task(id: colorView) {
+            // The phone shows "Colors are read from…" for 3 seconds as Highlight opens.
+            guard Theme.isPhone, colorView == .highlight else { phoneReadNote = false; return }
+            withAnimation { phoneReadNote = true }
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            withAnimation { phoneReadNote = false }
+        }
         .onChange(of: compare?.paused) { _, paused in blinkClock.setPaused(paused ?? false) }
         .onChange(of: compare?.mode) { blinkClock.restart() }  // each mode starts on A
     }
@@ -204,6 +213,10 @@ struct WorkspaceView: View {
 
     /// The Eyedropper, Simplify or Highlight is on: colors are read from the selected layer.
     private var colorToolOn: Bool { swatchesOn || colorView != .normal }
+
+    /// Whether "Colors are read from this layer…" may show. On the phone,
+    /// only for its first 3 seconds in Highlight; never in Simplify.
+    private var readNoteShown: Bool { !Theme.isPhone || (colorView == .highlight && phoneReadNote) }
 
     /// Turns every tool off, so the one being turned on is the only one
     /// (Grid on, then Transform: Grid goes off).
@@ -476,7 +489,7 @@ struct WorkspaceView: View {
                 if !Theme.isPhone || layersShown { layerBar.padding(Theme.isPhone ? 8 : 12) }  // the phone's only with Layers
             }
             .frame(maxHeight: .infinity, alignment: .top)  // the swatch panel can run down to the bottom bar
-            if colorToolOn, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
+            if colorToolOn, readNoteShown, let layer = session.selected, layer.blend != .normal || layer.opacity < 0.995 {
                 // Pick, Simplify and Highlight read the layer's own image, not the mix on the canvas.
                 Text("Colors are read from this layer at full strength. Flatten to read what you see.")
                     .font(.footnote)
@@ -678,12 +691,13 @@ struct WorkspaceView: View {
         toolButton("plus", "Add an image", on: toolPopup == .add) {
             withAnimation(.snappy) { toolPopup = toolPopup == .add ? nil : .add }
         }
-        .overlay(alignment: .top) {
+        // On the phone it's near the left edge of the top bar: the pop-up starts at its left edge.
+        .overlay(alignment: Theme.isPhone ? .topLeading : .top) {
             if toolPopup == .add {
                 popupChoices([
                     ("camera", "Camera", false, true, { capture = Capture(picked: nil) }),
                     ("photo.on.rectangle", "Photos", false, true, { showPhotos = true }),
-                ], below: true)
+                ], below: true, fromLeadingEdge: Theme.isPhone)
             }
         }
     }
@@ -719,21 +733,24 @@ struct WorkspaceView: View {
             withAnimation(.snappy) { toolPopup = toolPopup == .shape ? nil : .shape }
         }
         .disabled(session.selected == nil)
-        .overlay(alignment: Theme.isPhone ? .bottom : .top) {
+        // On the phone it's at the left of the bottom row: the pop-up starts at its left edge.
+        .overlay(alignment: Theme.isPhone ? .bottomLeading : .top) {
             if toolPopup == .shape {
                 popupChoices([
                     (transformSymbol, "Transform", transformOn, session.selected != nil, toggleTransform),
                     ("crop", "Crop", cropping != nil, session.selected != nil, toggleCrop),
-                ])
+                ], fromLeadingEdge: Theme.isPhone)
             }
         }
     }
 
     /// The pop-up by a combined button: icons with their names. Below a button
-    /// in the top bar, above one in the phone's bottom row. Choosing one closes it.
+    /// in the top bar, above one in the phone's bottom row; centred on the
+    /// button, or (`fromLeadingEdge`, near the screen's left) starting at its
+    /// left edge with the arrow at its middle. Choosing one closes it.
     private func popupChoices(_ choices: [(symbol: String, title: String, on: Bool, enabled: Bool, action: () -> Void)],
-                              below: Bool = !Theme.isPhone) -> some View {
-        Callout(below: below, fill: Theme.popup) {
+                              below: Bool = !Theme.isPhone, fromLeadingEdge: Bool = false) -> some View {
+        Callout(arrowInset: fromLeadingEdge ? 22 : nil, below: below, fill: Theme.popup) {
             HStack(spacing: 18) {
                 ForEach(choices, id: \.title) { choice in
                     Button {
@@ -786,6 +803,7 @@ struct WorkspaceView: View {
                 VStack(alignment: .trailing, spacing: 6) {
                     ForEach(session.layers.reversed()) { layer in layerRow(layer) }
                 }
+                .padding(.leading, 10)  // room for the swatch dot over the thumbnails' left edge
             }
             .frame(height: CGFloat(min(session.layers.count, 8)) * 54 - (session.layers.isEmpty ? 0 : 6))
             .scrollDisabled(session.layers.count <= 8)
