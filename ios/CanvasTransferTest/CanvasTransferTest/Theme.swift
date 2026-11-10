@@ -75,16 +75,28 @@ extension View {
 }
 
 /// Spacing in the bottom bars: between groups of controls, and between icon
-/// buttons in a group (as in the top bar).
+/// buttons in a group (as in the top bar). On a narrow screen (an iPad held
+/// upright) the groups sit closer.
 enum BarSpacing {
     static let group: CGFloat = 32
+    static let narrowGroup: CGFloat = 18
     static let icon: CGFloat = 16
+
+    static func group(_ narrow: Bool) -> CGFloat { narrow ? narrowGroup : group }
 }
 
-/// A bottom bar's title: its tool's icon and name (on the phone, the icon only).
+extension EnvironmentValues {
+    /// The bottom bars are on a narrow screen (an iPad held upright): closer
+    /// spacing, shorter sliders, and titles as icons only.
+    @Entry var narrowBars = false
+}
+
+/// A bottom bar's title: its tool's icon and name (on the phone, or a narrow
+/// iPad screen, the icon only).
 struct BarTitle: View {
     let title: String
     let symbol: String
+    @Environment(\.narrowBars) private var narrow
 
     init(_ title: String, symbol: String) {
         self.title = title
@@ -94,7 +106,7 @@ struct BarTitle: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: symbol).font(.system(size: 20))
-            if !Theme.isPhone { Text(title).font(.headline) }
+            if !Theme.isPhone && !narrow { Text(title).font(.headline) }
         }
         .fixedSize()
         .accessibilityElement(children: .ignore)

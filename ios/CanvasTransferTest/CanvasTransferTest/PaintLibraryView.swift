@@ -74,11 +74,11 @@ struct PaintLibraryView: View {
         let measured = paints.filter { $0.lab != nil }.count
         let standIn = paints.filter { $0.lab == nil && PaintLibrary.standIn(for: $0, among: paints) != nil }.count
         let none = paints.count - measured - standIn
-        return HStack {
+        return VStack(alignment: .leading, spacing: 2) {  // wraps on a narrow screen
             Text("\(paints.count) paints · \(measured) measured · \(standIn) using a stand-in · \(none) without color data · ⚠ = can't be shown exactly on screen")
-            Spacer()
             Text("Saved on this iPad · \(library.origin)")
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .font(.caption).foregroundStyle(.secondary)
     }
 }
@@ -134,45 +134,57 @@ private struct PaintsTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Button("Add Paint…") {
-                    let id = "manual-" + UUID().uuidString.prefix(8).lowercased()
-                    var p = Paint(id: id, medium: selected?.medium ?? media.first ?? "oil", brand: "", name: "", lab: nil)
-                    p.source = "Entered by hand"
-                    editing = PaintDraft(paint: p, isNew: true)
-                }
-                Button("Edit…") { if let selected { editing = PaintDraft(paint: selected, isNew: false) } }
-                    .disabled(selected == nil)
-                Button("Delete", role: .destructive) { confirmingDelete = true }
-                    .disabled(selected == nil)
-                Button("Revert to Site Data") {
-                    guard let i = paints.firstIndex(where: { $0.id == selectedID }) else { return }
-                    paints[i].revertToSite()
-                }
-                .disabled(selected?.site.isEmpty ?? true || (selected?.edited.isEmpty ?? true))
-                Button("Open Web Page") { if let s = selected, let url = URL(string: s.url) { openURL(url) } }
-                    .disabled(selected?.url.isEmpty ?? true)
-                Spacer()
-                Button("Import paints…", action: onImport)
-            }
-            .buttonStyle(.bordered)
-            header
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-                    ForEach(media, id: \.self) { medium in
-                        let list = paints.filter { $0.medium == medium }
-                            .sorted { ($0.brand, $0.name) < ($1.brand, $1.name) }
-                        Section {
-                            ForEach(list) { paint in row(paint) }
-                        } header: {
-                            Text("\(medium.capitalized) (\(list.count))").font(.headline)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 6).background(Theme.surface)
-                        }
+            ScrollView(.horizontal, showsIndicators: false) {  // on a narrow screen the buttons scroll
+                HStack(spacing: 10) {
+                    Button("Add Paint…") {
+                        let id = "manual-" + UUID().uuidString.prefix(8).lowercased()
+                        var p = Paint(id: id, medium: selected?.medium ?? media.first ?? "oil", brand: "", name: "", lab: nil)
+                        p.source = "Entered by hand"
+                        editing = PaintDraft(paint: p, isNew: true)
                     }
+                    Button("Edit…") { if let selected { editing = PaintDraft(paint: selected, isNew: false) } }
+                        .disabled(selected == nil)
+                    Button("Delete", role: .destructive) { confirmingDelete = true }
+                        .disabled(selected == nil)
+                    Button("Revert to Site Data") {
+                        guard let i = paints.firstIndex(where: { $0.id == selectedID }) else { return }
+                        paints[i].revertToSite()
+                    }
+                    .disabled(selected?.site.isEmpty ?? true || (selected?.edited.isEmpty ?? true))
+                    Button("Open Web Page") { if let s = selected, let url = URL(string: s.url) { openURL(url) } }
+                        .disabled(selected?.url.isEmpty ?? true)
+                    Button("Import paints…", action: onImport)
+                        .padding(.leading, 20)
                 }
+                .buttonStyle(.bordered)
+                .padding(.vertical, 2)
             }
-            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface))
+            // The table keeps its columns; on a narrow screen it scrolls sideways.
+            GeometryReader { geo in
+                ScrollView(.horizontal) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        header
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                                ForEach(media, id: \.self) { medium in
+                                    let list = paints.filter { $0.medium == medium }
+                                        .sorted { ($0.brand, $0.name) < ($1.brand, $1.name) }
+                                    Section {
+                                        ForEach(list) { paint in row(paint) }
+                                    } header: {
+                                        Text("\(medium.capitalized) (\(list.count))").font(.headline)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.vertical, 6).padding(.horizontal, 8).background(Theme.surface)
+                                    }
+                                }
+                            }
+                        }
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.surface))
+                    }
+                    .frame(width: max(geo.size.width, Self.tableWidth))
+                }
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            }
         }
         .sheet(item: $editing) { draft in
             PaintEditor(draft: draft, paints: paints) { saved in
@@ -192,8 +204,9 @@ private struct PaintsTab: View {
         } message: { Text("It's also taken out of your palettes.") }
     }
 
-    // Column widths.
+    // Column widths, and the table's least width: the columns, Color data, gaps and padding.
     private let widths: [CGFloat] = [28, 34, 26, 230, 230, 50, 150, 130, 80]
+    private static let tableWidth: CGFloat = 958 + 240 + 9 * 8 + 16
 
     private var header: some View {
         HStack(spacing: 8) {

@@ -160,6 +160,7 @@ struct CropBar: View {
     @Binding var shape: CropShape
     var onCancel: () -> Void
     var onDone: () -> Void
+    @Environment(\.narrowBars) private var narrow
 
     var body: some View {
         Group {
@@ -175,7 +176,7 @@ struct CropBar: View {
                     shapes
                 }
             } else {
-                HStack(spacing: BarSpacing.group) {
+                HStack(spacing: BarSpacing.group(narrow)) {
                     BarTitle("Crop", symbol: "crop")
                     shapes.frame(width: 200)
                     Button("Reset") { layer.crop = reshaped(Crop.full) }

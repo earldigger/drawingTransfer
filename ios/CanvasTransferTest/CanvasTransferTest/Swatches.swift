@@ -288,18 +288,23 @@ struct ColorBar: View {
     }
 
     /// On, with its options showing; or off. Simplify and Highlight take turns.
+    /// The Eyedropper turns on and off. Simplify and Highlight turn on with
+    /// their options showing; tapped again they only hide or show the options,
+    /// and stay on until the other one, Off or Done.
     private func toggle(_ tool: Tool) {
         let nowOn: Bool
         switch tool {
         case .pick:
             picking.toggle()
             nowOn = picking
-        case .simplify:
-            view = view == .simplify ? .normal : .simplify
-            nowOn = view == .simplify
-        case .highlight:
-            view = view == .highlight ? .normal : .highlight
-            nowOn = view == .highlight
+        case .simplify, .highlight:
+            let mode: ColorView = tool == .simplify ? .simplify : .highlight
+            if view == mode {
+                withAnimation(.snappy) { popup = popup == tool ? nil : tool }
+                return
+            }
+            view = mode
+            nowOn = true
         }
         withAnimation(.snappy) {
             if nowOn {
@@ -342,7 +347,7 @@ struct ColorBar: View {
 
     private var simplifyOptions: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Simplify", systemImage: "circle.lefthalf.filled").font(.title3.weight(.semibold))
+            popupHeader("Simplify", symbol: "circle.lefthalf.filled")
             HStack(alignment: .top, spacing: 36) {
                 sliderColumn("Steps") {
                     VerticalSlider(value: Binding(get: { Double(simplify.count) }, set: { simplify.count = Int($0) }),
@@ -365,7 +370,7 @@ struct ColorBar: View {
 
     private var highlightOptions: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Highlight", systemImage: "pencil.line").font(.title3.weight(.semibold))
+            popupHeader("Highlight", symbol: "pencil.line")
             if session.swatches.isEmpty {
                 Text("Add a swatch first.").font(.callout).foregroundStyle(.secondary)
             }
@@ -380,6 +385,27 @@ struct ColorBar: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 220)
+        }
+    }
+
+    /// Simplify's or Highlight's title, with Off (ends the mode) and ⌄ (hides
+    /// the options; the mode stays on).
+    private func popupHeader(_ title: String, symbol: String) -> some View {
+        HStack(spacing: 14) {
+            Label(title, systemImage: symbol).font(.title3.weight(.semibold))
+            Spacer(minLength: 12)
+            Button("Off") {
+                withAnimation(.snappy) {
+                    view = .normal
+                    popup = nil
+                }
+            }
+            Button {
+                withAnimation(.snappy) { popup = nil }
+            } label: {
+                Image(systemName: "chevron.down").font(.body.weight(.semibold)).frame(width: 32, height: 32)
+            }
+            .accessibilityLabel("Hide \(title.lowercased()) options")
         }
     }
 

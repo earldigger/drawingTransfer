@@ -86,6 +86,7 @@ struct WorkspaceView: View {
                     exitFullScreenButton
                 } else {
                     chrome
+                        .environment(\.narrowBars, !Theme.isPhone && geo.size.width < 1100)  // an iPad held upright
                 }
                 if let probe {
                     Loupe(probe: probe.pick, sample: sampleSize)
@@ -904,6 +905,7 @@ struct LookBar: View {
     var onEditCorners: () -> Void
 
     @Environment(History.self) private var history
+    @Environment(\.narrowBars) private var narrow
     @State private var adjusting = false
 
     var body: some View {
@@ -925,12 +927,11 @@ struct LookBar: View {
                 }
                 .bottomBar()
             }        } else {
-            HStack(spacing: BarSpacing.group) {
-                title.frame(maxWidth: 180, alignment: .leading)
+            HStack(spacing: BarSpacing.group(narrow)) {
+                title.frame(maxWidth: .infinity, alignment: .leading)  // the name gets what's left
                 opacity
-                blend.frame(width: 250)
+                blend.frame(width: narrow ? 220 : 250)
                 buttons
-                Spacer(minLength: 0)
             }
             .bottomBar()
         }
@@ -945,11 +946,11 @@ struct LookBar: View {
 
     private var opacity: some View {
         HStack(spacing: BarSpacing.icon) {
-            Text("Opacity")
             Slider(value: $layer.opacity, in: 0...1) { editing in
                 if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
             }
-            .frame(width: Theme.isPhone ? nil : 200)  // on the phone, the row's width
+            .frame(width: Theme.isPhone ? nil : narrow ? 160 : 200)  // on the phone, the row's width
+            .accessibilityLabel("Opacity")
             Text("\(Int((layer.opacity * 100).rounded()))%")
                 .monospacedDigit()
                 .lineLimit(1)
@@ -1045,6 +1046,7 @@ struct ShareFile: Identifiable {
 struct GridBar: View {
     @Bindable var session: TransferSession
     var onDone: () -> Void
+    @Environment(\.narrowBars) private var narrow
 
     var body: some View {
         Group {
@@ -1068,15 +1070,17 @@ struct GridBar: View {
                     }
                 }
             } else {
-                HStack(spacing: BarSpacing.group) {
+                HStack(spacing: BarSpacing.group(narrow)) {
                     title
                     count("Rows", $session.grid.rows)
                     count("Columns", $session.grid.columns)
                     squareCells
                     colors
                     HStack(spacing: 16) {
-                        Text("Opacity")
-                        Slider(value: $session.grid.opacity, in: 0.1...1).frame(width: 140)
+                        if !narrow { Text("Opacity") }
+                        Slider(value: $session.grid.opacity, in: 0.1...1)
+                            .frame(width: narrow ? 110 : 140)
+                            .accessibilityLabel("Opacity")
                     }
                     Spacer(minLength: 0)
                     DoneButton(action: onDone)
@@ -1087,7 +1091,7 @@ struct GridBar: View {
     }
 
     private var title: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: narrow ? 14 : 24) {
             BarTitle("Grid", symbol: "square.grid.3x3")
             Toggle("Grid", isOn: $session.grid.isOn)
                 .labelsHidden()

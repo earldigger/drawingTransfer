@@ -176,6 +176,7 @@ struct CompareBar: View {
     let layers: [Layer]
     let clock: BlinkClock
     var onDone: () -> Void
+    @Environment(\.narrowBars) private var narrow
 
     var body: some View {
         Group {
@@ -194,9 +195,9 @@ struct CompareBar: View {
                     if state.mode.blinks { speed }
                 }
             } else {
-                HStack(spacing: BarSpacing.group) {
+                HStack(spacing: BarSpacing.group(narrow)) {
                     BarTitle("Compare", symbol: "rectangle.split.2x1")
-                    modes.frame(width: 300)
+                    modes.frame(width: narrow ? 250 : 300)
                     roles
                     if state.mode.blinks { speed }
                     Spacer(minLength: 0)
@@ -216,7 +217,7 @@ struct CompareBar: View {
 
     /// A and B, and Swap.
     private var roles: some View {
-        HStack(spacing: BarSpacing.icon) {
+        HStack(spacing: narrow ? 8 : BarSpacing.icon) {
             layerPicker("A", $state.a)
             if state.mode.needsB {
                 layerPicker("B", $state.b)
@@ -230,10 +231,10 @@ struct CompareBar: View {
 
     /// The blink's speed, and pause.
     private var speed: some View {
-        HStack(spacing: BarSpacing.icon) {
+        HStack(spacing: narrow ? 8 : BarSpacing.icon) {
             Text(String(format: "%.1f s", state.interval)).monospacedDigit().frame(width: 44)
             Slider(value: $state.interval, in: CompareState.intervalRange)
-                .frame(width: Theme.isPhone ? nil : 120)  // on the phone, the row's width
+                .frame(width: Theme.isPhone ? nil : narrow ? 90 : 120)  // on the phone, the row's width
             Button { state.paused.toggle() } label: {
                 Image(systemName: state.paused ? "play.fill" : "pause.fill").font(.system(size: 20))
                     .frame(width: 44, height: 44)

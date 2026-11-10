@@ -91,7 +91,8 @@ automatically.
   pop-up above it:
   **Eyedropper** (sample size 1, 5 or 11 px): touch the canvas for a loupe on
   the selected layer and lift to add a numbered swatch; two fingers pan and zoom.
-  **Simplify**: upright Steps (1–24) and Smoothing sliders, Colors or Values;
+  **Simplify**: upright Steps (1–24) and Smoothing sliders, Colors or Values
+  (tap the tile again, or ⌄, to hide the options and stay simplified; Off ends it);
   the eyedropper then reads the flat color you see.
   **Highlight**: each swatch's range in its own bright color over gray, with
   an upright Range slider and All or Selected.

@@ -291,6 +291,7 @@ struct TransformBar: View {
     let canvasSize: CGSize  // inches
     var onCancel: () -> Void
     var onDone: () -> Void
+    @Environment(\.narrowBars) private var narrow
 
     var body: some View {
         Group {
@@ -307,7 +308,7 @@ struct TransformBar: View {
                     modes
                 }
             } else {
-                HStack(spacing: BarSpacing.group) {
+                HStack(spacing: BarSpacing.group(narrow)) {
                     title
                     modes.frame(width: 380)
                     flips
@@ -359,7 +360,7 @@ struct TransformBar: View {
     }
 
     private var actions: some View {
-        HStack(spacing: BarSpacing.group) {
+        HStack(spacing: BarSpacing.group(narrow)) {
             Button("Fit") { layer.fit(canvasAspect: canvasSize.width / canvasSize.height) }
             Button("Cancel", action: onCancel)
         }
