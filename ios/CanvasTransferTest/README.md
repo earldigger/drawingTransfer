@@ -110,10 +110,11 @@ automatically.
   selected drawing layer (or a new "Drawing n" on top) when you choose
   another layer, add one, or put the Pencil away. Thumbnails have a
   checkerboard behind see-through parts.
-- **Eraser** (in the Pencil's panel, under the pencil icon): Size and Opacity
-  then set the eraser (opacity = how strongly it erases). Each stroke is cut
-  out of the selected drawing layer when you lift (one undo step); its path
-  shows faintly in sky blue while you drag. It works on drawing layers only.
+- **Eraser** (in the Pencil's panel, under the pencil icon): erases the
+  selected layer, photo or drawing, live as you drag (no path drawn).
+  Size and Opacity then set the eraser (opacity = how strongly it erases).
+  When you lift, the stroke is taken back through the layer's placement into
+  its picture's pixels and cut out: one undo step.
 - **New layer** (+, below Flatten in the layer bar): an empty, transparent
   "Drawing n" on top, filling the canvas; the Pencil draws into it.
 - **Flatten** (bottom of the layer bar): the visible layers exactly as shown
@@ -154,7 +155,8 @@ automatically.
   crossfade), or Split with a draggable line; A and B, swap, speed, pause. The layer bar numbers the layers and
   marks A and B.
 - **Layers** (right): ‹ expands the bar to numbers, eyes and blend ·
-  opacity. Tap a thumbnail to select it, double-tap to show or hide it. Long-press a layer to move it up or down, to the front or back,
+  opacity. Tap a thumbnail to select it, double-tap to show or hide it (a hidden
+  layer's thumbnail shows a crossed-out eye). Long-press a layer to move it up or down, to the front or back,
   rename, duplicate, hide or delete it. The layer bar at the bottom has the layer's
   name, opacity, blend, Adjust, Flip horizontal / vertical, and **⋯** with Fit
   and **Edit corners…**, which reopens Adjust corners

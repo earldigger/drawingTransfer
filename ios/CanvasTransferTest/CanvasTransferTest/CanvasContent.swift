@@ -14,6 +14,7 @@ struct CanvasContent: View {
     var fades: [UUID: Double] = [:]  // Compare: a layer's opacity times this, while it fades in and out
     var replacements: [UUID: UIImage] = [:]  // Color: a layer shown simplified or highlighted instead
     var background: Color = .white  // the canvas under the layers
+    var erasing: EraseStroke? = nil  // the Eraser's stroke so far: that layer shows cut away under it
 
     var body: some View {
         ZStack {
@@ -57,8 +58,35 @@ struct CanvasContent: View {
         return content
             .projectionEffect(QuadGeometry.projection(from: own, to: layer.quadPoints(in: size)))
             .frame(width: size.width, height: size.height, alignment: .topLeading)
+            .overlay {
+                // While erasing this layer, the stroke so far cuts it away (live).
+                if let erasing, erasing.layerID == layer.id {
+                    erasing.path
+                        .stroke(Color.black.opacity(erasing.opacity),
+                                style: StrokeStyle(lineWidth: erasing.width, lineCap: .round, lineJoin: .round))
+                        .blendMode(.destinationOut)
+                }
+            }
+            .compositingGroup()  // the cut-out applies to this layer only
             .opacity(opacity)
             .blendMode(layer.blend.mode)
+    }
+}
+
+/// The Eraser's stroke while the finger or Pencil is down: canvas points,
+/// width in canvas points, and how strongly it erases.
+struct EraseStroke {
+    var layerID: UUID
+    var points: [CGPoint]
+    var width: CGFloat
+    var opacity: Double
+
+    var path: Path {
+        Path { p in
+            guard let first = points.first else { return }
+            p.move(to: first)
+            p.addLines(points.count > 1 ? points : [first, CGPoint(x: first.x + 0.01, y: first.y)])  // a tap: a dot
+        }
     }
 }
 

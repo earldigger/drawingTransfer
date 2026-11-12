@@ -66,7 +66,7 @@ struct WorkspaceView: View {
     @State private var erasing = false  // the Pencil's Eraser is chosen
     @AppStorage("eraserSizePixels") private var eraserSize = 40.0
     @AppStorage("eraserOpacity") private var eraserOpacity = 1.0  // how strongly it erases
-    @State private var eraserNote = false  // "The eraser works on drawing layers", for a moment
+    @State private var eraseStroke: EraseStroke? = nil  // the Eraser's stroke while it's down
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
@@ -201,11 +201,8 @@ struct WorkspaceView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active && pencilOn { commitPencil() }  // strokes are saved with the session
         }
-        .onChange(of: erasing) { wasErasing, _ in
-            commitPencil(erasingStrokes: wasErasing)  // strokes drawn before go in as what they were
-        }
-        .onChange(of: pencil.hasStrokes) { _, has in
-            if has && erasing { commitPencil() }  // each eraser stroke takes effect as it ends
+        .onChange(of: erasing) { _, nowErasing in
+            if nowErasing { commitPencil() }  // pencil strokes go into their layer before erasing
         }
         .onChange(of: colorView) { _, view in
             // Highlight shows one swatch: with none chosen yet, the newest (its panel stays closed).
@@ -256,40 +253,46 @@ struct WorkspaceView: View {
 
     /// The strokes drawn so far into the drawing layer (see `Pencil.commit`):
     /// the selected one, or `layerID`'s when the selection has just changed.
-    /// With the Eraser (`erasingStrokes`, the mode they were drawn in), the
-    /// strokes are cut out of the drawing layer instead.
-    private func commitPencil(into layerID: UUID? = nil, erasingStrokes: Bool? = nil) {
+    private func commitPencil(into layerID: UUID? = nil) {
         guard let strokes = pencil.take() else { return }
-        let target = layerID ?? session.selectedID
-        if erasingStrokes ?? erasing {
-            if !Pencil.erase(strokes.drawing, sheet: strokes.sheet, in: session, layerID: target) { showEraserNote() }
-        } else {
-            Pencil.commit(strokes.drawing, sheet: strokes.sheet, to: session, layerID: target)
-        }
-    }
-
-    private func showEraserNote() {
-        withAnimation { eraserNote = true }
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
-            withAnimation { eraserNote = false }
-        }
+        Pencil.commit(strokes.drawing, sheet: strokes.sheet, to: session, layerID: layerID ?? session.selectedID)
     }
 
     /// The size and opacity the panel's sliders set: the Pencil's or the Eraser's.
     private var toolSize: Binding<Double> { erasing ? $eraserSize : $pencilSize }
     private var toolOpacity: Binding<Double> { erasing ? $eraserOpacity : $pencilOpacity }
-    private var ink: PKInkingTool.InkType { erasing ? Pencil.eraserInk : Pencil.pencilInk }
 
-    /// The ink on the sheet: its size in the drawing layer's pixels turned
-    /// into the sheet's points, and its color and opacity. The Eraser's path
-    /// shows faintly in sky blue until it's cut out; its opacity is how much it erases.
+    /// The Pencil's ink on the sheet: its size in the drawing layer's pixels
+    /// turned into the sheet's points, its color and opacity.
     private func pencilTool(display: CGSize) -> PKInkingTool {
-        let color = erasing ? UIColor(Theme.accent).withAlphaComponent(eraserOpacity)
-                            : UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity)
-        let size = toolSize.wrappedValue
-        return Pencil.tool(pixels: size, color: color, display: display,
-                           scale: Pencil.scale(pixels: size, display: display, ink: ink), ink: ink)
+        Pencil.tool(pixels: pencilSize, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity),
+                    display: display, scale: Pencil.scale(pixels: pencilSize, display: display))
+    }
+
+    /// The Eraser on the selected layer: the stroke cuts it away as it's
+    /// drawn, and is cut out of its picture when it ends (one undo step).
+    private func eraser(canvas: CGSize) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        guard let layer = session.selected else { return }
+                        if eraseStroke == nil {
+                            eraseStroke = EraseStroke(layerID: layer.id, points: [],
+                                                      width: eraserSize * Pencil.pointsPerPixel(canvas: canvas),
+                                                      opacity: eraserOpacity)
+                        }
+                        eraseStroke?.points.append(drag.location)
+                    }
+                    .onEnded { _ in
+                        if let stroke = eraseStroke, let layer = session.layers.first(where: { $0.id == stroke.layerID }) {
+                            Pencil.erase(stroke, canvas: canvas, layer: layer)
+                        }
+                        eraseStroke = nil
+                    }
+            )
+            .accessibilityLabel("Eraser")
     }
 
     // MARK: crop
@@ -371,8 +374,10 @@ struct WorkspaceView: View {
         .shadow(color: .black.opacity(0.4), radius: 12, y: 4)
         .overlay {
             // The Pencil's sheet, after the shadow so strokes don't cast one.
-            if pencilOn {
-                let scale = Pencil.scale(pixels: toolSize.wrappedValue, display: size, ink: ink)
+            if pencilOn && erasing {
+                eraser(canvas: size)
+            } else if pencilOn {
+                let scale = Pencil.scale(pixels: pencilSize, display: size)
                 PencilCanvas(controller: pencil, tool: pencilTool(display: size), size: size, scale: scale)
                     .onChange(of: scale) { commitPencil() }  // strokes on the old sheet go in first
             }
@@ -429,7 +434,8 @@ struct WorkspaceView: View {
             CanvasContent(layers: session.layers, size: size, grid: grid, gridLineWidth: lineWidth,
                           faintFullImageOf: cropping?.id,
                           replacements: shownStudy.map { [$0.layerID: $0.image] } ?? [:],
-                          background: session.background.color)
+                          background: session.background.color,
+                          erasing: eraseStroke)
         }
     }
 
@@ -536,15 +542,6 @@ struct WorkspaceView: View {
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(Capsule().fill(Theme.bar))
                     .padding(.bottom, 8)
-            }
-            if eraserNote {
-                // An eraser stroke on a photo layer: nothing was erased.
-                Text("The eraser works on drawing layers. Choose one, or add one with +.")
-                    .font(.footnote)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Capsule().fill(Theme.bar))
-                    .padding(.bottom, 8)
-                    .transition(.opacity)
             }
             Group {
                 if let cropping, let layer = session.selected, layer.id == cropping.id {
@@ -945,6 +942,15 @@ struct WorkspaceView: View {
                 .background(Checkerboard())  // see-through parts (a new blank layer is all checkerboard)
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .opacity(layer.isVisible ? 1 : 0.35)
+                .overlay {  // hidden: a crossed-out eye, as in the layer's menu
+                    if !layer.isVisible {
+                        Image(systemName: "eye.slash")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 26, height: 26)
+                            .background(Circle().fill(Color.black.opacity(0.6)))
+                    }
+                }
                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.accent, lineWidth: selected ? 3 : 0))
                 .overlay(alignment: .bottomLeading) { compareBadge(layer) }
                 .overlay(alignment: .leading) {

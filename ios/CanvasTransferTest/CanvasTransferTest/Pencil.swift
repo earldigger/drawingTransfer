@@ -125,7 +125,9 @@ enum Pencil {
     static let longEdge: CGFloat = 2048  // a drawing layer's pixels on its long side
     static let sizes: ClosedRange<Double> = 1...300  // the Pencil's size, in a drawing layer's pixels
     static let pencilInk = PKInkingTool.InkType.pencil
-    static let eraserInk = PKInkingTool.InkType.monoline  // even and solid, so it erases cleanly
+
+    /// Canvas points per drawing-layer pixel, for sizes given in pixels.
+    static func pointsPerPixel(canvas: CGSize) -> CGFloat { pointsPerPixel(canvas) }
 
     /// How much larger the sheet is shown so a `pixels`-wide stroke fits the
     /// ink's widest, on a canvas `display` points in size on screen.
@@ -184,30 +186,41 @@ enum Pencil {
         }
     }
 
-    /// Erases `drawing`'s strokes (their shape and opacity; their color doesn't
-    /// matter) from the drawing layer `layerID`. One undo step. False, and
-    /// nothing changed, if that layer isn't a drawing layer.
+    /// Erases a stroke (canvas points on a canvas `canvas` points in size)
+    /// from any layer, photo or drawing: the stroke is drawn as a mask over the
+    /// canvas, the mask is taken back through the layer's corners into its own
+    /// picture's pixels (moved, turned, skewed, flipped, all undone), and cut
+    /// out of the picture. One undo step.
     @MainActor
-    @discardableResult
-    static func erase(_ drawing: PKDrawing, sheet: CGSize, in session: TransferSession, layerID: UUID?) -> Bool {
-        guard sheet.width > 0, sheet.height > 0,
-              let target = session.layers.first(where: { $0.id == layerID && isDrawingLayer($0) }) else { return false }
-        let pixels = CGSize(width: target.image.size.width * target.image.scale,
-                            height: target.image.size.height * target.image.scale)
-        var strokes = UIImage()
-        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
-            strokes = drawing.image(from: CGRect(origin: .zero, size: sheet), scale: pixels.width / sheet.width)
-        }
+    static func erase(_ stroke: EraseStroke, canvas: CGSize, layer: Layer) {
+        guard canvas.width > 0, canvas.height > 0, !stroke.points.isEmpty else { return }
+        // The mask, over the whole canvas, `k` pixels per canvas point.
+        let k = longEdge / max(canvas.width, canvas.height)
+        let maskSize = CGSize(width: (canvas.width * k).rounded(), height: (canvas.height * k).rounded())
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         format.opaque = false
+        let mask = UIGraphicsImageRenderer(size: maskSize, format: format).image { context in
+            let cg = context.cgContext
+            cg.scaleBy(x: k, y: k)
+            cg.setStrokeColor(UIColor.black.withAlphaComponent(stroke.opacity).cgColor)
+            cg.setLineWidth(stroke.width)
+            cg.setLineCap(.round)
+            cg.setLineJoin(.round)
+            cg.addPath(stroke.path.cgPath)
+            cg.strokePath()
+        }
+        // The layer's picture corners in mask pixels, and the mask warped onto the picture.
+        let corners = Corners(points: layer.quadPoints(in: canvas).map { CGPoint(x: $0.x * k, y: $0.y * k) })
+        let warped = ImageOps.perspectiveCorrect(mask, corners: corners)
+        guard warped !== mask else { return }  // couldn't be warped
+        let pixels = CGSize(width: layer.image.size.width * layer.image.scale, height: layer.image.size.height * layer.image.scale)
         let rect = CGRect(origin: .zero, size: pixels)
         let image = UIGraphicsImageRenderer(size: pixels, format: format).image { _ in
-            target.image.draw(in: rect)
-            strokes.draw(in: rect, blendMode: .destinationOut, alpha: 1)  // cut out where the strokes are
+            layer.image.draw(in: rect)
+            warped.draw(in: rect, blendMode: .destinationOut, alpha: 1)  // cut out where the stroke was
         }
-        target.replaceImage(image)
-        return true
+        layer.replaceImage(image)
     }
 
     /// A new, empty (transparent) drawing layer on top, filling the canvas at
