@@ -21,9 +21,12 @@ struct SessionSnapshot: Codable, Equatable {
         var adjustments: Adjustments?  // optional, so sessions saved before Look still open
         var flipH: Bool?  // before the quad, with center, width and rotation
         var flipV: Bool?
-        var imageID: UUID?  // the image's file; nil = named by the layer's id, as before Edit corners
-        var sourceID: UUID?  // the original photo's file, if kept
-        var corners: Corners?  // in the original photo's pixels
+        var imageID: UUID?  // the image's file; nil = named by the layer's id
+        // Older sessions kept each layer's original photo and its corners (for
+        // Edit corners). They're still read, so those files open, but not used:
+        // a layer is its picture once imported.
+        var sourceID: UUID?
+        var corners: Corners?
     }
 
     var version = 1
@@ -42,7 +45,7 @@ extension TransferSession {
             layers: layers.map {
                 .init(id: $0.id, name: $0.name, opacity: $0.opacity, blend: $0.blend, isVisible: $0.isVisible,
                       quad: $0.quad, crop: $0.crop, adjustments: $0.adjustments,
-                      imageID: $0.imageID, sourceID: $0.sourceID, corners: $0.corners)
+                      imageID: $0.imageID)
             },
             selectedID: selectedID,
             grid: grid,
@@ -52,8 +55,8 @@ extension TransferSession {
 
     /// Makes the session match `snapshot`. Layers that are already here are
     /// updated in place; others are made from `images` (by image id; a layer
-    /// without one is skipped). `sources` gives original photos by their id.
-    func apply(_ snapshot: SessionSnapshot, images: (UUID) -> UIImage?, sources: (UUID) -> UIImage?) {
+    /// without one is skipped).
+    func apply(_ snapshot: SessionSnapshot, images: (UUID) -> UIImage?) {
         canvasSize = snapshot.canvasSize
         if let saved = snapshot.grid { grid = saved }
         swatches = snapshot.swatches ?? []
@@ -70,11 +73,6 @@ extension TransferSession {
             } else {
                 return nil
             }
-            if layer.sourceID != state.sourceID {
-                layer.sourceID = state.sourceID
-                layer.source = state.sourceID.flatMap(sources)
-            }
-            layer.corners = state.corners
             layer.name = state.name
             layer.opacity = state.opacity
             layer.blend = state.blend
@@ -96,16 +94,15 @@ extension TransferSession {
     }
 }
 
-/// A project's session, kept in its folder: session.json; each layer's image
-/// as a PNG named by its image id; each original photo as a JPEG named by its
-/// source id. Neither ever changes under its name (Edit corners makes a new
-/// image id), so each file is written once.
+/// A project's session, kept in its folder: session.json, and each layer's
+/// image as a PNG named by its image id. An image never changes under its
+/// name (drawing or erasing makes a new image id), so each file is written
+/// once. Original photos kept by older versions ("-source.jpg") are removed.
 enum SessionStore {
     /// Where the one session lived before projects; moved into the first project.
     static let legacyFolder = URL.applicationSupportDirectory.appending(path: "Session", directoryHint: .isDirectory)
     private static func file(_ folder: URL) -> URL { folder.appending(path: "session.json") }
     private static func imageURL(_ id: UUID, _ folder: URL) -> URL { folder.appending(path: "\(id.uuidString).png") }
-    private static func sourceURL(_ id: UUID, _ folder: URL) -> URL { folder.appending(path: "\(id.uuidString)-source.jpg") }
     private static let queue = DispatchQueue(label: "autosave")  // one save at a time, in order
 
     /// Runs after every save already asked for has finished (to copy a project safely).
@@ -121,7 +118,7 @@ enum SessionStore {
                 let image = UIImage(contentsOfFile: imageURL(id, folder).path)
                 if image == nil { saveLog.error("No image \(id), skipped its layer") }
                 return image
-            }, sources: { UIImage(contentsOfFile: sourceURL($0, folder).path) })
+            })
             saveLog.notice("Opened the saved session: \(session.layers.count) layers")
         } catch {
             saveLog.error("Couldn't read session.json, starting empty: \(error)")
@@ -129,9 +126,9 @@ enum SessionStore {
         return session
     }
 
-    /// Writes new images and photos, then session.json, and removes files no
-    /// layer uses any more. Runs off the main thread; a PNG can take a moment.
-    static func save(_ snapshot: SessionSnapshot, images: [UUID: UIImage], sources: [UUID: UIImage], to folder: URL) {
+    /// Writes new images, then session.json, and removes files no layer uses
+    /// any more. Runs off the main thread; a PNG can take a moment.
+    static func save(_ snapshot: SessionSnapshot, images: [UUID: UIImage], to folder: URL) {
         queue.async {
             do {
                 let files = FileManager.default
@@ -140,16 +137,9 @@ enum SessionStore {
                     guard let png = image.pngData() else { continue }
                     try png.write(to: imageURL(id, folder), options: .atomic)
                 }
-                for (id, photo) in sources where !files.fileExists(atPath: sourceURL(id, folder).path) {
-                    guard let jpeg = photo.jpegData(compressionQuality: 0.95) else { continue }
-                    try jpeg.write(to: sourceURL(id, folder), options: .atomic)
-                }
                 // Files first: session.json never names one that isn't there yet.
                 try JSONEncoder().encode(snapshot).write(to: file(folder), options: .atomic)
-                let keep = Set(snapshot.layers.flatMap { state in
-                    [imageURL(state.imageID ?? state.id, folder).lastPathComponent]
-                        + (state.sourceID.map { [sourceURL($0, folder).lastPathComponent] } ?? [])
-                })
+                let keep = Set(snapshot.layers.map { imageURL($0.imageID ?? $0.id, folder).lastPathComponent })
                 for name in try files.contentsOfDirectory(atPath: folder.path)
                 where (name.hasSuffix(".png") || name.hasSuffix("-source.jpg")) && !keep.contains(name) {
                     try? files.removeItem(at: folder.appending(path: name))
@@ -194,8 +184,6 @@ struct Autosave: ViewModifier {
         let layers = session.layers
         SessionStore.save(session.snapshot,
                           images: Dictionary(layers.map { ($0.imageID, $0.image) }, uniquingKeysWith: { a, _ in a }),
-                          sources: Dictionary(layers.compactMap { l in l.sourceID.flatMap { id in l.source.map { (id, $0) } } },
-                                              uniquingKeysWith: { a, _ in a }),
                           to: folder)
         onSaved()
     }

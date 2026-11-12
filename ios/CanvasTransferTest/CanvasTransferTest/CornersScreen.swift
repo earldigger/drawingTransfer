@@ -230,10 +230,7 @@ struct CaptureFlow: View {
     private func add(_ corners: Corners) {
         guard let photo else { return }
         let image = ImageOps.layerImage(from: photo, corners: corners)
-        let layer = Layer(name: "Image", image: image, canvasAspect: canvasAspect)
-        layer.source = photo  // kept, so Edit corners can change them later
-        layer.sourceID = UUID()
-        layer.corners = corners
-        onDone(layer)
+        // Corners are set here, while importing; afterwards the layer is just its picture.
+        onDone(Layer(name: "Image", image: image, canvasAspect: canvasAspect))
     }
 }

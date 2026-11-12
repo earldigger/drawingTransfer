@@ -36,15 +36,10 @@ final class Layer: Identifiable {
     let id: UUID
     var name: String
     private(set) var image: UIImage  // corrected and ready to show
-    /// Names the image's file and its undo copy; new whenever Edit corners
-    /// remakes the image. A layer from before that is named by its own id.
+    /// Names the image's file and its undo copy; new whenever drawing or
+    /// erasing changes the image. An old layer may be named by its own id.
+    /// Once imported, a photo is just this picture: its original isn't kept.
     private(set) var imageID: UUID
-    // The upright photo the image was corrected from, and the corners used,
-    // in its pixels, so Edit corners can start where you left off. Nil for
-    // layers added before photos were kept.
-    var source: UIImage? = nil
-    var sourceID: UUID? = nil  // names its file; shared by duplicates
-    var corners: Corners? = nil
     var opacity = 0.6
     var blend = Blend.multiply  // white paper disappears
     var isVisible = true
@@ -86,29 +81,12 @@ final class Layer: Identifiable {
         fit(canvasAspect: canvasAspect)
     }
 
-    /// A new image for the layer (Edit corners, or undoing it). Placement,
-    /// crop and adjustments stay; the height follows the new proportions.
+    /// A new image for the layer (drawn on, erased, or undoing that).
+    /// Placement, crop and adjustments stay.
     func replaceImage(_ image: UIImage, id: UUID = UUID()) {
         self.image = image
         imageID = id
         refreshShownImage()
-    }
-
-    /// Remakes the image from `source` with new corners, as Add layer does.
-    /// It keeps its center, width, rotation and flips; its height follows the
-    /// new proportions, so a skew or distortion starts over.
-    func applyCorners(_ newCorners: Corners, canvasAspect: CGFloat) {
-        guard let source else { return }
-        corners = newCorners
-        let canvas = CGSize(width: canvasAspect, height: 1)
-        let q = quadPoints(in: canvas)
-        let u = q[1] - q[0], v = q[3] - q[0]
-        replaceImage(ImageOps.layerImage(from: source, corners: newCorners))
-        guard hypot(u.x, u.y) > 1e-9 else { return }
-        let side: CGFloat = QuadGeometry.cross(u, v) >= 0 ? 1 : -1  // which way the image faces
-        let down = CGPoint(x: -u.y, y: u.x) * (side / aspect)  // across the top edge, image-proportioned
-        let tl = QuadGeometry.centroid(q) - (u + down) * 0.5
-        setQuad(points: [tl, tl + u, tl + u + down, tl + down], in: canvas)
     }
 
     /// One render at a time, always of the latest adjustments: while a
@@ -249,9 +227,6 @@ final class TransferSession {
     func duplicate(_ layer: Layer) {
         guard let i = layers.firstIndex(where: { $0.id == layer.id }) else { return }
         let copy = Layer(name: layer.name, image: layer.image, imageID: layer.imageID, canvasAspect: canvasAspect)
-        copy.source = layer.source
-        copy.sourceID = layer.sourceID
-        copy.corners = layer.corners
         copy.opacity = layer.opacity
         copy.blend = layer.blend
         copy.isVisible = true

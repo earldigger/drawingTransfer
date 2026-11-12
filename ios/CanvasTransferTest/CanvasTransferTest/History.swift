@@ -14,14 +14,11 @@ import UIKit
 final class History {
     struct Step {
         var snapshot: SessionSnapshot
-        var images: [UUID: UIImage]  // by image id, so undoing Edit corners brings the old image back
-        var sources: [UUID: UIImage]  // original photos, by source id
+        var images: [UUID: UIImage]  // by image id, so undoing drawing or erasing brings the old image back
 
         init(_ session: TransferSession) {
             snapshot = session.snapshot
             images = Dictionary(session.layers.map { ($0.imageID, $0.image) }, uniquingKeysWith: { a, _ in a })
-            sources = Dictionary(session.layers.compactMap { l in l.sourceID.flatMap { id in l.source.map { (id, $0) } } },
-                                 uniquingKeysWith: { a, _ in a })
         }
     }
 
@@ -96,7 +93,7 @@ final class History {
         committed = step
         var snapshot = step.snapshot
         snapshot.grid = session.grid  // the grid stays as it is
-        session.apply(snapshot, images: { step.images[$0] }, sources: { step.sources[$0] })
+        session.apply(snapshot, images: { step.images[$0] })
     }
 }
 

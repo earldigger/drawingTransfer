@@ -159,9 +159,11 @@ automatically.
   opacity. Tap a thumbnail to select it, double-tap to show or hide it (a hidden
   layer's thumbnail shows a crossed-out eye). Long-press a layer to move it up or down, to the front or back,
   rename, duplicate, hide or delete it. The layer bar at the bottom has the layer's
-  name, opacity, blend, Adjust, Flip horizontal / vertical, and **⋯** with Fit
-  and **Edit corners…**, which reopens Adjust corners
-  on the original photo (kept since this build) and keeps the placement.
+  name, opacity, blend, Adjust, Flip horizontal / vertical, and **⋯** with Fit.
+  Corners are set only while importing: once added, a photo is an ordinary
+  picture layer (its original isn't kept), so drawing and erasing on it are
+  just drawing and erasing on a layer. While drawing, the strokes show at the
+  selected layer's opacity and blend, as they'll look once in it.
 - **Grid** (top bar): on / off, rows and columns (1–10), Square cells,
   color and opacity.
   It's saved with the session but isn't an undo step.

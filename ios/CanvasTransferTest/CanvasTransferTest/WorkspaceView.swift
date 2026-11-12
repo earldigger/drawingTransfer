@@ -38,7 +38,6 @@ struct WorkspaceView: View {
     @State private var exporting = false  // rendering the image to share
     @State private var shareFile: ShareFile? = nil
     @State private var shareFailed = false
-    @State private var editingCorners: CornerEdit? = nil
     @State private var layerBarExpanded = false  // names, eye, blend · opacity; collapsed by default (decision H)
     @State private var colorBarShown = false  // the color tool: its bar, the swatch panel and markers show
     @State private var swatchesOn = false  // its Eyedropper: one finger picks
@@ -131,15 +130,6 @@ struct WorkspaceView: View {
                     endTools()
                     transformOn = true  // place a new image straight away
                 }
-            }
-        }
-        .fullScreenCover(item: $editingCorners) { edit in
-            if let source = edit.layer.source {
-                CornersScreen(image: source, detected: edit.detected, notFoundInset: 0, start: edit.layer.corners,
-                              addTitle: "Done", onAdd: { corners in
-                                  edit.layer.applyCorners(corners, canvasAspect: session.canvasAspect)  // one undo step
-                                  editingCorners = nil
-                              }, onRetake: nil, onCancel: { editingCorners = nil })
             }
         }
         .fullScreenCover(isPresented: $paintLibraryOpen) {
@@ -313,14 +303,6 @@ struct WorkspaceView: View {
         history.release("crop")
     }
 
-    /// Opens Adjust corners on the layer's original photo, where it left off.
-    private func editCorners(_ layer: Layer) {
-        guard let source = layer.source else { return }
-        finishCrop(keep: true)
-        compare = nil
-        editingCorners = CornerEdit(layer: layer, detected: ImageOps.detectRectangle(in: source))
-    }
-
     // MARK: transform
 
     /// Where the layer was when Transform came on, for Cancel.
@@ -378,7 +360,11 @@ struct WorkspaceView: View {
                 eraser(canvas: size)
             } else if pencilOn {
                 let scale = Pencil.scale(pixels: pencilSize, display: size)
+                // Shown as they'll look in the selected layer: at its opacity and blend.
+                let layer = session.selected
                 PencilCanvas(controller: pencil, tool: pencilTool(display: size), size: size, scale: scale)
+                    .opacity(layer?.opacity ?? 1)
+                    .blendMode(layer?.blend.mode ?? .normal)
                     .onChange(of: scale) { commitPencil() }  // strokes on the old sheet go in first
             }
         }
@@ -459,7 +445,7 @@ struct WorkspaceView: View {
     /// Everything Simplify or Highlight depends on; nil when neither is on.
     private var studyKey: String? {
         guard colorView != .normal, let layer = session.selected else { return nil }
-        let image = ObjectIdentifier(layer.shownImage).hashValue  // a new image after Look or Edit corners
+        let image = ObjectIdentifier(layer.shownImage).hashValue  // a new image after Look, drawing or erasing
         switch colorView {
         case .simplify:
             let s = simplifySettings
@@ -565,7 +551,7 @@ struct WorkspaceView: View {
                              sample: $sampleSize, simplify: $simplifySettings, highlight: $highlightSettings,
                              markersShown: $studyMarkersShown, working: studyWorking) { endTools() }
                 } else if let layer = session.selected, !Theme.isPhone || layersShown {  // the phone's only with Layers
-                    LookBar(layer: layer, canvasAspect: session.canvasAspect, onEditCorners: { editCorners(layer) })
+                    LookBar(layer: layer, canvasAspect: session.canvasAspect)
                 }
             }
             .padding(.horizontal, Theme.isPhone ? 8 : 12)  // full-width bars keep a margin
@@ -978,8 +964,6 @@ struct WorkspaceView: View {
             Button("Send to back", systemImage: "square.3.layers.3d.bottom.filled") { session.move(layer, to: 0) }
                 .disabled(number == 1)
             Divider()
-            Button("Edit corners…", systemImage: "perspective") { editCorners(layer) }
-                .disabled(layer.source == nil)
             Button("Rename…", systemImage: "pencil.and.list.clipboard") {
                 newLayerName = layer.name
                 renaming = layer
@@ -1030,12 +1014,10 @@ struct WorkspaceView: View {
 }
 
 /// The selected layer's Look, cut down: opacity first and largest, blend,
-/// Adjust (levels, hue / saturation, colorize, invert), and ⋯ for Fit, Flip
-/// and Edit corners. Transform and Crop are in the left tool strip.
+/// Adjust (levels, hue / saturation, colorize, invert), Flip, and ⋯ for Fit.
 struct LookBar: View {
     @Bindable var layer: Layer
     let canvasAspect: CGFloat
-    var onEditCorners: () -> Void
 
     @Environment(History.self) private var history
     @Environment(\.narrowBars) private var narrow
@@ -1117,9 +1099,6 @@ struct LookBar: View {
                 .accessibilityLabel("Flip vertical")
             Menu {
                 Button("Fit", systemImage: "arrow.up.left.and.down.right.magnifyingglass") { layer.fit(canvasAspect: canvasAspect) }
-                Divider()
-                Button("Edit corners…", systemImage: "perspective", action: onEditCorners)
-                    .disabled(layer.source == nil)  // added before photos were kept
             } label: {
                 icon("ellipsis.circle")
             }
@@ -1140,13 +1119,6 @@ struct StudyResult {
     let image: UIImage
     let simplified: ColorStudy.Simplified?
     let pixels: PixelBuffer?
-}
-
-/// A layer whose corners are being edited, and the rectangle found in its photo.
-struct CornerEdit: Identifiable {
-    let layer: Layer
-    let detected: Corners?
-    var id: UUID { layer.id }
 }
 
 /// The small circle on a layer thumbnail's left edge: it has swatches.

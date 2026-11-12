@@ -215,7 +215,7 @@ final class ProjectStore {
         let session = TransferSession()
         session.canvasSize = canvasSize
         session.background = background
-        SessionStore.save(session.snapshot, images: [:], sources: [:], to: folder(info.id))
+        SessionStore.save(session.snapshot, images: [:], to: folder(info.id))
         projects.insert(info, at: 0)
         return info
     }
