@@ -232,9 +232,10 @@ struct CompareBar: View {
     /// The blink's speed, and pause.
     private var speed: some View {
         HStack(spacing: narrow ? 8 : BarSpacing.icon) {
-            Text(String(format: "%.1f s", state.interval)).monospacedDigit().frame(width: 44)
-            Slider(value: $state.interval, in: CompareState.intervalRange)
-                .frame(width: Theme.isPhone ? nil : narrow ? 90 : 120)  // on the phone, the row's width
+            ValueSlider(value: $state.interval, range: CompareState.intervalRange, step: 0.1,
+                        label: String(format: "%.1f s", state.interval))
+                .frame(width: Theme.isPhone ? nil : narrow ? 130 : 170)  // on the phone, the row's width
+                .accessibilityLabel("Blink speed")
             Button { state.paused.toggle() } label: {
                 Image(systemName: state.paused ? "play.fill" : "pause.fill").font(.system(size: 20))
                     .frame(width: 44, height: 44)

@@ -348,24 +348,15 @@ struct ColorBar: View {
     private var simplifyOptions: some View {
         VStack(alignment: .leading, spacing: 16) {
             popupHeader("Simplify", symbol: SimplifySymbol.simplify)
-            HStack(alignment: .top, spacing: 36) {
-                sliderColumn("Steps") {
-                    VerticalSlider(value: Binding(get: { Double(simplify.count) }, set: { simplify.count = Int($0) }),
-                                   range: 1...24, label: "\(simplify.count)")
-                }
-                sliderColumn("Smoothing") {
-                    VerticalSlider(value: Binding(get: { Double(simplify.smoothing) }, set: { simplify.smoothing = Int($0) }),
-                                   range: 0...6)
-                }
-            }
-            .frame(maxWidth: .infinity)
             Picker("Show", selection: $simplify.mode) {
                 Text("Colors").tag(ColorStudy.SimplifyMode.colors)
                 Text("Values").tag(ColorStudy.SimplifyMode.values)
             }
             .pickerStyle(.segmented)
-            .frame(width: 220)
+            SettingSlider.steps($simplify)
+            SettingSlider.smoothing($simplify)
         }
+        .frame(width: 320)
     }
 
     private var highlightOptions: some View {
@@ -385,12 +376,10 @@ struct ColorBar: View {
                 Text("No swatches yet.").font(.callout).foregroundStyle(.secondary)
             }
             // Range: how far from a swatch's color still counts as its color.
-            sliderColumn("Range") {
-                VerticalSlider(value: $highlight.tolerance, range: 2...40, label: "\(Int(highlight.tolerance.rounded()))")
-            }
-            .frame(maxWidth: .infinity)
+            SettingSlider.range($highlight)
             Text("Highlights the chosen swatch.").font(.caption).foregroundStyle(.secondary)
         }
+        .frame(width: 320)
     }
 
     /// Simplify's or Highlight's title, with ⌄ to hide the options (the mode
@@ -408,12 +397,6 @@ struct ColorBar: View {
         }
     }
 
-    private func sliderColumn<Slider: View>(_ title: String, @ViewBuilder slider: () -> Slider) -> some View {
-        VStack(spacing: 10) {
-            Text(title).foregroundStyle(.secondary)
-            slider()
-        }
-    }
 
     // MARK: delete all
 
@@ -468,7 +451,6 @@ struct ColorBar: View {
     private func chip(_ swatch: Swatch, number: Int) -> some View {
         let selected = swatch.id == selectedID
         // In Highlight, each chip's edge is its highlight color.
-        let edge = view == .highlight ? ColorStudy.highlightColor(number - 1) : Color.white.opacity(0.4)
         return Button {
             selectedID = selected ? nil : swatch.id
         } label: {
@@ -477,8 +459,14 @@ struct ColorBar: View {
                 .foregroundStyle(swatch.labelColor)
                 .frame(width: 44, height: 44)
                 .background(RoundedRectangle(cornerRadius: 8).fill(swatch.color))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.accent : edge,
-                                                                  lineWidth: selected || view == .highlight ? 3 : 1))
+                .overlay {  // in Highlight, a small triangle of its highlight color, lower left
+                    if view == .highlight {
+                        CornerTriangle().fill(ColorStudy.highlightColor(number - 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.accent : Color.white.opacity(0.4),
+                                                                  lineWidth: selected ? 3 : 1))
         }
         .contextMenu {
             Button("Delete swatch \(number)", systemImage: "trash", role: .destructive) {

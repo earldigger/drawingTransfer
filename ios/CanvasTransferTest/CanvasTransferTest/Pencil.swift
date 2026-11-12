@@ -124,17 +124,19 @@ final class PencilSheet: UIView {
 enum Pencil {
     static let longEdge: CGFloat = 2048  // a drawing layer's pixels on its long side
     static let sizes: ClosedRange<Double> = 1...300  // the Pencil's size, in a drawing layer's pixels
-    private static let ink = PKInkingTool.InkType.pencil
+    static let pencilInk = PKInkingTool.InkType.pencil
+    static let eraserInk = PKInkingTool.InkType.monoline  // even and solid, so it erases cleanly
 
     /// How much larger the sheet is shown so a `pixels`-wide stroke fits the
     /// ink's widest, on a canvas `display` points in size on screen.
-    static func scale(pixels: Double, display: CGSize) -> CGFloat {
+    static func scale(pixels: Double, display: CGSize, ink: PKInkingTool.InkType = pencilInk) -> CGFloat {
         let points = pixels * pointsPerPixel(display)
         return max(1, ceil(points / ink.validWidthRange.upperBound))
     }
 
     /// The ink: `pixels` wide in the drawing layer, drawn on the sheet at `scale`.
-    static func tool(pixels: Double, color: UIColor, display: CGSize, scale: CGFloat) -> PKInkingTool {
+    static func tool(pixels: Double, color: UIColor, display: CGSize, scale: CGFloat,
+                     ink: PKInkingTool.InkType = pencilInk) -> PKInkingTool {
         let width = pixels * pointsPerPixel(display) / scale
         let limits = ink.validWidthRange
         return PKInkingTool(ink, color: color, width: min(max(width, limits.lowerBound), limits.upperBound))
@@ -180,6 +182,32 @@ enum Pencil {
             layer.quad = Flatten.fullCanvas
             session.add(layer)  // on top, and selected
         }
+    }
+
+    /// Erases `drawing`'s strokes (their shape and opacity; their color doesn't
+    /// matter) from the drawing layer `layerID`. One undo step. False, and
+    /// nothing changed, if that layer isn't a drawing layer.
+    @MainActor
+    @discardableResult
+    static func erase(_ drawing: PKDrawing, sheet: CGSize, in session: TransferSession, layerID: UUID?) -> Bool {
+        guard sheet.width > 0, sheet.height > 0,
+              let target = session.layers.first(where: { $0.id == layerID && isDrawingLayer($0) }) else { return false }
+        let pixels = CGSize(width: target.image.size.width * target.image.scale,
+                            height: target.image.size.height * target.image.scale)
+        var strokes = UIImage()
+        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+            strokes = drawing.image(from: CGRect(origin: .zero, size: sheet), scale: pixels.width / sheet.width)
+        }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let rect = CGRect(origin: .zero, size: pixels)
+        let image = UIGraphicsImageRenderer(size: pixels, format: format).image { _ in
+            target.image.draw(in: rect)
+            strokes.draw(in: rect, blendMode: .destinationOut, alpha: 1)  // cut out where the strokes are
+        }
+        target.replaceImage(image)
+        return true
     }
 
     /// A new, empty (transparent) drawing layer on top, filling the canvas at
@@ -230,11 +258,13 @@ extension Color {
 
 // MARK: - the bar
 
-/// The Pencil's panel at the left: size (in the drawing layer's pixels),
-/// opacity, and the color, whose pop-up has a color wheel and the colors
-/// chosen last. No Done: the Pencil draws until it's turned off.
+/// The Pencil's panel at the left: Pencil or Eraser (the Pencil to start
+/// with), then the chosen one's size (in the drawing layer's pixels) and
+/// opacity, and for the Pencil its color, whose pop-up has a color wheel and
+/// the colors chosen last. No Done: it draws until it's turned off.
 struct PencilPanel: View {
-    @Binding var size: Double
+    @Binding var erasing: Bool
+    @Binding var size: Double  // the Pencil's or the Eraser's, whichever is chosen
     @Binding var opacity: Double
     @Binding var colorHex: String
     let pencil: PencilController
@@ -243,7 +273,10 @@ struct PencilPanel: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: "pencil").font(.system(size: 20, weight: .bold)).accessibilityLabel("Pencil")
+            VStack(spacing: 6) {
+                modeButton("pencil", "Pencil", on: !erasing) { erasing = false }
+                modeButton("eraser", "Eraser", on: erasing) { erasing = true }
+            }
             column("Size") {
                 VerticalSlider(value: Binding(get: { size }, set: { size = $0.rounded() }), range: Pencil.sizes,
                                label: "\(Int(size.rounded()))", height: 170)
@@ -254,20 +287,36 @@ struct PencilPanel: View {
                                range: 5...100, label: "\(Int((opacity * 100).rounded()))", height: 170)
                     .accessibilityLabel("Opacity, percent")
             }
-            Button { choosingColor = true } label: {
-                Circle()
-                    .fill(Color(hex: colorHex).opacity(opacity))
-                    .frame(width: 36, height: 36)
-                    .background(Checkerboard().clipShape(Circle()))
-                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    .frame(width: 44, height: 44)
+            if !erasing {  // the Eraser has no color
+                Button { choosingColor = true } label: {
+                    Circle()
+                        .fill(Color(hex: colorHex).opacity(opacity))
+                        .frame(width: 36, height: 36)
+                        .background(Checkerboard().clipShape(Circle()))
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Color")
+                .popover(isPresented: $choosingColor, arrowEdge: .leading) { colorPopup }
             }
-            .accessibilityLabel("Color")
-            .popover(isPresented: $choosingColor, arrowEdge: .leading) { colorPopup }
         }
         .padding(.vertical, 14)
         .frame(width: 64)
         .themedBar()
+    }
+
+    /// Pencil or Eraser: a sky-blue tile when chosen.
+    private func modeButton(_ symbol: String, _ label: String, on: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(on ? Theme.onAccent : Color.white)
+                .frame(width: 44, height: 44)
+                .background(RoundedRectangle(cornerRadius: Theme.controlRadius, style: .continuous)
+                    .fill(on ? Theme.accent : Color.clear))
+        }
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 
     private func column<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

@@ -297,24 +297,44 @@ struct PhoneSimplifyBar: View {
                 Spacer(minLength: 0)
                 DoneButton(action: onDone)
             }
-            row("Steps", "\(settings.count)") {
-                Slider(value: Binding(get: { Double(settings.count) }, set: { settings.count = Int($0.rounded()) }),
-                       in: 1...24, step: 1)
-            }
-            row("Smoothing", "\(settings.smoothing)") {
-                Slider(value: Binding(get: { Double(settings.smoothing) }, set: { settings.smoothing = Int($0.rounded()) }),
-                       in: 0...6, step: 1)
-            }
+            SettingSlider.steps($settings)
+            SettingSlider.smoothing($settings)
         }
         .bottomBar()
     }
+}
 
-    private func row<S: View>(_ title: String, _ value: String, @ViewBuilder slider: () -> S) -> some View {
+/// A setting's name and its slider, the value on the knob: Simplify's Steps
+/// and Smoothing and Highlight's Range, on the phone's bars and the iPad's pop-ups.
+struct SettingSlider: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double = 1
+
+    var body: some View {
         HStack(spacing: 12) {
-            Text(title).font(.footnote).lineLimit(1).fixedSize().frame(width: 72, alignment: .leading)
-            slider()
-            Text(value).monospacedDigit().frame(width: 28, alignment: .trailing)
+            Text(title).font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                .frame(width: 72, alignment: .leading)
+            ValueSlider(value: $value, range: range, step: step, label: "\(Int(value.rounded()))")
+                .accessibilityLabel(title)
         }
+    }
+
+    static func steps(_ settings: Binding<SimplifySettings>) -> SettingSlider {
+        SettingSlider(title: "Steps", value: Binding(get: { Double(settings.wrappedValue.count) },
+                                                     set: { settings.wrappedValue.count = Int($0.rounded()) }),
+                      range: 1...24)
+    }
+
+    static func smoothing(_ settings: Binding<SimplifySettings>) -> SettingSlider {
+        SettingSlider(title: "Smoothing", value: Binding(get: { Double(settings.wrappedValue.smoothing) },
+                                                         set: { settings.wrappedValue.smoothing = Int($0.rounded()) }),
+                      range: 0...6)
+    }
+
+    static func range(_ settings: Binding<HighlightSettings>) -> SettingSlider {
+        SettingSlider(title: "Range", value: settings.tolerance, range: 2...40)
     }
 }
 
@@ -373,10 +393,7 @@ struct PhoneHighlightBar: View {
                 DoneButton(action: onDone)
             }
             chips
-            HStack(spacing: 12) {
-                Text("Range")
-                Slider(value: $settings.tolerance, in: 2...40)
-            }
+            SettingSlider.range($settings)
         }
         .bottomBar()
         .onChange(of: session.swatches.isEmpty) { _, empty in if empty { confirmingClear = false } }
@@ -409,8 +426,11 @@ struct PhoneHighlightBar: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(swatch.color)
                 .frame(width: 40, height: 40)
+                .overlay {  // a small triangle of its highlight color, lower left
+                    CornerTriangle().fill(ColorStudy.highlightColor(index)).clipShape(RoundedRectangle(cornerRadius: 8))
+                }
                 .overlay(RoundedRectangle(cornerRadius: 8)
-                    .stroke(selected ? Theme.accent : ColorStudy.highlightColor(index), lineWidth: 3))
+                    .stroke(selected ? Theme.accent : Color.white.opacity(0.4), lineWidth: selected ? 3 : 1))
         }
         .overlay(alignment: .topTrailing) {
             Button {

@@ -110,6 +110,10 @@ automatically.
   selected drawing layer (or a new "Drawing n" on top) when you choose
   another layer, add one, or put the Pencil away. Thumbnails have a
   checkerboard behind see-through parts.
+- **Eraser** (in the Pencil's panel, under the pencil icon): Size and Opacity
+  then set the eraser (opacity = how strongly it erases). Each stroke is cut
+  out of the selected drawing layer when you lift (one undo step); its path
+  shows faintly in sky blue while you drag. It works on drawing layers only.
 - **New layer** (+, below Flatten in the layer bar): an empty, transparent
   "Drawing n" on top, filling the canvas; the Pencil draws into it.
 - **Flatten** (bottom of the layer bar): the visible layers exactly as shown

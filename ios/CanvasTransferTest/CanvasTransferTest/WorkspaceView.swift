@@ -63,6 +63,10 @@ struct WorkspaceView: View {
     @AppStorage("pencilSizePixels") private var pencilSize = 10.0  // in the drawing layer's pixels (Pencil.sizes)
     @AppStorage("pencilOpacity") private var pencilOpacity = 1.0
     @AppStorage("pencilColor") private var pencilColor = "#202020"
+    @State private var erasing = false  // the Pencil's Eraser is chosen
+    @AppStorage("eraserSizePixels") private var eraserSize = 40.0
+    @AppStorage("eraserOpacity") private var eraserOpacity = 1.0  // how strongly it erases
+    @State private var eraserNote = false  // "The eraser works on drawing layers", for a moment
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("studyMarkersShown") private var studyMarkersShown = true  // swatch markers in Simplify and Highlight
 
@@ -197,6 +201,12 @@ struct WorkspaceView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active && pencilOn { commitPencil() }  // strokes are saved with the session
         }
+        .onChange(of: erasing) { wasErasing, _ in
+            commitPencil(erasingStrokes: wasErasing)  // strokes drawn before go in as what they were
+        }
+        .onChange(of: pencil.hasStrokes) { _, has in
+            if has && erasing { commitPencil() }  // each eraser stroke takes effect as it ends
+        }
         .onChange(of: colorView) { _, view in
             // Highlight shows one swatch: with none chosen yet, the newest (its panel stays closed).
             if view == .highlight, selectedSwatchID == nil, let newest = session.swatches.last {
@@ -246,16 +256,40 @@ struct WorkspaceView: View {
 
     /// The strokes drawn so far into the drawing layer (see `Pencil.commit`):
     /// the selected one, or `layerID`'s when the selection has just changed.
-    private func commitPencil(into layerID: UUID? = nil) {
+    /// With the Eraser (`erasingStrokes`, the mode they were drawn in), the
+    /// strokes are cut out of the drawing layer instead.
+    private func commitPencil(into layerID: UUID? = nil, erasingStrokes: Bool? = nil) {
         guard let strokes = pencil.take() else { return }
-        Pencil.commit(strokes.drawing, sheet: strokes.sheet, to: session, layerID: layerID ?? session.selectedID)
+        let target = layerID ?? session.selectedID
+        if erasingStrokes ?? erasing {
+            if !Pencil.erase(strokes.drawing, sheet: strokes.sheet, in: session, layerID: target) { showEraserNote() }
+        } else {
+            Pencil.commit(strokes.drawing, sheet: strokes.sheet, to: session, layerID: target)
+        }
     }
 
-    /// The Pencil's ink: its color and opacity, and its size in the drawing
-    /// layer's pixels turned into the sheet's points.
+    private func showEraserNote() {
+        withAnimation { eraserNote = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation { eraserNote = false }
+        }
+    }
+
+    /// The size and opacity the panel's sliders set: the Pencil's or the Eraser's.
+    private var toolSize: Binding<Double> { erasing ? $eraserSize : $pencilSize }
+    private var toolOpacity: Binding<Double> { erasing ? $eraserOpacity : $pencilOpacity }
+    private var ink: PKInkingTool.InkType { erasing ? Pencil.eraserInk : Pencil.pencilInk }
+
+    /// The ink on the sheet: its size in the drawing layer's pixels turned
+    /// into the sheet's points, and its color and opacity. The Eraser's path
+    /// shows faintly in sky blue until it's cut out; its opacity is how much it erases.
     private func pencilTool(display: CGSize) -> PKInkingTool {
-        Pencil.tool(pixels: pencilSize, color: UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity),
-                    display: display, scale: Pencil.scale(pixels: pencilSize, display: display))
+        let color = erasing ? UIColor(Theme.accent).withAlphaComponent(eraserOpacity)
+                            : UIColor(Color(hex: pencilColor)).withAlphaComponent(pencilOpacity)
+        let size = toolSize.wrappedValue
+        return Pencil.tool(pixels: size, color: color, display: display,
+                           scale: Pencil.scale(pixels: size, display: display, ink: ink), ink: ink)
     }
 
     // MARK: crop
@@ -338,7 +372,7 @@ struct WorkspaceView: View {
         .overlay {
             // The Pencil's sheet, after the shadow so strokes don't cast one.
             if pencilOn {
-                let scale = Pencil.scale(pixels: pencilSize, display: size)
+                let scale = Pencil.scale(pixels: toolSize.wrappedValue, display: size, ink: ink)
                 PencilCanvas(controller: pencil, tool: pencilTool(display: size), size: size, scale: scale)
                     .onChange(of: scale) { commitPencil() }  // strokes on the old sheet go in first
             }
@@ -479,7 +513,7 @@ struct WorkspaceView: View {
                 .zIndex(1)  // its pop-ups open over what's below
             HStack(alignment: .top, spacing: 0) {
                 if pencilOn {  // the Pencil's size, opacity and color, at the left
-                    PencilPanel(size: $pencilSize, opacity: $pencilOpacity, colorHex: $pencilColor, pencil: pencil)
+                    PencilPanel(erasing: $erasing, size: toolSize, opacity: toolOpacity, colorHex: $pencilColor, pencil: pencil)
                         .padding(12)
                         .frame(maxHeight: .infinity)
                 }
@@ -502,6 +536,15 @@ struct WorkspaceView: View {
                     .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(Capsule().fill(Theme.bar))
                     .padding(.bottom, 8)
+            }
+            if eraserNote {
+                // An eraser stroke on a photo layer: nothing was erased.
+                Text("The eraser works on drawing layers. Choose one, or add one with +.")
+                    .font(.footnote)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(Capsule().fill(Theme.bar))
+                    .padding(.bottom, 8)
+                    .transition(.opacity)
             }
             Group {
                 if let cropping, let layer = session.selected, layer.id == cropping.id {
@@ -655,6 +698,7 @@ struct WorkspaceView: View {
             toolButton("pencil", "Pencil", on: pencilOn) {
                 let on = pencilOn
                 endTools()
+                erasing = false  // the Pencil to start with
                 pencilOn = !on
             }
             if Theme.isPhone {
@@ -1028,18 +1072,11 @@ struct LookBar: View {
     }
 
     private var opacity: some View {
-        HStack(spacing: BarSpacing.icon) {
-            Slider(value: $layer.opacity, in: 0...1) { editing in
-                if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
-            }
-            .frame(width: Theme.isPhone ? nil : narrow ? 160 : 200)  // on the phone, the row's width
-            .accessibilityLabel("Opacity")
-            Text("\(Int((layer.opacity * 100).rounded()))%")
-                .monospacedDigit()
-                .lineLimit(1)
-                .fixedSize()  // "100%" stays on one line
-                .frame(minWidth: 48, alignment: .trailing)
+        ValueSlider(value: $layer.opacity, range: 0...1, label: "\(Int((layer.opacity * 100).rounded()))%") { editing in
+            if editing { history.hold("opacity") } else { history.release("opacity") }  // one drag, one step
         }
+        .frame(width: Theme.isPhone ? nil : narrow ? 200 : 250)  // on the phone, the row's width
+        .accessibilityLabel("Opacity")
     }
 
     private var blend: some View {
@@ -1148,8 +1185,7 @@ struct GridBar: View {
                     }
                     HStack(spacing: 12) {
                         colors
-                        Slider(value: $session.grid.opacity, in: 0.1...1)
-                            .accessibilityLabel("Opacity")
+                        opacity
                     }
                 }
             } else {
@@ -1161,9 +1197,7 @@ struct GridBar: View {
                     colors
                     HStack(spacing: 16) {
                         if !narrow { Text("Opacity") }
-                        Slider(value: $session.grid.opacity, in: 0.1...1)
-                            .frame(width: narrow ? 110 : 140)
-                            .accessibilityLabel("Opacity")
+                        opacity.frame(width: narrow ? 120 : 150)
                     }
                     Spacer(minLength: 0)
                     DoneButton(action: onDone)
@@ -1180,6 +1214,11 @@ struct GridBar: View {
                 .labelsHidden()
                 .fixedSize()
         }
+    }
+
+    private var opacity: some View {
+        ValueSlider(value: $session.grid.opacity, range: 0.1...1, label: "\(Int((session.grid.opacity * 100).rounded()))%")
+            .accessibilityLabel("Opacity")
     }
 
     private var squareCells: some View {

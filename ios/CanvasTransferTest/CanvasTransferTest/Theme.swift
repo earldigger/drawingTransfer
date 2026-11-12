@@ -175,6 +175,20 @@ struct Callout<Content: View>: View {
     }
 }
 
+/// A small triangle in a rectangle's lower-left corner, `size` along each side.
+struct CornerTriangle: Shape {
+    var size: CGFloat = 16
+
+    func path(in rect: CGRect) -> Path {
+        Path { p in
+            p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - size))
+            p.addLine(to: CGPoint(x: rect.minX + size, y: rect.maxY))
+            p.closeSubpath()
+        }
+    }
+}
+
 struct DownArrow: Shape {
     func path(in rect: CGRect) -> Path {
         Path { p in
@@ -234,6 +248,71 @@ struct VerticalSlider: View {
             switch direction {
             case .increment: value = min(value + step, range.upperBound)
             case .decrement: value = max(value - step, range.lowerBound)
+            @unknown default: break
+            }
+        }
+    }
+}
+
+/// A sideways slider whose white oval knob shows the value (like the
+/// Pencil's upright ones): a thin track, filled sky blue up to the knob.
+/// Drag along it, or tap a spot. `onEditing` brackets a drag (for undo).
+struct ValueSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double? = nil
+    let label: String
+    var onEditing: (Bool) -> Void = { _ in }
+
+    @State private var dragging = false
+    private let knob = CGSize(width: 54, height: 30)
+
+    var body: some View {
+        GeometryReader { g in
+            let span = range.upperBound - range.lowerBound
+            let travel = max(g.size.width - knob.width, 1)
+            let fraction = min(max((value - range.lowerBound) / max(span, .ulpOfOne), 0), 1)
+            let x = fraction * travel
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.raised).frame(height: 6)
+                Capsule().fill(Theme.accent).frame(width: x + knob.width / 2, height: 6)
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: knob.width, height: knob.height)
+                    .overlay {
+                        Text(label).font(.footnote.weight(.semibold)).monospacedDigit()
+                            .lineLimit(1).minimumScaleFactor(0.7).padding(.horizontal, 4)
+                            .foregroundStyle(Theme.onAccent)
+                    }
+                    .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+                    .offset(x: x)
+            }
+            .frame(width: g.size.width, height: g.size.height)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { drag in
+                        if !dragging { dragging = true; onEditing(true) }
+                        let f = min(max((drag.location.x - knob.width / 2) / travel, 0), 1)
+                        var v = range.lowerBound + f * span
+                        if let step { v = (v / step).rounded() * step }
+                        value = min(max(v, range.lowerBound), range.upperBound)
+                    }
+                    .onEnded { _ in
+                        dragging = false
+                        onEditing(false)
+                    }
+            )
+        }
+        .frame(height: 36)
+        .frame(minWidth: 90)
+        .accessibilityElement()
+        .accessibilityValue(label)
+        .accessibilityAdjustableAction { direction in
+            let s = step ?? (range.upperBound - range.lowerBound) / 20
+            switch direction {
+            case .increment: value = min(value + s, range.upperBound)
+            case .decrement: value = max(value - s, range.lowerBound)
             @unknown default: break
             }
         }

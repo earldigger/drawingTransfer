@@ -344,14 +344,11 @@ struct LookPanel: View {
     private func slider(_ title: String, _ value: Binding<Double>, _ range: ClosedRange<Double>,
                         _ format: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text(String(format: format, value.wrappedValue)).monospacedDigit().foregroundStyle(.secondary)
+            Text(title)
+            ValueSlider(value: value, range: range, label: String(format: format, value.wrappedValue)) { editing in
+                if editing { history.hold("look") } else { history.release("look") }  // one drag, one step
             }
-            Slider(value: value, in: range) { editing in
-                if editing { history.hold("look") } else { history.release("look") }
-            }
+            .accessibilityLabel(title)
         }
     }
 
