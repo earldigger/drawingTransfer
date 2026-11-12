@@ -154,11 +154,17 @@ enum Pencil {
             && layer.adjustments.isIdentity
     }
 
-    /// Draws `drawing` (made on a sheet `sheet` points in size) into the
-    /// drawing layer `layerID`, or a new one on top if that isn't one. One undo step.
+    /// Draws `drawing` (made on a sheet `sheet` points in size) into the layer
+    /// `layerID`: a drawing layer directly, any other (a photo) through its
+    /// corners into its picture; a new drawing layer on top if there's no
+    /// layer. One undo step.
     @MainActor
     static func commit(_ drawing: PKDrawing, sheet: CGSize, to session: TransferSession, layerID: UUID?) {
         guard sheet.width > 0, sheet.height > 0 else { return }
+        if let layer = session.layers.first(where: { $0.id == layerID }), !isDrawingLayer(layer) {
+            drawOnPicture(drawing, sheet: sheet, layer: layer)
+            return
+        }
         let aspect = session.canvasAspect
         let pixels = aspect >= 1 ? CGSize(width: longEdge, height: (longEdge / aspect).rounded())
                                  : CGSize(width: (longEdge * aspect).rounded(), height: longEdge)
@@ -184,6 +190,33 @@ enum Pencil {
             layer.quad = Flatten.fullCanvas
             session.add(layer)  // on top, and selected
         }
+    }
+
+    /// Draws the strokes into a layer that's been placed on the canvas (a
+    /// photo): the strokes, drawn over the sheet, are taken back through the
+    /// layer's corners into its picture's pixels and painted on. Strokes past
+    /// the picture's edges are left out.
+    @MainActor
+    private static func drawOnPicture(_ drawing: PKDrawing, sheet: CGSize, layer: Layer) {
+        let s = longEdge / max(sheet.width, sheet.height)  // pixels per sheet point
+        var strokes = UIImage()
+        UITraitCollection(userInterfaceStyle: .light).performAsCurrent {
+            strokes = drawing.image(from: CGRect(origin: .zero, size: sheet), scale: s)
+        }
+        // The quad is kept in fractions of the canvas, so on the sheet it's the same fractions of the sheet.
+        let corners = Corners(points: layer.quadPoints(in: sheet).map { CGPoint(x: $0.x * s, y: $0.y * s) })
+        let warped = ImageOps.perspectiveCorrect(strokes, corners: corners)
+        guard warped !== strokes else { return }  // couldn't be warped
+        let pixels = CGSize(width: layer.image.size.width * layer.image.scale, height: layer.image.size.height * layer.image.scale)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let rect = CGRect(origin: .zero, size: pixels)
+        let image = UIGraphicsImageRenderer(size: pixels, format: format).image { _ in
+            layer.image.draw(in: rect)
+            warped.draw(in: rect)
+        }
+        layer.replaceImage(image)
     }
 
     /// Erases a stroke (canvas points on a canvas `canvas` points in size)

@@ -79,7 +79,7 @@ libdbus-1-3 are needed). Keep them passing.
 
 ## iPad app — done
 
-- **Pencil** (Nov 2026, `Pencil.swift`): PencilKit strokes on a sheet over the canvas, drawn into a "Drawing n" image layer when the Pencil is put away (no new file format). iPad only for now.
+- **Pencil** (Nov 2026, `Pencil.swift`): PencilKit strokes on a sheet over the canvas, drawn into the selected layer when put away (a photo through its corners into its picture; a new "Drawing n" only with no layers). The Eraser cuts any layer the same way, live. No new file format. iPad and iPhone.
 
 - **iPhone** (Nov 2026): the same app (iPad + iPhone, portrait only on the phone), switched by `Theme.isPhone`: tools in a bottom row (+ and Transform / Crop are pop-ups), Layers toggles the side layer panel and the layer bar together, bars stacked into rows. First scope only; the color tools and Paint library aren't on the phone yet.
 

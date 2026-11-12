@@ -107,7 +107,8 @@ automatically.
   is drawn smaller and magnified), Opacity and Color (one pop-up: a hue ring
   and shade disc, and a History of the last 10 colors chosen, with Clear). No Done: it draws until
   turned off. Undo takes back strokes one at a time. The strokes go into the
-  selected drawing layer (or a new "Drawing n" on top) when you choose
+  selected layer (a photo too: through its placement into its picture; a new
+  "Drawing n" only when there are no layers) when you choose
   another layer, add one, or put the Pencil away. Thumbnails have a
   checkerboard behind see-through parts.
 - **Eraser** (in the Pencil's panel, under the pencil icon): erases the
